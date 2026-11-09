@@ -86,7 +86,11 @@ public static class Agency
     public static void Earn(long v) => SetMoney(Money + Math.Max(0, v));
 
     /// <summary>Engineering makes rockets a little cheaper (3% per point above 1).</summary>
-    public static float CostFactor => 1f - 0.03f * (Stat(0) - 1) - (TypeIndex == 3 ? 0.1f : 0f);
+    public static float CostFactor => Mathf.Max(0.5f, 1f - 0.03f * (Stat(0) - 1) - (TypeIndex == 3 ? 0.1f : 0f)
+        - (BaseSave.Has("test_engine") ? 0.04f : 0f) - (BaseSave.Has("test_struct") ? 0.03f : 0f));
+
+    /// <summary>Passing the comms link test makes contracts pay 10% more.</summary>
+    public static float RewardFactor => 1f + (BaseSave.Has("test_comms") ? 0.1f : 0f);
 
     // ---------------------------------------------------------------- reputation
     public static int RepPoints => PlayerPrefs.GetInt(K("Rep"), 0);
@@ -95,7 +99,7 @@ public static class Agency
 
     public static void AddReputation(int pts)
     {
-        float mul = (TypeIndex == 2 ? 1.25f : 1f) * (1f + 0.1f * (Stat(1) - 1));
+        float mul = (TypeIndex == 2 ? 1.25f : 1f) * (1f + 0.1f * (Stat(1) - 1)) * (1f + 0.08f * BaseSave.Level("sci"));
         PlayerPrefs.SetInt(K("Rep"), Mathf.Max(0, RepPoints + Mathf.RoundToInt(pts * (pts > 0 ? mul : 1f))));
         Changed?.Invoke();
     }
@@ -110,6 +114,7 @@ public static class Agency
         // fresh game: wipe the previous run's progress
         foreach (var key in new[] { "SpaceAgency.Deployment", "SpaceAgency.RocketDesign", "SpaceAgency.RocketName", K("Rep"), K("Owned"), K("Accepted") })
             PlayerPrefs.DeleteKey(key);
+        BaseSave.Reset();                                     // buildings, programmes and certificates start over
         PlayerPrefs.SetString(K("AgencyName"), string.IsNullOrWhiteSpace(name) ? "Space Agency" : name.Trim());
         PlayerPrefs.SetInt(K("AgencyType"), Mathf.Clamp(type, 0, Types.Length - 1));
         PlayerPrefs.SetString(K("Stats"), string.Join(",", stats));

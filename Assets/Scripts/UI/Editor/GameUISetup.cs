@@ -66,8 +66,8 @@ public static class GameUISetup
         if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
         var theme = BuildTheme();
         var glass = theme.glass; var flat = theme.flat;
-        glass.SetFloat("_BlurRadius", 7f); glass.SetFloat("_TintStrength", 0.42f);
-        glass.SetFloat("_BackdropBrightness", 0.95f); glass.SetFloat("_BackdropSaturation", 1.7f);
+        glass.SetFloat("_BlurRadius", 7f); glass.SetFloat("_TintStrength", 0.6f);
+        glass.SetFloat("_BackdropBrightness", 0.85f); glass.SetFloat("_BackdropSaturation", 1.7f);
         glass.SetColor("_BorderColor", new Color(1f, 1f, 1f, 0.55f)); glass.SetFloat("_RimBottom", 0.3f);
         flat.SetColor("_BorderColor", new Color(1f, 1f, 1f, 0.2f)); flat.SetFloat("_RimBottom", 0.25f);
         EditorUtility.SetDirty(glass); EditorUtility.SetDirty(flat);
@@ -110,6 +110,18 @@ public static class GameUISetup
         hud.playIcon = AssetDatabase.LoadAssetAtPath<Sprite>(IconDir + "play_arrow.png");
         hud.pauseIcon = AssetDatabase.LoadAssetAtPath<Sprite>(IconDir + "pause.png");
         hud.navIcons = new[] { NavIcon("assignment"), NavIcon("nav_training"), NavIcon("nav_building"), NavIcon("nav_testing") };
+
+        // procedural sky with moving clouds, driven by DayNightCycle
+        var dn = Object.FindAnyObjectByType<DayNightCycle>(FindObjectsInactive.Include);
+        if (dn != null)
+        {
+            const string skyDir = "Assets/Assets/Graphics/Sky", skyPath = skyDir + "/Sky.mat";
+            if (!AssetDatabase.IsValidFolder(skyDir)) AssetDatabase.CreateFolder("Assets/Assets/Graphics", "Sky");
+            var sky = AssetDatabase.LoadAssetAtPath<Material>(skyPath);
+            var shader = Shader.Find("SpaceAgency/Sky/Procedural");
+            if (sky == null && shader != null) { sky = new Material(shader); AssetDatabase.CreateAsset(sky, skyPath); }
+            if (sky != null) { sky.shader = shader; dn.skyMaterial = sky; RenderSettings.skybox = sky; EditorUtility.SetDirty(sky); EditorUtility.SetDirty(dn); }
+        }
 
         // game time: one real minute is one game hour at normal speed; controls are pause / 3x / 6x; a fixed start date (not real time)
         var clock = Object.FindAnyObjectByType<GameClock>(FindObjectsInactive.Include);

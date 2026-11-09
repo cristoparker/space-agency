@@ -111,7 +111,7 @@ public class MissionManager : MonoBehaviour
         running.Remove(m);
         completed.Add(m);
         if (Tracked == m) Tracked = running.Count > 0 ? running[0] : null;
-        Agency.Earn(m.Definition.budget);
+        Agency.Earn((long)(m.Definition.budget * Agency.RewardFactor));
         Agency.AddReputation(25);
         MissionCompleted?.Invoke(m);
         Changed?.Invoke();

@@ -24,6 +24,13 @@ public class DayNightCycle : MonoBehaviour
     public Color nightEquator = new Color32(0x20, 0x2A, 0x48, 255);
     public Color nightGround = new Color32(0x14, 0x18, 0x24, 255);
 
+    [Header("Sky")]
+    [Tooltip("Procedural sky (SpaceAgency/Sky/Procedural): gradient, sun, stars and drifting clouds.")]
+    public Material skyMaterial;
+    [Range(0f, 1f)] public float cloudCoverage = 0.62f;
+    [Tooltip("Colour the ambient light takes on at sunrise and sunset.")]
+    public Color twilightAmbient = new Color32(0xFF, 0x9A, 0x6A, 255);
+
     [Tooltip("Used in the editor / when no GameClock exists. 0..1 of the day.")]
     [Range(0f, 1f)] public float previewDayProgress = 0.5f;
 
@@ -31,6 +38,7 @@ public class DayNightCycle : MonoBehaviour
     {
         if (sun == null) sun = FindAnyObjectByType<Light>();
         if (sun != null) RenderSettings.sun = sun;
+        if (skyMaterial != null) RenderSettings.skybox = skyMaterial;
     }
 
     void Update()
@@ -47,15 +55,24 @@ public class DayNightCycle : MonoBehaviour
 
         float elevation = Mathf.Sin((dayProgress - 0.25f) * Mathf.PI * 2f);
         float day = Mathf.Clamp01(elevation * 3f);
-        sun.intensity = maxIntensity * day;
-        sun.color = Color.Lerp(horizonColor, dayColor, day);
+        sun.intensity = maxIntensity * Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((elevation + 0.08f) * 5f));   // gentle light even at sunrise and sunset
+        sun.color = Color.Lerp(horizonColor, dayColor, Mathf.SmoothStep(0f, 1f, day));
         sun.shadows = day > 0.01f ? shadowType : LightShadows.None;
         sun.shadowStrength = shadowStrength;
 
         RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
         RenderSettings.ambientSkyColor = Color.Lerp(nightSky, daySky, day);
-        RenderSettings.ambientEquatorColor = Color.Lerp(nightEquator, dayEquator, day);
+        // warm the ambient light around sunrise and sunset
+        float twilight = Mathf.Clamp01(1f - Mathf.Abs(elevation) * 4f);
+        Color equator = Color.Lerp(nightEquator, dayEquator, day);
+        RenderSettings.ambientEquatorColor = Color.Lerp(equator, twilightAmbient * 0.55f, twilight * 0.5f);
         RenderSettings.ambientGroundColor = Color.Lerp(nightGround, dayGround, day);
+
+        // feed the sky shader: where the sun is and how far the wind has blown the clouds
+        Vector3 toSun = -sun.transform.forward;
+        Shader.SetGlobalVector("_SkySunDir", new Vector4(toSun.x, toSun.y, toSun.z, 0f));
+        Shader.SetGlobalFloat("_SkyTime", Application.isPlaying ? Time.time : (float)UnityEngine.Time.realtimeSinceStartupAsDouble);
+        if (skyMaterial != null) skyMaterial.SetFloat("_CloudCoverage", cloudCoverage);
 
     }
 }

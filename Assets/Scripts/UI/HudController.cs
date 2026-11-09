@@ -29,7 +29,7 @@ public class HudController : MonoBehaviour
         ("Contract", new string[0]),
         ("Training", new[] { "Scientist Training", "Pilot Training" }),
         ("Building", new[] { "Facility", "Payload", "Rocket" }),
-        ("Testing", new[] { "Module 1", "Module 2", "Module 3" }),
+        ("Testing", new[] { "Engine Test", "Structure Test", "Comms Test" }),
     };
 
     RectTransform canvasRt, top;
@@ -47,13 +47,14 @@ public class HudController : MonoBehaviour
     void Awake()
     {
         Hud.OnToast = ShowToast;
+        if (BaseSim.Instance == null) new GameObject("Base Sim").AddComponent<BaseSim>();      // buildings, training and testing programmes
     }
 
     void OnDestroy()
     {
         if (Hud.OnToast == ShowToast) Hud.OnToast = null;
         Agency.Changed -= RefreshStats;
-        Panels.Unregister("contracts"); Panels.Unregister("facility"); Panels.Unregister("rocket"); Panels.Unregister("payload");
+        Panels.Unregister("contracts"); Panels.Unregister("facility"); Panels.Unregister("programs:0"); Panels.Unregister("programs:1"); Panels.Unregister("rocket"); Panels.Unregister("payload");
     }
 
     void Start()
@@ -99,8 +100,21 @@ public class HudController : MonoBehaviour
         Panels.Register("contracts", cgo, () => { cgo.SetActive(true); });
 
         facilityPanel = NewPanel("Facility Panel");
-        BuildFacility((RectTransform)facilityPanel.transform);
-        Panels.Register("facility", facilityPanel, () => { facilityPanel.SetActive(true); facilityPanel.transform.SetAsLastSibling(); });
+        facilityPanel.AddComponent<FacilityPanelUI>().Init();
+        Panels.Register("facility", facilityPanel, () => { facilityPanel.SetActive(true); });
+
+        var pgo = NewPanel("Programs Panel");
+        var pp = pgo.AddComponent<ProgramsPanelUI>();
+        pp.Init();
+        Panels.Register("programs:0", pgo, () => { pp.SetTab(0); pgo.SetActive(true); });
+        Panels.Register("programs:1", pgo, () => { pp.SetTab(1); pgo.SetActive(true); });
+
+        // hover / select buildings in the world
+        var sgo = new GameObject("Building Selector");
+        var bs = sgo.AddComponent<BuildingSelector>();
+        bs.canvasRect = (RectTransform)transform;
+        bs.outline = builder != null && builder.library != null ? builder.library.outlineMaterial : null;
+        bs.Init();
 
         if (builder != null)
         {
@@ -108,33 +122,6 @@ public class HudController : MonoBehaviour
             Panels.Register("payload", builder.gameObject, () => { builder.mode = DesignerMode.Payload; builder.gameObject.SetActive(true); });
         }
     }
-
-    void BuildFacility(RectTransform r)
-    {
-        const float W = 198f, H = 190f;
-        r.anchorMin = r.anchorMax = new Vector2(1f, 1f); r.pivot = new Vector2(1f, 1f);
-        r.anchoredPosition = new Vector2(-8f, -32f); r.sizeDelta = new Vector2(W, H);
-        UIKit.Glass(r);
-        UIKit.TitleBar(r, "Facility", UIKit.T.teal, W, () => facilityPanel.SetActive(false));
-        var list = UIKit.ScrollList(r, "List", 6, 26, W - 12, H - 32, null, 3f);
-        var root = GameObject.Find("Base Buildings");
-        var names = new List<string>();
-        if (root != null) foreach (Transform c in root.transform) names.Add(c.name);
-        if (names.Count == 0) names.AddRange(new[] { "LaunchPad", "Hangar", "MissionControl" });
-        foreach (var n in names)
-        {
-            var row = UIKit.At(list, n, 0, 0, 100, 22);
-            row.gameObject.AddComponent<LayoutElement>().preferredHeight = 22;
-            UIKit.Tint(row, UIKit.T.chip);
-            UIKit.TextAt(row, "Name", 6, 0, 110, 22, Nicify(n), 7.5f, TextAlignmentOptions.MidlineLeft, true);
-            UIKit.TextAt(row, "Level", 0, 0, 80, 22, "Level 1  ·  upgrades soon", 6f, TextAlignmentOptions.MidlineRight, false, UIKit.T.dim);
-            ((RectTransform)row.Find("Level")).anchorMin = ((RectTransform)row.Find("Level")).anchorMax = new Vector2(1, 1);
-            ((RectTransform)row.Find("Level")).pivot = new Vector2(1, 1);
-            ((RectTransform)row.Find("Level")).anchoredPosition = new Vector2(-4, 0);
-        }
-    }
-
-    static string Nicify(string s) => System.Text.RegularExpressions.Regex.Replace(s, "(?<=[a-z])(?=[A-Z])", " ");
 
     // =============================================================== bottom navigation
     void BuildNav()
@@ -205,8 +192,8 @@ public class HudController : MonoBehaviour
             case "Facility": Panels.Open("facility"); break;
             case "Payload": Panels.Open("payload"); break;
             case "Rocket": Panels.Open("rocket"); break;
-            case "Scientist Training": case "Pilot Training": Hud.Toast(item + " is coming soon."); break;
-            default: Hud.Toast("Test " + item.ToLowerInvariant() + " is coming soon."); break;
+            case "Scientist Training": case "Pilot Training": Panels.Open("programs:0"); break;
+            default: Panels.Open("programs:1"); break;                  // Engine / Structure / Comms test
         }
     }
 
