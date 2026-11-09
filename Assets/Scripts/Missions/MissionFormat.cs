@@ -12,19 +12,19 @@ public static class MissionFormat
     public static string Details(MissionDefinition m)
     {
         var sb = new StringBuilder();
-        sb.AppendLine($"<color=#1565C0>Type:</color> {m.missionType}");
-        sb.AppendLine($"<color=#1565C0>Target:</color> {m.target}");
-        sb.AppendLine($"<color=#1565C0>Budget:</color> {Money(m.budget)}");
-        sb.AppendLine($"<color=#1565C0>Mass limit:</color> {Mass(m.massLimit)}");
-        sb.AppendLine($"<color=#1565C0>Payload:</color> {m.payload}");
-        sb.AppendLine($"<color=#1565C0>Duration:</color> {m.duration}");
+        sb.AppendLine($"<color=#7FDBFF>Type:</color> {m.missionType}");
+        sb.AppendLine($"<color=#7FDBFF>Target:</color> {m.target}");
+        sb.AppendLine($"<color=#7FDBFF>Budget:</color> {Money(m.budget)}");
+        sb.AppendLine($"<color=#7FDBFF>Mass limit:</color> {Mass(m.massLimit)}");
+        sb.AppendLine($"<color=#7FDBFF>Payload:</color> {m.payload}");
+        sb.AppendLine($"<color=#7FDBFF>Duration:</color> {m.duration}");
         sb.AppendLine();
-        sb.AppendLine("<color=#1565C0>Objective:</color>");
+        sb.AppendLine("<color=#7FDBFF>Objective:</color>");
         sb.AppendLine(m.objective);
         if (m.specialRequirements != null && m.specialRequirements.Count > 0)
         {
             sb.AppendLine();
-            sb.AppendLine("<color=#1565C0>Special requirements:</color>");
+            sb.AppendLine("<color=#7FDBFF>Special requirements:</color>");
             foreach (var r in m.specialRequirements) sb.AppendLine("- " + r.ToDisplayString());
         }
         return sb.ToString().TrimEnd();

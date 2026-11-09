@@ -12,8 +12,8 @@ public class RunningMissionRowUI : MonoBehaviour, IPointerClickHandler
     public TMP_Text infoText;
     public TMP_Text percentText;
     public Slider progressSlider;
-    public Color normalColor = new Color(1f, 1f, 1f, 1f);
-    public Color trackedColor = new Color32(0xFF, 0xF1, 0x76, 255);
+    public Color normalColor = new Color(1f, 1f, 1f, 0.14f);
+    public Color trackedColor = new Color(0.25f, 0.8f, 1f, 0.38f);
 
     public MissionInstance Mission { get; private set; }
     Action<MissionInstance> onClick;

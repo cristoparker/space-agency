@@ -13,7 +13,7 @@ public class CalendarUI : MonoBehaviour
     public Button previousMonthButton;
     public Button nextMonthButton;
 
-    public Color todayColor = new Color32(0xFF, 0xEB, 0x3B, 255);
+    public Color todayColor = new Color(0.25f, 0.8f, 1f, 0.55f);
     public Color normalColor = new Color(1f, 1f, 1f, 0f);
 
     DateTime viewMonth;

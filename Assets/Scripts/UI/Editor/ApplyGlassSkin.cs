@@ -141,11 +141,21 @@ public static class ApplyGlassSkin
             var go = new GameObject("Icon", typeof(RectTransform), typeof(Image));
             go.transform.SetParent(button, false);
             var rt = (RectTransform)go.transform;
-            rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
-            rt.offsetMin = new Vector2(3, 3); rt.offsetMax = new Vector2(-3, -3);
+            if (button.name == "Date Button")
+            {
+                // Button also shows the date text: small icon on the left, text keeps the rest.
+                rt.anchorMin = rt.anchorMax = new Vector2(0f, 0.5f);
+                rt.sizeDelta = new Vector2(14, 14); rt.anchoredPosition = new Vector2(8, 0);
+            }
+            else
+            {
+                rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+                rt.offsetMin = new Vector2(3, 3); rt.offsetMax = new Vector2(-3, -3);
+            }
             existing = go.transform;
         }
-        foreach (var txt in button.GetComponentsInChildren<TMP_Text>(true)) txt.gameObject.SetActive(false);
+        if (button.name != "Date Button")
+            foreach (var txt in button.GetComponentsInChildren<TMP_Text>(true)) txt.gameObject.SetActive(false);
         return existing.GetComponent<Image>();
     }
 
