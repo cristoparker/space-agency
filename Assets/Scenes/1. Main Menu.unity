@@ -178,8 +178,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: Start
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: cea54734f2dc7ce4ba285c0091c0f85e, type: 2}
-  m_sharedMaterial: {fileID: 3835622372612541684, guid: cea54734f2dc7ce4ba285c0091c0f85e, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 5f3a5c8ac17e1654e84d9ed6af811af6, type: 2}
+  m_sharedMaterial: {fileID: 9094301417839637989, guid: 5f3a5c8ac17e1654e84d9ed6af811af6, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -466,15 +466,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
-  m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Material: {fileID: 2100000, guid: cc857505680bffa4a85ad3eb38c4a966, type: 2}
+  m_Color: {r: 0.04, g: 0.07, b: 0.12, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 1847d3af254956245bb7099c48c3b658, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 3e83f34b2f690514d9bcb5c68e1ed0c1, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -551,8 +551,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: Settings
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: cea54734f2dc7ce4ba285c0091c0f85e, type: 2}
-  m_sharedMaterial: {fileID: 3835622372612541684, guid: cea54734f2dc7ce4ba285c0091c0f85e, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 5f3a5c8ac17e1654e84d9ed6af811af6, type: 2}
+  m_sharedMaterial: {fileID: 9094301417839637989, guid: 5f3a5c8ac17e1654e84d9ed6af811af6, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -747,15 +747,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
-  m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Material: {fileID: 2100000, guid: cc857505680bffa4a85ad3eb38c4a966, type: 2}
+  m_Color: {r: 0.04, g: 0.07, b: 0.12, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 1847d3af254956245bb7099c48c3b658, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 3e83f34b2f690514d9bcb5c68e1ed0c1, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -832,8 +832,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: Exit
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: cea54734f2dc7ce4ba285c0091c0f85e, type: 2}
-  m_sharedMaterial: {fileID: 3835622372612541684, guid: cea54734f2dc7ce4ba285c0091c0f85e, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 5f3a5c8ac17e1654e84d9ed6af811af6, type: 2}
+  m_sharedMaterial: {fileID: 9094301417839637989, guid: 5f3a5c8ac17e1654e84d9ed6af811af6, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -1083,9 +1083,9 @@ Canvas:
   m_GameObject: {fileID: 1747636837}
   m_Enabled: 1
   serializedVersion: 3
-  m_RenderMode: 0
-  m_Camera: {fileID: 0}
-  m_PlaneDistance: 100
+  m_RenderMode: 1
+  m_Camera: {fileID: 290198789}
+  m_PlaneDistance: 1
   m_PixelPerfect: 0
   m_ReceivesEvents: 1
   m_OverrideSorting: 0
@@ -1442,15 +1442,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
-  m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Material: {fileID: 2100000, guid: cc857505680bffa4a85ad3eb38c4a966, type: 2}
+  m_Color: {r: 0.04, g: 0.07, b: 0.12, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 1847d3af254956245bb7099c48c3b658, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 3e83f34b2f690514d9bcb5c68e1ed0c1, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1

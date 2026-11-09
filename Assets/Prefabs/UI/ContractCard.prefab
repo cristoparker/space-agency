@@ -60,15 +60,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
-  m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Material: {fileID: 2100000, guid: 2bd45e38219680c40afa47a020480963, type: 2}
+  m_Color: {r: 1, g: 1, b: 1, a: 0.14}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 1847d3af254956245bb7099c48c3b658, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 3e83f34b2f690514d9bcb5c68e1ed0c1, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -93,8 +93,8 @@ MonoBehaviour:
   background: {fileID: 270599640613524662}
   titleText: {fileID: 3220238635273758596}
   typeText: {fileID: 8655387735615134154}
-  normalSprite: {fileID: 21300000, guid: 1847d3af254956245bb7099c48c3b658, type: 3}
-  selectedSprite: {fileID: 21300000, guid: 77170543ca857324391717c410065b7d, type: 3}
+  normalColor: {r: 1, g: 1, b: 1, a: 0.14}
+  selectedColor: {r: 0.25, g: 0.8, b: 1, a: 0.38}
 --- !u!1 &1390675390469462021
 GameObject:
   m_ObjectHideFlags: 0
@@ -162,15 +162,15 @@ MonoBehaviour:
       m_Calls: []
   m_text: Mission Type
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: cea54734f2dc7ce4ba285c0091c0f85e, type: 2}
-  m_sharedMaterial: {fileID: 3835622372612541684, guid: cea54734f2dc7ce4ba285c0091c0f85e, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 9d5cca48b2ed8e6448a061f40b659826, type: 2}
+  m_sharedMaterial: {fileID: -3979295499864123689, guid: 9d5cca48b2ed8e6448a061f40b659826, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontColor: {r: 1, g: 0.9254902, b: 0.7019608, a: 1}
+  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -299,8 +299,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: Mission Title
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: cea54734f2dc7ce4ba285c0091c0f85e, type: 2}
-  m_sharedMaterial: {fileID: 3835622372612541684, guid: cea54734f2dc7ce4ba285c0091c0f85e, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 5f3a5c8ac17e1654e84d9ed6af811af6, type: 2}
+  m_sharedMaterial: {fileID: 9094301417839637989, guid: 5f3a5c8ac17e1654e84d9ed6af811af6, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
