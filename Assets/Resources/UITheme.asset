@@ -15,17 +15,19 @@ MonoBehaviour:
   glass: {fileID: 2100000, guid: cc857505680bffa4a85ad3eb38c4a966, type: 2}
   flat: {fileID: 2100000, guid: 2bd45e38219680c40afa47a020480963, type: 2}
   round: {fileID: 21300000, guid: 3e83f34b2f690514d9bcb5c68e1ed0c1, type: 3}
-  body: {fileID: 11400000, guid: 9d5cca48b2ed8e6448a061f40b659826, type: 2}
-  head: {fileID: 11400000, guid: 5f3a5c8ac17e1654e84d9ed6af811af6, type: 2}
+  body: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  head: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   closeIcon: {fileID: 21300000, guid: 69a4c9af66a9e6845ba4bdaa51d07c76, type: 3}
-  dark: {r: 0.04, g: 0.07, b: 0.12, a: 1}
-  ink: {r: 0.93, g: 0.96, b: 1, a: 1}
-  dim: {r: 0.93, g: 0.96, b: 1, a: 0.55}
-  well: {r: 1, g: 1, b: 1, a: 0.1}
-  chip: {r: 1, g: 1, b: 1, a: 0.16}
-  teal: {r: 0.3, g: 0.76, b: 0.88, a: 0.95}
-  orange: {r: 1, g: 0.62, b: 0.14, a: 0.95}
-  purple: {r: 0.72, g: 0.48, b: 1, a: 0.95}
-  green: {r: 0.14, g: 0.82, b: 0.42, a: 0.95}
-  red: {r: 1, g: 0.3, b: 0.4, a: 0.95}
-  blue: {r: 0.27, g: 0.58, b: 0.95, a: 0.95}
+  dark: {r: 0.085, g: 0.095, b: 0.13, a: 1}
+  ink: {r: 1, g: 1, b: 1, a: 0.96}
+  dim: {r: 0.92, g: 0.94, b: 1, a: 0.6}
+  well: {r: 1, g: 1, b: 1, a: 0.07}
+  chip: {r: 1, g: 1, b: 1, a: 0.13}
+  track: {r: 0, g: 0, b: 0, a: 0.28}
+  teal: {r: 0.04, g: 0.52, b: 1, a: 1}
+  orange: {r: 1, g: 0.62, b: 0.04, a: 1}
+  purple: {r: 0.75, g: 0.35, b: 0.95, a: 1}
+  green: {r: 0.19, g: 0.82, b: 0.35, a: 1}
+  red: {r: 1, g: 0.27, b: 0.23, a: 1}
+  blue: {r: 0.37, g: 0.36, b: 0.9, a: 1}
+  priceText: {r: 0.19, g: 0.82, b: 0.35, a: 1}

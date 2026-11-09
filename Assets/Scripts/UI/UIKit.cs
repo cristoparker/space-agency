@@ -38,11 +38,12 @@ public static class UIKit
 
     // ------------------------------------------------------------------ surfaces
     /// <summary>Top-level glass panel (blurs the scene behind it). Use for the outermost card only.</summary>
-    public static Image Glass(RectTransform r)
+    public static Image Glass(RectTransform r, bool shadow = true)
     {
         var i = r.gameObject.AddComponent<Image>();
         i.sprite = T.round; i.type = Image.Type.Sliced; i.pixelsPerUnitMultiplier = 1f;
         i.material = T.glass; i.color = T.dark;
+        if (shadow) UIShadow.Attach(r);
         return i;
     }
 
@@ -70,6 +71,7 @@ public static class UIKit
         Fill(r);
         var t = r.gameObject.AddComponent<TextMeshProUGUI>();
         t.font = head ? T.head : T.body;
+        t.fontStyle = head ? FontStyles.Bold : FontStyles.Normal;
         t.fontSize = size; t.color = color ?? T.ink; t.alignment = al; t.text = s;
         t.textWrappingMode = TextWrappingModes.NoWrap; t.raycastTarget = false;
         return t;
@@ -94,20 +96,23 @@ public static class UIKit
         b.colors = cb;
     }
 
-    public static Button Btn(Transform parent, string label, float x, float y, float w, float h, Color tint, UnityAction click, float size = 7.5f, bool head = true)
+    public static Button Btn(Transform parent, string label, float x, float y, float w, float h, Color tint, UnityAction click, float size = 7.5f, bool head = true, Color? labelColor = null)
     {
         var r = At(parent, label, x, y, w, h);
-        return MakeButton(r, label, tint, click, size, head);
+        return MakeButton(r, label, tint, click, size, head, labelColor);
     }
 
-    public static Button MakeButton(RectTransform r, string label, Color tint, UnityAction click, float size = 7.5f, bool head = true)
+    /// <summary>A translucent wash of an accent colour: the fill of a secondary (tinted) button. Pair with the accent as label colour.</summary>
+    public static Color Wash(Color accent, float a = 0.24f) => new Color(accent.r, accent.g, accent.b, a);
+
+    public static Button MakeButton(RectTransform r, string label, Color tint, UnityAction click, float size = 7.5f, bool head = true, Color? labelColor = null)
     {
         var img = Tint(r, tint);
         var b = r.gameObject.AddComponent<Button>();
         b.targetGraphic = img;
         if (click != null) b.onClick.AddListener(click);
         StyleButton(b);
-        if (!string.IsNullOrEmpty(label)) Text(r, label, size, TextAlignmentOptions.Center, head);
+        if (!string.IsNullOrEmpty(label)) Text(r, label, size, TextAlignmentOptions.Center, head, labelColor);
         return b;
     }
 
@@ -121,21 +126,26 @@ public static class UIKit
     }
 
     // ------------------------------------------------------------------ title bar of a panel
-    /// <summary>Coloured pill title with a round close button, as in the reference layouts.</summary>
+    /// <summary>Panel title (bold, left) with a small accent capsule and a round close button, Apple style.</summary>
     public static TMP_Text TitleBar(Transform card, string title, Color accent, float width, UnityAction close)
     {
-        var bar = At(card, "Title Bar", 6, 6, width - 12, 16);
-        Tint(bar, accent);
-        var t = Text(bar, title, 8f, TextAlignmentOptions.Center, true);
+        var bar = At(card, "Title Bar", 10, 8, width - 20, 16);
+        var acc = At(bar, "Accent", 0, 3, 3, 10);
+        Tint(acc, accent);
+        var tr = At(bar, "Title", 8, 0, width - 56, 16);
+        var t = Text(tr, title, 9.5f, TextAlignmentOptions.MidlineLeft, true);
         if (close != null)
         {
-            var x = At(bar, "Close", width - 12 - 15, 1, 14, 14);
-            var b = MakeButton(x, "", new Color(1f, 1f, 1f, 0.9f), close);
-            var ic = IconAt(x, T.closeIcon, 2, 2, 10, 10, new Color(0.1f, 0.15f, 0.25f, 1f));
-            if (ic.sprite == null) Text(x, "x", 8f, TextAlignmentOptions.Center, true, new Color(0.1f, 0.15f, 0.25f, 1f));
+            var x = At(bar, "Close", width - 20 - 14, 1, 14, 14);
+            MakeButton(x, "", new Color(1f, 1f, 1f, 0.2f), close);
+            var ic = IconAt(x, T.closeIcon, 3.5f, 3.5f, 7, 7, new Color(1f, 1f, 1f, 0.85f));
+            if (ic.sprite == null) Text(x, "x", 8f, TextAlignmentOptions.Center, true);
         }
         return t;
     }
+
+    /// <summary>The coloured capsule next to a title made by <see cref="TitleBar"/>.</summary>
+    public static Image TitleAccent(TMP_Text title) => title.transform.parent.parent.Find("Accent").GetComponent<Image>();
 
     // ------------------------------------------------------------------ scroll areas
     /// <summary>A vertically scrolling list. Returns the content rect (add children with a LayoutElement height).</summary>
@@ -176,7 +186,7 @@ public static class UIKit
     public static TMP_InputField Input(Transform parent, float x, float y, float w, float h, string hint, int limit = 20, float size = 8f)
     {
         var r = At(parent, "Input", x, y, w, h);
-        var bg = Tint(r, T.chip);
+        var bg = Tint(r, T.track);
         var inp = r.gameObject.AddComponent<TMP_InputField>();
         var area = At(r, "Text Area", 0, 0, w, h); Fill(area, 4, 0, 4, 0);
         area.gameObject.AddComponent<RectMask2D>();
@@ -185,6 +195,26 @@ public static class UIKit
         inp.textViewport = area; inp.textComponent = txt; inp.placeholder = ph; inp.targetGraphic = bg;
         inp.characterLimit = limit; inp.lineType = TMP_InputField.LineType.SingleLine;
         return inp;
+    }
+
+    static Sprite radial;
+    /// <summary>White circle that fades smoothly to nothing at the edge (for background colour glows).</summary>
+    public static Sprite RadialSprite()
+    {
+        if (radial != null) return radial;
+        const int n = 128;
+        var tex = new Texture2D(n, n, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+        var px = new Color32[n * n];
+        for (int y = 0; y < n; y++)
+            for (int x = 0; x < n; x++)
+            {
+                float d = Mathf.Sqrt(Mathf.Pow((x + 0.5f) / n * 2f - 1f, 2) + Mathf.Pow((y + 0.5f) / n * 2f - 1f, 2));
+                float a = Mathf.Clamp01(1f - d); a = a * a * (3f - 2f * a);
+                px[y * n + x] = new Color(1f, 1f, 1f, a);
+            }
+        tex.SetPixels32(px); tex.Apply();
+        radial = Sprite.Create(tex, new Rect(0, 0, n, n), new Vector2(0.5f, 0.5f), 100f);
+        return radial;
     }
 
     public static string Money(long v)
@@ -228,4 +258,110 @@ public static class Panels
     {
         if (IsOpen(id)) CloseAll(); else Open(id);
     }
+}
+
+/// <summary>A soft drop shadow drawn behind a glass panel (a sibling placed under it that follows its size and visibility).</summary>
+public class UIShadow : MonoBehaviour
+{
+    static Sprite sprite;
+    RectTransform me;
+    public float spread = 14f, dropY = 4f;
+
+    static Sprite Soft()
+    {
+        if (sprite != null) return sprite;
+        const int n = 128; const float r = 30f, blur = 40f;
+        var tex = new Texture2D(n, n, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+        var px = new Color32[n * n];
+        float half = n * 0.5f;
+        for (int y = 0; y < n; y++)
+            for (int x = 0; x < n; x++)
+            {
+                // signed distance to a rounded box, turned into a smooth falloff that reaches zero at the texture edge
+                float dx = Mathf.Abs(x + 0.5f - half) - Mathf.Max(0f, half - blur - r), dy = Mathf.Abs(y + 0.5f - half) - Mathf.Max(0f, half - blur - r);
+                float d = Mathf.Sqrt(Mathf.Max(dx, 0f) * Mathf.Max(dx, 0f) + Mathf.Max(dy, 0f) * Mathf.Max(dy, 0f)) + Mathf.Min(Mathf.Max(dx, dy), 0f) - r;
+                float a = Mathf.Clamp01(0.5f - d / (blur * 1.6f));
+                a = a * a * (3f - 2f * a);
+                px[y * n + x] = new Color(0f, 0f, 0f, a);
+            }
+        tex.SetPixels32(px); tex.Apply();
+        sprite = Sprite.Create(tex, new Rect(0, 0, n, n), new Vector2(0.5f, 0.5f), 46f, 0, SpriteMeshType.FullRect, new Vector4(56, 56, 56, 56));
+        return sprite;
+    }
+
+    /// <summary>Put the shadow on a panel: the component lives on the panel, the shadow object is its sibling.</summary>
+    public static void Attach(RectTransform panel)
+    {
+        if (panel.parent == null) return;
+        var go = new GameObject(panel.name + " Shadow", typeof(RectTransform));
+        go.transform.SetParent(panel.parent, false);
+        go.transform.SetSiblingIndex(panel.GetSiblingIndex());
+        var img = go.AddComponent<Image>();
+        img.sprite = Soft(); img.type = Image.Type.Sliced; img.color = new Color(0f, 0f, 0f, 0.38f); img.raycastTarget = false;
+        var s = panel.gameObject.AddComponent<UIShadow>();
+        s.me = (RectTransform)go.transform;
+        go.SetActive(panel.gameObject.activeInHierarchy);
+        if (go.activeSelf) s.Sync();
+    }
+
+    void OnEnable() { if (me != null) { me.gameObject.SetActive(true); Sync(); } }
+    void OnDisable() { if (me != null) me.gameObject.SetActive(false); }
+    void OnDestroy() { if (me != null) Destroy(me.gameObject); }
+    void LateUpdate() { if (me != null) Sync(); }
+
+    void Sync()
+    {
+        var target = (RectTransform)transform;
+        me.anchorMin = target.anchorMin; me.anchorMax = target.anchorMax; me.pivot = new Vector2(0.5f, 0.5f);
+        var size = target.sizeDelta;
+        me.sizeDelta = size + new Vector2(spread * 2f, spread * 2f);
+        // centre of the panel, whatever its pivot, pushed down a little (light comes from above)
+        me.anchoredPosition = target.anchoredPosition + new Vector2((0.5f - target.pivot.x) * size.x, (0.5f - target.pivot.y) * size.y - dropY);
+        int want = Mathf.Max(0, target.GetSiblingIndex() - 1);          // just under the panel when it moves to the front
+        if (me.GetSiblingIndex() != want) me.SetSiblingIndex(want);
+    }
+}
+
+/// <summary>Apple style segmented control: a dark track with a lighter pill under the selected segment.</summary>
+public class Segmented
+{
+    readonly Image[] pills;
+    readonly TMP_Text[] labels;
+    int sel = -1;
+    readonly Color selColor;
+
+    public Segmented(Transform parent, float x, float y, float w, float h, string[] names, int selected, System.Action<int> onChange, Color? selectedFill = null)
+    {
+        var T = UIKit.T;
+        selColor = selectedFill ?? new Color(1f, 1f, 1f, 0.26f);
+        var track = UIKit.At(parent, "Segmented", x, y, w, h);
+        UIKit.Tint(track, T.track);
+        pills = new Image[names.Length]; labels = new TMP_Text[names.Length];
+        float seg = (w - 4f) / names.Length;
+        for (int i = 0; i < names.Length; i++)
+        {
+            int idx = i;
+            var r = UIKit.At(track, names[i], 2 + i * seg, 2, seg, h - 4);
+            var img = UIKit.Tint(r, Color.clear);
+            var b = r.gameObject.AddComponent<Button>();
+            b.targetGraphic = img; b.transition = Selectable.Transition.None;
+            b.onClick.AddListener(() => { Select(idx); onChange?.Invoke(idx); });
+            labels[i] = UIKit.Text(r, names[i], Mathf.Min(7f, h * 0.5f), TextAlignmentOptions.Center, true);
+            pills[i] = img;
+        }
+        Select(selected);
+    }
+
+    public void Select(int i)
+    {
+        sel = i;
+        for (int k = 0; k < pills.Length; k++)
+        {
+            pills[k].color = k == i ? selColor : Color.clear;
+            labels[k].color = k == i ? UIKit.T.ink : UIKit.T.dim;
+        }
+    }
+
+    public void SetLabel(int i, string s) { if (i >= 0 && i < labels.Length) labels[i].text = s; }
+    public int Selected => sel;
 }

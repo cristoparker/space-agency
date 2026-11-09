@@ -2,33 +2,34 @@ using TMPro;
 using UnityEngine;
 
 /// <summary>
-/// The Space Agency UI design system: one asset (Resources/UITheme) that points at the existing glass materials,
-/// rounded sprite and fonts, plus the accent colours used by the reference layouts.
-/// It never changes the glass shader or the materials - it only reuses them.
+/// The Space Agency UI design system, Apple-inspired: graphite glass with a bright top edge, system colours,
+/// clean sans-serif type, soft shadows and capsule controls. One asset (Resources/UITheme) points at the glass materials,
+/// the rounded sprite and the font; GameUISetup writes the palette below into it.
 /// </summary>
 [CreateAssetMenu(menuName = "Space Agency/UI Theme", fileName = "UITheme")]
 public class UITheme : ScriptableObject
 {
-    [Header("Existing glass look (not modified)")]
-    public Material glass;          // UI-Glass: blur panel, top-level only
+    [Header("Glass")]
+    public Material glass;          // UI-Glass: blurred backdrop, top-level panels only
     public Material flat;           // UI-GlassFlat: translucent fill for anything inside a panel
     public Sprite round;            // ui-glass-round
     public TMP_FontAsset body, head;
     public Sprite closeIcon;
 
-    [Header("Palette")]
-    public Color dark = new Color(0.04f, 0.07f, 0.12f, 1f);
-    public Color ink = new Color(0.93f, 0.96f, 1f, 1f);
-    public Color dim = new Color(0.93f, 0.96f, 1f, 0.55f);
-    public Color well = new Color(1f, 1f, 1f, 0.10f);              // sunken area inside a panel
-    public Color chip = new Color(1f, 1f, 1f, 0.16f);              // neutral button / chip
-    public Color teal = new Color(0.30f, 0.76f, 0.88f, 0.95f);     // contracts, nav
-    public Color orange = new Color(1f, 0.62f, 0.14f, 0.95f);      // rocket designer
-    public Color purple = new Color(0.72f, 0.48f, 1f, 0.95f);      // payload / satellite designer
-    public Color green = new Color(0.14f, 0.82f, 0.42f, 0.95f);    // accept / equip / confirm
-    public Color priceText = new Color(0.55f, 1f, 0.7f, 1f);      // prices on parts
-    public Color red = new Color(1f, 0.30f, 0.40f, 0.95f);         // decline / abandon / delete
-    public Color blue = new Color(0.27f, 0.58f, 0.95f, 0.95f);     // blueprints
+    [Header("Palette (Apple system colours, dark appearance)")]
+    public Color dark = new Color(0.085f, 0.095f, 0.13f, 1f);      // glass tint: graphite with a hint of blue
+    public Color ink = new Color(1f, 1f, 1f, 0.96f);                // label
+    public Color dim = new Color(0.92f, 0.94f, 1f, 0.60f);          // secondary label
+    public Color well = new Color(1f, 1f, 1f, 0.07f);              // grouped / sunken area
+    public Color chip = new Color(1f, 1f, 1f, 0.13f);              // neutral control fill
+    public Color track = new Color(0f, 0f, 0f, 0.28f);             // segmented control track, input fields
+    public Color teal = new Color(0.04f, 0.52f, 1f, 1f);           // system blue: primary accent, selection
+    public Color orange = new Color(1f, 0.62f, 0.04f, 1f);         // rocket designer
+    public Color purple = new Color(0.75f, 0.35f, 0.95f, 1f);      // satellite designer
+    public Color green = new Color(0.19f, 0.82f, 0.35f, 1f);       // accept / equip / confirm
+    public Color red = new Color(1f, 0.27f, 0.23f, 1f);            // decline / destructive
+    public Color blue = new Color(0.37f, 0.36f, 0.9f, 1f);         // indigo: blueprints
+    public Color priceText = new Color(0.19f, 0.82f, 0.35f, 1f);   // prices on parts
 
     static UITheme cur;
     public static UITheme Current

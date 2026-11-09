@@ -22,6 +22,7 @@ public class HudController : MonoBehaviour
     [Header("Existing scene objects")]
     public RocketBuilderUI builder;
     public Sprite playIcon, pauseIcon;
+    [Tooltip("Contract, Training, Building, Testing")] public Sprite[] navIcons;
 
     static readonly (string label, string[] items)[] Nav =
     {
@@ -37,10 +38,11 @@ public class HudController : MonoBehaviour
     int openGroup = -1;
     GameObject facilityPanel;
     TMP_Text toastText, moneyText, repText, resText, agencyName;
-    Image repFill, playIconImg;
+    Image repFill, playIconImg, playBg, fast3Bg, fast6Bg;
+    TMP_Text fast3Label, fast6Label;
     float toastTimer;
     RectTransform toastBox;
-    int lastSpeedIndex = 1;
+    int resumeIndex = 1;
 
     void Awake()
     {
@@ -61,10 +63,16 @@ public class HudController : MonoBehaviour
         top = transform.Find("Top Panel") as RectTransform;
         Canvas.ForceUpdateCanvases();
 
+        var cal = transform.Find("Calendar Panel") as RectTransform;
+        if (cal != null)
+        {
+            if (cal.GetComponent<UIShadow>() == null) UIShadow.Attach(cal);
+            cal.anchoredPosition = new Vector2(96f, -30f);                         // drops down from the date in the top bar
+        }
         BuildPanels();
         BuildNav();
         BuildToast();
-        if (top != null) BuildTopExtras();
+        if (top != null) BuildTopBar();
         Agency.Changed += RefreshStats;
         RefreshStats();
 
@@ -105,9 +113,9 @@ public class HudController : MonoBehaviour
     {
         const float W = 198f, H = 190f;
         r.anchorMin = r.anchorMax = new Vector2(1f, 1f); r.pivot = new Vector2(1f, 1f);
-        r.anchoredPosition = new Vector2(-8f, -36f); r.sizeDelta = new Vector2(W, H);
+        r.anchoredPosition = new Vector2(-8f, -32f); r.sizeDelta = new Vector2(W, H);
         UIKit.Glass(r);
-        UIKit.TitleBar(r, "FACILITY", UIKit.T.teal, W, () => facilityPanel.SetActive(false));
+        UIKit.TitleBar(r, "Facility", UIKit.T.teal, W, () => facilityPanel.SetActive(false));
         var list = UIKit.ScrollList(r, "List", 6, 26, W - 12, H - 32, null, 3f);
         var root = GameObject.Find("Base Buildings");
         var names = new List<string>();
@@ -119,7 +127,7 @@ public class HudController : MonoBehaviour
             row.gameObject.AddComponent<LayoutElement>().preferredHeight = 22;
             UIKit.Tint(row, UIKit.T.chip);
             UIKit.TextAt(row, "Name", 6, 0, 110, 22, Nicify(n), 7.5f, TextAlignmentOptions.MidlineLeft, true);
-            UIKit.TextAt(row, "Level", 0, 0, 80, 22, "Level 1  -  upgrades soon", 6f, TextAlignmentOptions.MidlineRight, false, UIKit.T.dim);
+            UIKit.TextAt(row, "Level", 0, 0, 80, 22, "Level 1  ·  upgrades soon", 6f, TextAlignmentOptions.MidlineRight, false, UIKit.T.dim);
             ((RectTransform)row.Find("Level")).anchorMin = ((RectTransform)row.Find("Level")).anchorMax = new Vector2(1, 1);
             ((RectTransform)row.Find("Level")).pivot = new Vector2(1, 1);
             ((RectTransform)row.Find("Level")).anchoredPosition = new Vector2(-4, 0);
@@ -131,7 +139,7 @@ public class HudController : MonoBehaviour
     // =============================================================== bottom navigation
     void BuildNav()
     {
-        const float bw = 46f, gap = 4f, pad = 5f, bh = 18f;
+        const float bw = 22f, gap = 3f, pad = 5f, bh = 22f;
         float w = pad * 2 + Nav.Length * bw + (Nav.Length - 1) * gap, h = bh + pad * 2;
         var bar = new GameObject("Bottom Nav", typeof(RectTransform)).GetComponent<RectTransform>();
         bar.SetParent(transform, false);
@@ -143,7 +151,12 @@ public class HudController : MonoBehaviour
         {
             int gi = g;
             float x = pad + g * (bw + gap);
-            var b = UIKit.Btn(bar, Nav[g].label, x, pad, bw, bh, UIKit.T.teal, () => OnNav(gi), 7f);
+            var r = UIKit.At(bar, Nav[g].label, x, pad, bw, bh);
+            var b = UIKit.MakeButton(r, "", UIKit.T.chip, () => OnNav(gi));
+            var sprite = navIcons != null && g < navIcons.Length ? navIcons[g] : null;
+            if (sprite != null) UIKit.IconAt(r, sprite, 4.5f, 4.5f, bh - 9f, bh - 9f, UIKit.T.ink);
+            else UIKit.Text(r, Nav[g].label.Substring(0, 1), 9f, TextAlignmentOptions.Center, true);
+            r.gameObject.AddComponent<TooltipTrigger>().text = Nav[g].label;
             navImages.Add((Image)b.targetGraphic);
 
             var items = Nav[g].items;
@@ -152,13 +165,14 @@ public class HudController : MonoBehaviour
             sub.SetParent(bar, false);
             sub.anchorMin = sub.anchorMax = Vector2.zero; sub.pivot = Vector2.zero;
             sub.anchoredPosition = new Vector2(x, h + 3f);
-            float ch = 13f, cg = 2f;
-            sub.sizeDelta = new Vector2(bw + 12f, items.Length * (ch + cg));
+            float ch = 14f, cg = 2f, cw = 70f;
+            sub.sizeDelta = new Vector2(cw, items.Length * (ch + cg));
             for (int i = 0; i < items.Length; i++)
             {
                 string item = items[i];
-                var chip = UIKit.At(sub, item, 0, i * (ch + cg), bw + 12f, ch);
-                UIKit.MakeButton(chip, item, new Color(0.04f, 0.07f, 0.12f, 0.92f), () => OnSubMenu(item), 6.2f, false);
+                var chip = UIKit.At(sub, item, 0, i * (ch + cg), cw, ch);
+                UIKit.Glass(chip, false);
+                UIKit.MakeButton(UIKit.At(chip, "Hit", 0, 0, cw, ch), item, Color.clear, () => OnSubMenu(item), 6.8f, false);
             }
             sub.gameObject.SetActive(false);
             subMenus.Add(sub.gameObject);
@@ -173,14 +187,14 @@ public class HudController : MonoBehaviour
         if (wasOpen) return;
         openGroup = g;
         subMenus[g].SetActive(true);
-        navImages[g].color = new Color(0.45f, 0.88f, 1f, 1f);
+        navImages[g].color = UIKit.T.teal;
     }
 
     void CloseMenus()
     {
         openGroup = -1;
         foreach (var s in subMenus) if (s != null) s.SetActive(false);
-        foreach (var i in navImages) i.color = UIKit.T.teal;
+        foreach (var i in navImages) i.color = UIKit.T.chip;
     }
 
     void OnSubMenu(string item)
@@ -224,100 +238,182 @@ public class HudController : MonoBehaviour
             toastTimer -= Time.unscaledDeltaTime;
             if (toastTimer <= 0f && toastBox != null) toastBox.gameObject.SetActive(false);
         }
-        var clock = GameClock.Instance;
-        if (clock != null && playIconImg != null)
-        {
-            var want = clock.Speed <= 0f ? playIcon : pauseIcon;
-            if (want != null && playIconImg.sprite != want) playIconImg.sprite = want;
-            if (clock.SpeedIndex > 0) lastSpeedIndex = clock.SpeedIndex;
-        }
+        RefreshClockControls();
     }
 
-    // =============================================================== top bar extras
-    void BuildTopExtras()
+    // =============================================================== game speed: pause / 3x / 6x
+    // One real minute is one game hour at normal speed (GameClock.gameMinutesPerSecond = 1); 3x and 6x multiply that.
+    int IndexOfSpeed(float v)
     {
-        // play / pause: a copy of the slow-down button so it matches the existing glass buttons
-        var speed = top.Find("Time Bar/Speed Controls");
-        var slow = speed != null ? speed.Find("Slow Down Button") : null;
-        if (slow != null)
+        var c = GameClock.Instance; if (c == null) return -1;
+        for (int i = 0; i < c.speedLevels.Length; i++) if (Mathf.Approximately(c.speedLevels[i], v)) return i;
+        return -1;
+    }
+
+    void TogglePause()
+    {
+        var c = GameClock.Instance; if (c == null) return;
+        if (c.Speed <= 0f) c.SetSpeedIndex(Mathf.Max(1, resumeIndex));
+        else { resumeIndex = c.SpeedIndex; c.SetSpeedIndex(0); }
+    }
+
+    void SetFast(float factor)
+    {
+        var c = GameClock.Instance; if (c == null) return;
+        int fast = IndexOfSpeed(factor), normal = IndexOfSpeed(1f);
+        if (fast < 0) return;
+        c.SetSpeedIndex(c.SpeedIndex == fast ? normal : fast);        // pressing the active one goes back to normal speed
+    }
+
+    void RefreshClockControls()
+    {
+        var c = GameClock.Instance;
+        if (c == null || playIconImg == null) return;
+        bool paused = c.Speed <= 0f;
+        if (c.SpeedIndex > 0) resumeIndex = c.SpeedIndex;
+        var want = paused ? playIcon : pauseIcon;
+        if (want != null && playIconImg.sprite != want) playIconImg.sprite = want;
+        playBg.color = paused ? UIKit.T.teal : Color.clear;
+        bool f3 = Mathf.Approximately(c.Speed, 3f), f6 = Mathf.Approximately(c.Speed, 6f);
+        fast3Bg.color = f3 ? new Color(1f, 1f, 1f, 0.26f) : Color.clear;
+        fast6Bg.color = f6 ? new Color(1f, 1f, 1f, 0.26f) : Color.clear;
+        fast3Label.color = f3 ? UIKit.T.ink : UIKit.T.dim;
+        fast6Label.color = f6 ? UIKit.T.ink : UIKit.T.dim;
+    }
+
+    // =============================================================== top bar (thin): agency, game speed, clock, timeline, resources, money
+    RectTransform Cluster(RectTransform bar, string name, bool left)
+    {
+        var r = new GameObject(name, typeof(RectTransform)).GetComponent<RectTransform>();
+        r.SetParent(bar, false);
+        r.anchorMin = new Vector2(left ? 0f : 1f, 0f); r.anchorMax = new Vector2(left ? 0f : 1f, 1f);
+        r.pivot = new Vector2(left ? 0f : 1f, 0.5f);
+        r.anchoredPosition = new Vector2(left ? 9f : -9f, 0f); r.sizeDelta = Vector2.zero;
+        var h = r.gameObject.AddComponent<HorizontalLayoutGroup>();
+        h.spacing = 7f; h.childAlignment = left ? TextAnchor.MiddleLeft : TextAnchor.MiddleRight;
+        h.childControlWidth = h.childControlHeight = true; h.childForceExpandWidth = h.childForceExpandHeight = false;
+        r.gameObject.AddComponent<ContentSizeFitter>().horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+        return r;
+    }
+
+    static LayoutElement Size(Component c, float w, float h)
+    {
+        var le = c.GetComponent<LayoutElement>() ?? c.gameObject.AddComponent<LayoutElement>();
+        le.preferredWidth = w; le.minWidth = w > 0 ? w : -1; le.preferredHeight = h; le.minHeight = h;
+        le.flexibleWidth = 0; le.flexibleHeight = 0;
+        return le;
+    }
+
+    static void Small(Component root, float size)
+    {
+        foreach (var t in root.GetComponentsInChildren<TMP_Text>(true)) { t.enableAutoSizing = false; t.fontSize = size; }
+    }
+
+    void BuildTopBar()
+    {
+        var T = UIKit.T;
+        var bar = new GameObject("Top Bar", typeof(RectTransform)).GetComponent<RectTransform>();
+        bar.SetParent(transform, false);
+        bar.anchorMin = new Vector2(0f, 1f); bar.anchorMax = new Vector2(1f, 1f); bar.pivot = new Vector2(0.5f, 1f);
+        bar.sizeDelta = new Vector2(-16f, 19f); bar.anchoredPosition = new Vector2(0f, -5f);
+        UIKit.Glass(bar);
+        bar.SetSiblingIndex(top.GetSiblingIndex());
+        var left = Cluster(bar, "Left", true);
+        var right = Cluster(bar, "Right", false);
+
+        // ---- agency: logo + name
+        var badge = UIKit.At(left, "Agency", 0, 0, 60, 13);
+        agencyLogo = UIKit.At(badge, "Logo", 0, -0.5f, 14, 14);
+        agencyName = UIKit.TextAt(badge, "Name", 18, 0, 60, 13, Agency.Name, 7f, TextAlignmentOptions.MidlineLeft, true);
+        badgeRt = badge;
+
+        // ---- game speed: pause/play, 3x, 6x
+        var ctl = UIKit.At(left, "Game Speed", 0, 0, 58, 13);
+        UIKit.Tint(ctl, T.track);
+        Size(ctl, 58f, 13f);
+        var pr = UIKit.At(ctl, "Play", 1.5f, 1.5f, 19, 10);
+        var pb = UIKit.MakeButton(pr, "", Color.clear, TogglePause); playBg = (Image)pb.targetGraphic;
+        playIconImg = UIKit.IconAt(pr, pauseIcon, 5.5f, 1.5f, 8, 7, T.ink);
+        pr.gameObject.AddComponent<TooltipTrigger>().text = "Pause / play";
+        var r3 = UIKit.At(ctl, "3x", 21.5f, 1.5f, 17, 10);
+        var b3 = UIKit.MakeButton(r3, "", Color.clear, () => SetFast(3f)); fast3Bg = (Image)b3.targetGraphic;
+        fast3Label = UIKit.Text(r3, "3×", 6.8f, TextAlignmentOptions.Center, true);
+        r3.gameObject.AddComponent<TooltipTrigger>().text = "3× speed";
+        var r6 = UIKit.At(ctl, "6x", 39.5f, 1.5f, 17, 10);
+        var b6 = UIKit.MakeButton(r6, "", Color.clear, () => SetFast(6f)); fast6Bg = (Image)b6.targetGraphic;
+        fast6Label = UIKit.Text(r6, "6×", 6.8f, TextAlignmentOptions.Center, true);
+        r6.gameObject.AddComponent<TooltipTrigger>().text = "6× speed";
+
+        // ---- clock + date, reusing the existing objects (TimeBarUI keeps updating them)
+        var timeText = top.Find("Time Bar/Time Text");
+        var dateBtn = top.Find("Time Bar/Date Button");
+        if (timeText != null) { timeText.SetParent(left, false); Size(timeText, 32f, 13f); Small(timeText, 7f); }
+        if (dateBtn != null) { dateBtn.SetParent(left, false); Size(dateBtn, 70f, 13f); Small(dateBtn, 6.8f); }
+        foreach (var n in new[] { "Time Bar/Speed Controls", "Time Bar/Day Progress Slider" })
         {
-            var play = Instantiate(slow.gameObject, speed);
-            play.name = "Play Pause Button";
-            play.transform.SetSiblingIndex(0);
-            var btn = play.GetComponent<Button>();
-            btn.onClick.RemoveAllListeners();
-            btn.interactable = true;
-            btn.onClick.AddListener(() =>
-            {
-                var c = GameClock.Instance; if (c == null) return;
-                if (c.Speed <= 0f) c.SetSpeedIndex(Mathf.Max(1, lastSpeedIndex)); else { lastSpeedIndex = c.SpeedIndex; c.SetSpeedIndex(0); }
-            });
-            playIconImg = play.transform.Find("Icon") != null ? play.transform.Find("Icon").GetComponent<Image>() : null;
-            if (playIconImg != null && pauseIcon != null) playIconImg.sprite = pauseIcon;
+            var o = top.Find(n); if (o != null) o.gameObject.SetActive(false);              // replaced by the controls above
         }
 
-        // free some width: the day slider gets slimmer
-        var daySlider = top.Find("Time Bar/Day Progress Slider");
-        var le = daySlider != null ? daySlider.GetComponent<LayoutElement>() : null;
-        if (le != null) { le.preferredWidth = 34f; le.minWidth = 34f; }
+        // ---- right: resources, reputation, money
+        var res = UIKit.At(right, "Resources Pill", 0, 0, 46, 13);
+        UIKit.Tint(res, T.chip); Size(res, 46f, 13f);
+        resText = UIKit.Text(res, "Staff 25", 6.5f, TextAlignmentOptions.Center, true);
+        res.gameObject.AddComponent<TooltipTrigger>().text = "Resources\nStaff and facilities your agency runs.";
 
-        var money = top.Find("Money") as RectTransform;
+        var rep = UIKit.At(right, "Reputation Pill", 0, 0, 52, 13);
+        UIKit.Tint(rep, T.chip); Size(rep, 52f, 13f);
+        repText = UIKit.TextAt(rep, "Label", 5, 0, 44, 11, "Rep LVL 1", 6.3f, TextAlignmentOptions.MidlineLeft, true);
+        var track = UIKit.At(rep, "Bar", 5, 9.5f, 42, 2f); UIKit.Tint(track, new Color(1f, 1f, 1f, 0.18f));
+        repFill = UIKit.Tint(UIKit.At(track, "Fill", 0, 0, 10, 2f), T.teal);
+        rep.gameObject.AddComponent<TooltipTrigger>().text = "Reputation\nGrows when contracts finish. Higher levels unlock better contracts.";
+
+        var money = top.Find("Money");
         if (money != null)
         {
-            LayoutRebuilder.ForceRebuildLayoutImmediate(money);
+            money.SetParent(right, false);
+            Size(money, -1f, 13f);
+            Small(money, 7.5f);
+            var icon = money.Find("Money Icon");
+            if (icon != null) Size(icon, 10f, 10f);
             var mt = money.Find("Money Text");
             moneyText = mt != null ? mt.GetComponent<TMP_Text>() : null;
         }
-        float mw = money != null ? Mathf.Max(60f, LayoutUtility.GetPreferredWidth(money)) : 80f;
-        float right = 10f + mw + 8f;
 
-        // Reputation pill (level + progress) and Resources pill, right of the timeline
-        var rep = UIKit.At(top, "Reputation Pill", 0, 0, 58, 18);
-        UIKit.AnchorRight(rep, right, 5.5f);
-        UIKit.Tint(rep, UIKit.T.chip);
-        repText = UIKit.TextAt(rep, "Label", 4, 0, 52, 13, "Rep LVL 1", 6.5f, TextAlignmentOptions.MidlineLeft, true);
-        var bar = UIKit.At(rep, "Bar", 4, 13, 50, 2.5f); UIKit.Tint(bar, new Color(1f, 1f, 1f, 0.18f));
-        var fill = UIKit.At(bar, "Fill", 0, 0, 20, 2.5f); repFill = UIKit.Tint(fill, UIKit.T.purple);
-        right += 58f + 4f;
-
-        var res = UIKit.At(top, "Resources Pill", 0, 0, 58, 18);
-        UIKit.AnchorRight(res, right, 5.5f);
-        UIKit.Tint(res, UIKit.T.chip);
-        resText = UIKit.Text(res, "Staff 25", 6.5f, TextAlignmentOptions.Center, true);
-        res.gameObject.AddComponent<TooltipTrigger>().text = "Resources\nStaff and facilities your agency runs.";
-        rep.gameObject.AddComponent<TooltipTrigger>().text = "Reputation\nGrows when contracts finish. Higher levels unlock better contracts.";
-        right += 58f + 6f;
-
+        // ---- centre: mission timeline
         var mission = top.Find("Mission Bar") as RectTransform;
         if (mission != null)
         {
-            mission.anchoredPosition = new Vector2(-(right - 12f), mission.anchoredPosition.y);
+            mission.SetParent(bar, false);
+            mission.anchorMin = mission.anchorMax = new Vector2(0.5f, 0.5f); mission.pivot = new Vector2(0.5f, 0.5f);
+            mission.anchoredPosition = new Vector2(34f, 0f);
+            Small(mission, 6.5f);
             var ms = mission.Find("Mission Progress Slider");
-            var mle = ms != null ? ms.GetComponent<LayoutElement>() : null;
-            if (mle != null) { mle.preferredWidth = 40f; mle.minWidth = 40f; }       // keeps the timeline clear of the date
+            if (ms != null) Size(ms, 54f, 4f);
         }
 
-        // agency badge under the top bar, top-left
-        var badge = UIKit.At(transform, "Agency Badge", 8, 31, 124, 20);
-        UIKit.Glass(badge);
-        var logoBox = UIKit.At(badge, "Logo", 3, 2, 16, 16);
-        agencyLogo = logoBox;
-        agencyName = UIKit.TextAt(badge, "Name", 23, 0, 97, 20, Agency.Name, 6.5f, TextAlignmentOptions.MidlineLeft, true);
-        agencyName.overflowMode = TextOverflowModes.Ellipsis;
-        badge.SetAsFirstSibling();
-        badge.SetSiblingIndex(Mathf.Min(1, transform.childCount - 1));
+        // the old top panel stays (TimeBarUI lives on it) but draws nothing
+        var oldImg = top.GetComponent<Image>();
+        if (oldImg != null) oldImg.enabled = false;
+        var oldShadow = top.GetComponent<UIShadow>();
+        if (oldShadow != null) oldShadow.enabled = false;
         RefreshStats();
     }
 
-    RectTransform agencyLogo;
+    RectTransform agencyLogo, badgeRt;
 
     void RefreshStats()
     {
         if (moneyText != null) moneyText.text = Agency.Money.ToString("N0", CultureInfo.InvariantCulture);
         if (repText != null) repText.text = "Rep LVL " + Agency.RepLevel;
-        if (repFill != null) ((RectTransform)repFill.transform).sizeDelta = new Vector2(50f * Agency.RepProgress, 2.5f);
+        if (repFill != null) ((RectTransform)repFill.transform).sizeDelta = new Vector2(42f * Agency.RepProgress, 2f);
         if (resText != null) resText.text = "Staff " + Agency.Staff;
-        if (agencyName != null) agencyName.text = Agency.Name;
-        if (agencyLogo != null) LogoArt.Draw(agencyLogo, Agency.Logo, 16f);
+        if (agencyName != null)
+        {
+            agencyName.text = Agency.Name;
+            float tw = Mathf.Min(90f, agencyName.GetPreferredValues(Agency.Name).x + 2f);       // the badge hugs the name
+            ((RectTransform)agencyName.transform.parent).sizeDelta = new Vector2(tw, 13f);
+            if (badgeRt != null) Size(badgeRt, 18f + tw, 13f);
+        }
+        if (agencyLogo != null) LogoArt.Draw(agencyLogo, Agency.Logo, 14f);
     }
 }

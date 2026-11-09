@@ -21,6 +21,8 @@ Shader "SpaceAgency/UI/Glass"
         _BackdropSaturation ("Backdrop Saturation", Range(0, 2)) = 1.2
         _FlatFill ("Flat Fill Opacity", Range(0, 1)) = 1
         _BorderColor ("Rim Colour", Color) = (1,1,1,0.35)
+        _RimBottom ("Rim strength at the bottom edge (top edge is 1): light comes from above", Range(0, 1)) = 0.35
+        _EdgeGlow ("Soft inner glow along the rim", Range(0, 1)) = 0.0
 
         [HideInInspector] _StencilComp ("Stencil Comparison", Float) = 8
         [HideInInspector] _Stencil ("Stencil ID", Float) = 0
@@ -85,6 +87,8 @@ Shader "SpaceAgency/UI/Glass"
                 float _BackdropSaturation;
                 float _FlatFill;
                 float4 _BorderColor;
+                float _RimBottom;
+                float _EdgeGlow;
                 float4 _ClipRect;
             CBUFFER_END
 
@@ -145,6 +149,9 @@ Shader "SpaceAgency/UI/Glass"
                 float outer = shape.a;
                 float inner = shape.g;
                 float rim = saturate(outer - inner);
+                // light from above: the top edge catches a bright specular line, the bottom edge fades out
+                float lit = lerp(_RimBottom, 1.0, smoothstep(0.2, 0.9, IN.uv.y));
+                rim *= lit;
 
                 float3 tint = IN.color.rgb;
                 float3 col;
@@ -163,6 +170,7 @@ Shader "SpaceAgency/UI/Glass"
                     bg = lerp(lum.xxx, bg, _BackdropSaturation) * _BackdropBrightness;
                     col = lerp(bg, tint, _TintStrength);
                     col = lerp(col, _BorderColor.rgb, rim * _BorderColor.a);
+                    col += _EdgeGlow * lit * (1.0 - inner) * outer * 0.25;
                     alpha = outer * IN.color.a;
                 }
 

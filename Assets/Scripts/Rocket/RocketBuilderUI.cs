@@ -42,7 +42,7 @@ public class RocketBuilderUI : MonoBehaviour
 
     const string SaveKey = "SpaceAgency.RocketDesign", NameKey = "SpaceAgency.RocketName";
     const string Good = "#8FE3B0", Warn = "#FFB878", Bad = "#FF8C8C", Soft = "#9FB4C8", Cyan = "#7FDBFF";
-    const float LW = 190f, RW = 196f, CardH = 302f, CardY = 36f, Gap = 4f;
+    const float LW = 190f, RW = 196f, CardH = 302f, CardY = 32f, Gap = 4f;
 
     // ---------------- state ----------------
     RocketDesign design = new RocketDesign();
@@ -59,7 +59,7 @@ public class RocketBuilderUI : MonoBehaviour
 
     // ---------------- ui refs ----------------
     readonly List<Image> chipImages = new List<Image>();
-    readonly List<Image> infoTabImages = new List<Image>();
+    Segmented infoSeg;
     GameObject selCard, deployDialog;
     GameObject[] infoViews;
     RectTransform chipRow, gridContent;
@@ -160,14 +160,13 @@ public class RocketBuilderUI : MonoBehaviour
         var raw = viewRt.gameObject.AddComponent<RawImage>(); raw.texture = preview.Texture;
         previewInput = viewRt.gameObject.AddComponent<RocketPreviewInput>(); previewInput.preview = preview;
         previewInput.picked = pr => { sel = pr == null ? Sel.None : Sel.Of(pr.kind, pr.index); RefreshAll(); };
-        Tip(viewRt.gameObject, "Drag: rotate   Right-drag: move   Scroll: zoom\nClick a part to select it");
 
         // top row: undo / redo / delete / auto
         var T = UIKit.T;
         undoBtn = UIKit.Btn(frame, "Undo", 4, 4, 26, 12, T.chip, Undo, 6f);
         redoBtn = UIKit.Btn(frame, "Redo", 32, 4, 26, 12, T.chip, Redo, 6f);
-        deleteBtn = UIKit.Btn(frame, "Delete", 60, 4, 30, 12, T.red, DeleteSelected, 6f);
-        var auto = UIKit.Btn(frame, "Auto order", 92, 4, 38, 12, T.chip, AutoOrderClicked, 6f);
+        deleteBtn = UIKit.Btn(frame, "Delete", 60, 4, 30, 12, T.chip, DeleteSelected, 6f, true, new Color(1f, 0.45f, 0.42f, 1f));
+        var auto = UIKit.Btn(frame, "Auto order", 92, 4, 40, 12, T.chip, AutoOrderClicked, 6f);
         Tip(auto.gameObject, "Fix the part order automatically\n<color=" + Soft + ">stages, decouplers, adapters, head on top</color>");
 
         // bottom row: view controls
@@ -175,7 +174,7 @@ public class RocketBuilderUI : MonoBehaviour
         var bPan = UIKit.Btn(frame, "Move", 32, 134, 26, 12, T.chip, () => SetPan(true), 6f);
         UIKit.Btn(frame, "Reset", 60, 134, 26, 12, T.chip, () => preview.ResetView(), 6f);
         rotImg = (Image)bRot.targetGraphic; panImg = (Image)bPan.targetGraphic;
-        Tip(bRot.gameObject, "Drag the view to rotate around it");
+        Tip(bRot.gameObject, "Drag the view to rotate around it\nScroll to zoom, click a part to select it");
         Tip(bPan.gameObject, "Drag the view to move it anywhere.\nRight or middle mouse button does this too.");
 
         // selected part caption
@@ -187,15 +186,8 @@ public class RocketBuilderUI : MonoBehaviour
         selCard = sc.gameObject;
 
         // ---- info area: stats / order / checks (and the blueprint lists) ----
-        string[] tabs = { "Stats", "Order", "Checks" };
-        infoTabImages.Clear();
-        for (int i = 0; i < tabs.Length; i++)
-        {
-            int idx = i;
-            var b = UIKit.Btn(card, tabs[i], 5 + i * 42, 159, 40, 12, T.chip, () => { infoView = idx; RefreshAll(); }, 6.5f);
-            infoTabImages.Add((Image)b.targetGraphic);
-        }
-        summaryText = UIKit.TextAt(card, "Summary", 5 + 3 * 42, 159, 180 - 3 * 42, 12, "", 6.2f, TextAlignmentOptions.MidlineRight);
+        infoSeg = new Segmented(card, 5, 158, 112, 13, new[] { "Stats", "Order", "Checks" }, 0, idx => { infoView = idx; RefreshAll(); });
+        summaryText = UIKit.TextAt(card, "Summary", 120, 158, 65, 13, "", 6f, TextAlignmentOptions.MidlineRight);
 
         const float ay = 174f, ah = 82f;
         infoViews = new GameObject[5];
@@ -217,12 +209,12 @@ public class RocketBuilderUI : MonoBehaviour
 
         // ---- name / save / deploy ----
         nameInput = UIKit.Input(card, 5, 261, 88, 14, "Rocket name", 18, 7f);
-        UIKit.Btn(card, "SAVE", 96, 261, 40, 14, T.chip, SaveRocket, 6.5f);
-        deployBtn = UIKit.Btn(card, "DEPLOY", 139, 261, 46, 14, T.chip, OpenDeploy, 6.5f);
+        UIKit.Btn(card, "Save", 96, 261, 40, 14, T.chip, SaveRocket, 6.5f);
+        deployBtn = UIKit.Btn(card, "Deploy", 139, 261, 46, 14, T.chip, OpenDeploy, 6.5f);
 
         // ---- blueprints (as in the reference) ----
-        var bp = UIKit.Btn(card, "BLUEPRINTS", 5, 280, 89, 18, T.blue, () => { infoView = infoView == 3 ? 0 : 3; RefreshAll(); }, 7f);
-        var buy = UIKit.Btn(card, "BUY BLUEPRINTS", 96, 280, 89, 18, T.purple, () => { infoView = infoView == 4 ? 0 : 4; RefreshAll(); }, 6.5f);
+        var bp = UIKit.Btn(card, "Blueprints", 5, 280, 89, 18, UIKit.Wash(T.blue, 0.35f), () => { infoView = infoView == 3 ? 0 : 3; RefreshAll(); }, 7f, true, new Color(0.7f, 0.69f, 1f, 1f));
+        var buy = UIKit.Btn(card, "Buy blueprints", 96, 280, 89, 18, UIKit.Wash(T.purple, 0.35f), () => { infoView = infoView == 4 ? 0 : 4; RefreshAll(); }, 7f, true, new Color(0.9f, 0.7f, 1f, 1f));
         bpBtnImg = (Image)bp.targetGraphic; buyBtnImg = (Image)buy.targetGraphic;
     }
 
@@ -254,8 +246,8 @@ public class RocketBuilderUI : MonoBehaviour
     void BuildRightCard(RectTransform root, float x)
     {
         var card = UIKit.Card(root, "Right Card", x, CardY, RW, CardH);
-        titleText = UIKit.TitleBar(card, "ROCKET DESIGNER", UIKit.T.orange, RW, () => gameObject.SetActive(false));
-        titleBar = titleText.transform.parent.GetComponent<Image>();
+        titleText = UIKit.TitleBar(card, "Rocket Designer", UIKit.T.orange, RW, () => gameObject.SetActive(false));
+        titleBar = UIKit.TitleAccent(titleText);
         chipRow = UIKit.At(card, "Categories", 6, 26, RW - 12, 20);
         gridContent = UIKit.ScrollList(card, "Parts", 6, 50, RW - 12, CardH - 56, UIKit.T.well, 3f, true, new Vector2(56, 78), 3);
         ((GridLayoutGroup)gridContent.GetComponent<GridLayoutGroup>()).padding = new RectOffset(3, 3, 3, 3);
@@ -264,7 +256,7 @@ public class RocketBuilderUI : MonoBehaviour
     void ApplyMode()
     {
         bool rocket = mode == DesignerMode.Rocket;
-        titleText.text = rocket ? "ROCKET DESIGNER" : "SATELLITE DESIGNER";
+        titleText.text = rocket ? "Rocket Designer" : "Satellite Designer";
         titleBar.color = Accent;
         previewInput.panMode = false; SetPan(false);
         nameInput.placeholder.GetComponent<TMP_Text>().text = rocket ? "Rocket name" : "Rocket name";
@@ -295,7 +287,7 @@ public class RocketBuilderUI : MonoBehaviour
         deployDialog = dim.gameObject;
         float bw = 232, bh = 222, bx = (W - bw) / 2, by = (H - bh) / 2;
         var box = UIKit.Card(dim, "Box", bx, by, bw, bh);
-        UIKit.TitleBar(box, "DEPLOY TO THE LAUNCH PAD", UIKit.T.green, bw, () => deployDialog.SetActive(false));
+        UIKit.TitleBar(box, "Deploy to the launch pad", UIKit.T.green, bw, () => deployDialog.SetActive(false));
         deployInfo = UIKit.TextAt(box, "Info", 10, 26, bw - 20, 30, "", 6.8f, TextAlignmentOptions.TopLeft);
         deployInfo.textWrappingMode = TextWrappingModes.Normal; deployInfo.lineSpacing = -6f;
         UIKit.Btn(box, "<", 12, 60, 16, 13, UIKit.T.chip, () => ShiftMonth(-1), 8f);
@@ -312,8 +304,8 @@ public class RocketBuilderUI : MonoBehaviour
             dayButtons.Add(b);
         }
         deployDate = UIKit.TextAt(box, "Picked", 0, 182, bw, 12, "", 7.5f, TextAlignmentOptions.Center);
-        UIKit.Btn(box, "CONFIRM DEPLOY", 12, 200, 104, 16, UIKit.T.green, ConfirmDeploy, 6.8f);
-        UIKit.Btn(box, "CANCEL", bw - 116, 200, 104, 16, UIKit.T.chip, () => deployDialog.SetActive(false), 6.8f);
+        UIKit.Btn(box, "Confirm deploy", 12, 200, 104, 16, UIKit.T.green, ConfirmDeploy, 6.8f);
+        UIKit.Btn(box, "Cancel", bw - 116, 200, 104, 16, UIKit.T.chip, () => deployDialog.SetActive(false), 6.8f);
     }
 
     // =============================================================== history (undo / redo)
@@ -503,9 +495,9 @@ public class RocketBuilderUI : MonoBehaviour
         if (!built) return;
         ValidateSel();
         for (int i = 0; i < chipImages.Count; i++) chipImages[i].color = i == catIdx ? Accent : UIKit.T.chip;
-        for (int i = 0; i < infoTabImages.Count; i++) infoTabImages[i].color = i == infoView ? UIKit.T.teal : UIKit.T.chip;
-        bpBtnImg.color = infoView == 3 ? new Color(0.4f, 0.75f, 1f, 1f) : UIKit.T.blue;
-        buyBtnImg.color = infoView == 4 ? new Color(0.85f, 0.65f, 1f, 1f) : UIKit.T.purple;
+        infoSeg.Select(infoView < 3 ? infoView : -1);
+        bpBtnImg.color = infoView == 3 ? UIKit.Wash(UIKit.T.blue, 0.65f) : UIKit.Wash(UIKit.T.blue, 0.35f);
+        buyBtnImg.color = infoView == 4 ? UIKit.Wash(UIKit.T.purple, 0.65f) : UIKit.Wash(UIKit.T.purple, 0.35f);
         for (int i = 0; i < infoViews.Length; i++) infoViews[i].SetActive(i == infoView);
         undoBtn.interactable = hIdx > 0;
         redoBtn.interactable = hIdx < history.Count - 1;
@@ -634,7 +626,7 @@ public class RocketBuilderUI : MonoBehaviour
             PartIcon(cell, part.id, 5, 3, 46, 36);
             UIKit.TextAt(cell, "Name", 2, 40, 52, 9, part.DisplayName, 5.5f, TextAlignmentOptions.Center, false, UIKit.T.dim).overflowMode = TextOverflowModes.Ellipsis;
             UIKit.TextAt(cell, "Price", 2, 49, 52, 11, "$" + part.costM.ToString("0.#") + " M", 7f, TextAlignmentOptions.Center, true, UIKit.T.priceText);
-            var b = UIKit.Btn(cell, equipped ? "EQUIPPED" : "EQUIP", 4, 62, 48, 13, equipped ? UIKit.T.chip : UIKit.T.green, () => AddPart(part), 6.5f);
+            var b = UIKit.Btn(cell, equipped ? "Equipped" : "Equip", 4, 62, 48, 13, equipped ? UIKit.T.chip : UIKit.Wash(UIKit.T.green, 0.6f), () => AddPart(part), 6.8f, true, equipped ? UIKit.T.dim : UIKit.T.ink);
             b.interactable = !equipped;
             Tip(cell.gameObject, Describe(part) + (string.IsNullOrEmpty(advisory) ? "" : "\n<color=" + Warn + ">" + advisory + "</color>"));
         }
@@ -740,7 +732,7 @@ public class RocketBuilderUI : MonoBehaviour
         UIKit.Clear(bpList); UIKit.Clear(buyList);
 
         // owned blueprints: bought demo designs, then my own saved rockets
-        ListHeader(bpList, "OWNED BLUEPRINTS");
+        ListHeader(bpList, "Owned blueprints");
         foreach (var dm in RocketDemos.All)
         {
             if (!DemoOwned(dm)) continue;
@@ -752,7 +744,7 @@ public class RocketBuilderUI : MonoBehaviour
             var dd = UIKit.TextAt(row, "D", 4, 12, 170, 10, demo.description, 6f, TextAlignmentOptions.TopLeft, false, T.dim); dd.overflowMode = TextOverflowModes.Ellipsis;
             Tip(row.gameObject, "<b>" + demo.name + "</b>\n" + demo.description);
         }
-        ListHeader(bpList, "MY ROCKETS");
+        ListHeader(bpList, "My rockets");
         var all = RocketSaves.All();
         foreach (var sr in all)
         {
@@ -772,7 +764,7 @@ public class RocketBuilderUI : MonoBehaviour
         }
 
         // shop
-        ListHeader(buyList, "BUY BLUEPRINTS   money: $" + UIKit.Money(Agency.Money));
+        ListHeader(buyList, "Buy blueprints  ·  you have $" + UIKit.Money(Agency.Money));
         bool any = false;
         foreach (var dm in RocketDemos.All)
         {
@@ -785,13 +777,13 @@ public class RocketBuilderUI : MonoBehaviour
             UIKit.Tint(row, T.chip);
             UIKit.TextAt(row, "T", 4, 2, 112, 10, demo.name, 7f, TextAlignmentOptions.TopLeft);
             var dd = UIKit.TextAt(row, "D", 4, 13, 112, 10, demo.description, 6f, TextAlignmentOptions.TopLeft, false, T.dim); dd.overflowMode = TextOverflowModes.Ellipsis;
-            var buy = UIKit.Btn(row, "BUY  $" + price.ToString("0.#") + " M", 0, 4, 58, 18, T.purple, () =>
+            var buy = UIKit.Btn(row, "Buy  $" + price.ToString("0.#") + " M", 0, 4, 58, 18, UIKit.Wash(T.purple, 0.4f), () =>
             {
                 if (!Agency.TrySpend((long)(price * 1_000_000f))) { Toast("Not enough money for this blueprint.", true); return; }
                 Agency.AddBlueprint(demo.name);
                 Toast("Blueprint bought: " + demo.name);
                 RefreshLists();
-            }, 6.2f);
+            }, 6.5f, true, new Color(0.9f, 0.7f, 1f, 1f));
             UIKit.AnchorRight((RectTransform)buy.transform, 3, 4);
             Tip(row.gameObject, "<b>" + demo.name + "</b>\n" + demo.description);
         }
