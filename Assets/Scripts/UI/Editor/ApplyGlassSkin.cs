@@ -95,6 +95,8 @@ public static class ApplyGlassSkin
             // Only old pixel-art sliced backgrounds (have 9-slice borders) are replaced; icons are left alone.
             var s = img.sprite;
             bool isBackground = s != null && s.border != Vector4.zero && s != round;
+            // Sprite-less panel containers (e.g. Main Menu Panel, Mission Bar) become glass too.
+            if (s == null && (img.name.Contains("Panel") || img.name == "Mission Bar")) isBackground = true;
             bool isGlassAlready = img.sprite == round;
             if (!isBackground && !isGlassAlready) continue;
             // Skip scrollbars/sliders handles etc. that are driven by other components.
@@ -116,7 +118,7 @@ public static class ApplyGlassSkin
             if (icon == null) continue;
             Image target = tr.name == "Money Icon" ? tr.GetComponent<Image>() : EnsureIconChild(tr);
             if (target == null) continue;
-            target.sprite = icon; target.type = Image.Type.Simple; target.preserveAspectRatio = true;
+            target.sprite = icon; target.type = Image.Type.Simple; target.preserveAspect = true;
             target.material = null; target.color = Color.white; target.raycastTarget = false;
             EditorUtility.SetDirty(target);
         }
