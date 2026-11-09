@@ -6270,12 +6270,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RocketBuilderUI
   library: {fileID: 11400000, guid: 2650fce13d2565644a5acd24c30c6dce, type: 2}
+  mode: 0
   flatMat: {fileID: 2100000, guid: 2bd45e38219680c40afa47a020480963, type: 2}
   roundSprite: {fileID: 21300000, guid: 3e83f34b2f690514d9bcb5c68e1ed0c1, type: 3}
   bodyFont: {fileID: 11400000, guid: 9d5cca48b2ed8e6448a061f40b659826, type: 2}
   headFont: {fileID: 11400000, guid: 5f3a5c8ac17e1654e84d9ed6af811af6, type: 2}
-  normalColor: {r: 0.17, g: 0.22, b: 0.31, a: 1}
-  activeColor: {r: 0.13, g: 0.5, b: 0.72, a: 1}
 --- !u!114 &686273662
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6289,8 +6288,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0.03, g: 0.05, b: 0.09, a: 1}
-  m_RaycastTarget: 1
+  m_Color: {r: 0, g: 0, b: 0, a: 0}
+  m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
@@ -8196,6 +8195,7 @@ GameObject:
   - component: {fileID: 956191468}
   - component: {fileID: 956191467}
   - component: {fileID: 956191466}
+  - component: {fileID: 956191470}
   m_Layer: 0
   m_Name: Canvas
   m_TagString: Untagged
@@ -8292,6 +8292,21 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0}
+--- !u!114 &956191470
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 956191465}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3bd507ec527cb443da405d58732a1653, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HudController
+  builder: {fileID: 686273661}
+  playIcon: {fileID: 21300000, guid: 9a8af687682369a41bb7acf7b7cc67b6, type: 3}
+  pauseIcon: {fileID: 21300000, guid: 96ec10b279dd5e44c847bdf09dcc3ed3, type: 3}
 --- !u!1001 &963240366
 PrefabInstance:
   m_ObjectHideFlags: 0

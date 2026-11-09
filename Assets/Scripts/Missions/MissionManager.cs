@@ -77,6 +77,17 @@ public class MissionManager : MonoBehaviour
         return true;
     }
 
+    /// <summary>Gives up a running contract: it goes back to the available list and its progress is lost.</summary>
+    public bool AbandonMission(MissionInstance mission)
+    {
+        if (mission == null || !running.Remove(mission)) return false;
+        if (!available.Contains(mission.Definition)) available.Add(mission.Definition);
+        if (Tracked == mission) Tracked = running.Count > 0 ? running[0] : null;
+        Agency.AddReputation(-5);
+        Changed?.Invoke();
+        return true;
+    }
+
     /// <summary>Hook for other systems: set progress (0..1) of a running mission by id.</summary>
     public bool SetProgress(string missionId, float progress)
     {
@@ -100,6 +111,8 @@ public class MissionManager : MonoBehaviour
         running.Remove(m);
         completed.Add(m);
         if (Tracked == m) Tracked = running.Count > 0 ? running[0] : null;
+        Agency.Earn(m.Definition.budget);
+        Agency.AddReputation(25);
         MissionCompleted?.Invoke(m);
         Changed?.Invoke();
     }

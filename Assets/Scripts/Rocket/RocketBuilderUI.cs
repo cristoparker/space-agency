@@ -6,90 +6,93 @@ using System.Text;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using UnityEngine.Events;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
+public enum DesignerMode { Rocket, Payload }
+
 /// <summary>
-/// The Rocket Builder screen, laid out like a space-flight-simulator editor:
-/// icon sidebar (hover = name) -> part flyout, full-screen 3D view (click a part to select, outline + highlight),
-/// slim right panel (drag-to-reorder hierarchy, stats, contract, saved rockets) and a top bar with
-/// Undo / Redo / Delete / Auto order / Save / Deploy. Everything is created in code the first time it opens.
+/// The Rocket Designer and the Satellite (Payload) Designer, laid out like the reference screens:
+/// a left card with the 3D preview, a stats area and the Blueprints / Buy Blueprints buttons,
+/// and a right card with a coloured title, category chips and a 3-column grid of parts with a price and an EQUIP button.
+/// Missing from the reference and added here: undo / redo / delete / auto order, the build order list, contract checks,
+/// naming + saving, and Deploy with a launch-date calendar. Built in code the first time it opens.
+/// Uses the existing glass materials through <see cref="UIKit"/>; nothing about the glass look is changed.
 /// </summary>
 public class RocketBuilderUI : MonoBehaviour
 {
     [Header("Data")]
     public PartLibrary library;
+    public DesignerMode mode = DesignerMode.Rocket;
 
-    [Header("Style")]
-    public Material flatMat;
-    public Sprite roundSprite;
-    public TMP_FontAsset bodyFont, headFont;
-    public Color normalColor = new Color(0.17f, 0.22f, 0.31f, 1f);
-    public Color activeColor = new Color(0.13f, 0.5f, 0.72f, 1f);
+    // Kept so the existing scene (and the setup tool) still serialise: the look now comes from Resources/UITheme.
+    [HideInInspector] public Material flatMat;
+    [HideInInspector] public Sprite roundSprite;
+    [HideInInspector] public TMP_FontAsset bodyFont, headFont;
 
-    static readonly (string label, string[] cats, string icon)[] Tabs =
+    static readonly (string label, string cat)[] RocketCats =
     {
-        ("Engines", new[] { "Engine" }, "Eng_M_Lifter"), ("Thrusters", new[] { "Thruster" }, "Thr_RCS_Block"), ("Fuel tanks", new[] { "Tank" }, "Tank_M_Short"),
-        ("Rocket heads", new[] { "Head" }, "Head_Fairing_M"), ("Side boosters", new[] { "Booster" }, "Booster_M"),
-        ("Payloads", new[] { "Payload" }, "Pay_Satellite_M"), ("Communication", new[] { "Comms" }, "Com_Dish_S"),
-        ("Power", new[] { "Power" }, "Pow_Solar_S"), ("Landing & recovery", new[] { "Recovery" }, "Rec_Parachute_M"),
-        ("Structure & control", new[] { "Structure" }, "Dec_M"),
+        ("Engines", "Engine"), ("Fuel tanks", "Tank"), ("Rocket heads", "Head"), ("Side boosters", "Booster"),
+        ("Thrusters", "Thruster"), ("Structure & control", "Structure"), ("Landing & recovery", "Recovery"),
+    };
+    static readonly (string label, string cat)[] PayloadCats =
+    {
+        ("Payloads", "Payload"), ("Communication", "Comms"), ("Power", "Power"),
     };
 
-    static readonly string[] RightTabs = { "Build", "Stats", "Mission", "Saved" };
-
     const string SaveKey = "SpaceAgency.RocketDesign", NameKey = "SpaceAgency.RocketName";
-    static readonly Color Ink = new Color(0.92f, 0.95f, 1f, 1f), Dim = new Color(0.92f, 0.95f, 1f, 0.5f);
-    static readonly Color Bar = new Color(0.05f, 0.07f, 0.11f, 1f);
-    static readonly Color Well = new Color(0.085f, 0.115f, 0.17f, 1f), RowColor = new Color(0.13f, 0.17f, 0.25f, 1f), AttachColor = new Color(0.1f, 0.24f, 0.33f, 1f);
-    static readonly Color Ready = new Color(0.16f, 0.5f, 0.36f, 1f);
     const string Good = "#8FE3B0", Warn = "#FFB878", Bad = "#FF8C8C", Soft = "#9FB4C8", Cyan = "#7FDBFF";
-    const int LB = 34, RB = 134;
+    const float LW = 190f, RW = 196f, CardH = 302f, CardY = 36f, Gap = 4f;
 
     // ---------------- state ----------------
     RocketDesign design = new RocketDesign();
     RocketPreview preview;
     RocketReport report;
     Sel sel = Sel.None;
-    int openTab = -1, rightTab;
+    int catIdx, infoView;                 // infoView: 0 stats, 1 order, 2 checks, 3 blueprints, 4 buy blueprints
     bool built;
     float W = 640f, H = 360f;
-    float toastTimer;
     readonly List<string> history = new List<string>();
     int hIdx = -1;
     readonly List<MissionDefinition> missions = new List<MissionDefinition> { null };
     int missionIndex;
 
     // ---------------- ui refs ----------------
-    readonly List<Image> tabImages = new List<Image>();
-    readonly List<Image> rightTabImages = new List<Image>();
-    GameObject flyout, selCard, deployDialog;
-    GameObject[] rightViews;
-    Transform flyList, hierList, savedList;
-    TMP_Text flyTitle, statsText, checksText, missionLabel, summaryText, toastText, cardText, deployInfo, deployDate, monthLabel;
+    readonly List<Image> chipImages = new List<Image>();
+    readonly List<Image> infoTabImages = new List<Image>();
+    GameObject selCard, deployDialog;
+    GameObject[] infoViews;
+    RectTransform chipRow, gridContent;
+    Transform hierList, bpList, buyList;
+    TMP_Text titleText, statsText, checksText, missionLabel, summaryText, cardText, deployInfo, deployDate, monthLabel;
+    Image titleBar, rotImg, panImg, bpBtnImg, buyBtnImg;
     TMP_InputField nameInput;
     Button undoBtn, redoBtn, deleteBtn, deployBtn;
+    RocketPreviewInput previewInput;
     readonly List<Button> dayButtons = new List<Button>();
     DateTime viewMonth, minDate;
     DateTime? pickDate;
 
     MissionDefinition Mission => missionIndex > 0 && missionIndex < missions.Count ? missions[missionIndex] : null;
+    (string label, string cat)[] Cats => mode == DesignerMode.Rocket ? RocketCats : PayloadCats;
+    Color Accent => mode == DesignerMode.Rocket ? UIKit.T.orange : UIKit.T.purple;
 
     // =============================================================== lifecycle
     void OnEnable()
     {
         if (library == null) { Debug.LogWarning("RocketBuilderUI: no PartLibrary assigned."); return; }
+        if (UITheme.Current == null) { Debug.LogError("RocketBuilderUI: Resources/UITheme is missing. Run Tools / Space Agency / Setup Game UI."); return; }
         Canvas.ForceUpdateCanvases();
         if (!built) Build();
         transform.SetAsLastSibling();
         design = RocketDesign.FromJson(PlayerPrefs.GetString(SaveKey, ""));
         design.stack.RemoveAll(id => library.Get(id) == null);
         history.Clear(); hIdx = -1; Commit();
-        sel = Sel.None; openTab = -1; rightTab = 0;
+        sel = Sel.None; catIdx = 0; infoView = 0;
         nameInput.text = PlayerPrefs.GetString(NameKey, "");
         deployDialog.SetActive(false);
         RefreshMissions();
+        ApplyMode();
         preview.SetActive(true);
         RefreshAll();
     }
@@ -108,7 +111,6 @@ public class RocketBuilderUI : MonoBehaviour
     void Update()
     {
         if (!built) return;
-        if (toastTimer > 0f) { toastTimer -= Time.unscaledDeltaTime; if (toastTimer <= 0f) toastText.text = ""; }
         var kb = Keyboard.current;
         if (kb == null || nameInput.isFocused || deployDialog.activeSelf) return;
         bool ctrl = kb.ctrlKey.isPressed;
@@ -117,149 +119,12 @@ public class RocketBuilderUI : MonoBehaviour
         if (ctrl && kb.yKey.wasPressedThisFrame) Redo();
     }
 
-    // =============================================================== ui helpers
-    RectTransform Rt(Transform parent, string name, float x, float y, float w, float h)
-    {
-        var r = new GameObject(name, typeof(RectTransform)).GetComponent<RectTransform>();
-        r.SetParent(parent, false);
-        r.anchorMin = r.anchorMax = new Vector2(0f, 1f);
-        r.pivot = new Vector2(0f, 1f);
-        r.anchoredPosition = new Vector2(x, -y);
-        r.sizeDelta = new Vector2(w, h);
-        return r;
-    }
-
-    static void Stretch(RectTransform r, float l = 0, float t = 0, float rr = 0, float b = 0)
-    {
-        r.anchorMin = Vector2.zero; r.anchorMax = Vector2.one; r.pivot = new Vector2(0.5f, 0.5f);
-        r.offsetMin = new Vector2(l, b); r.offsetMax = new Vector2(-rr, -t);
-    }
-
-    static Sprite roundedSprite;
-
-    // A plain white rounded rectangle (9-sliced), drawn with the normal UI shader: flat colours, no blur or glass.
-    static Sprite Rounded()
-    {
-        if (roundedSprite != null) return roundedSprite;
-        const int n = 32; const float r = 10f;
-        var tex = new Texture2D(n, n, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
-        var px = new Color32[n * n];
-        for (int y = 0; y < n; y++)
-            for (int x = 0; x < n; x++)
-            {
-                float dx = Mathf.Max(r - (x + 0.5f), (x + 0.5f) - (n - r), 0f), dy = Mathf.Max(r - (y + 0.5f), (y + 0.5f) - (n - r), 0f);
-                float a = Mathf.Clamp01(r - Mathf.Sqrt(dx * dx + dy * dy) + 0.5f);
-                px[y * n + x] = new Color(1f, 1f, 1f, a);
-            }
-        tex.SetPixels32(px); tex.Apply();
-        roundedSprite = Sprite.Create(tex, new Rect(0, 0, n, n), new Vector2(0.5f, 0.5f), 150f, 0, SpriteMeshType.FullRect, new Vector4(r, r, r, r));
-        return roundedSprite;
-    }
-
-    Image Img(RectTransform r, Color c)
-    {
-        var i = r.gameObject.AddComponent<Image>();
-        i.sprite = Rounded(); i.type = Image.Type.Sliced; i.color = c;
-        return i;
-    }
-
-    // Hover brightens, press darkens, disabled dims. Works on flat colours.
-    static void Style(Button b)
-    {
-        var cb = b.colors;
-        cb.normalColor = Color.white; cb.selectedColor = Color.white;
-        cb.highlightedColor = new Color(1.3f, 1.3f, 1.3f, 1f);
-        cb.pressedColor = new Color(0.75f, 0.75f, 0.75f, 1f);
-        cb.disabledColor = new Color(0.55f, 0.55f, 0.55f, 1f);
-        cb.fadeDuration = 0.06f;
-        b.colors = cb;
-    }
-
-    TMP_Text Txt(Transform parent, string s, float size, TextAlignmentOptions al, bool head = false)
-    {
-        var r = new GameObject("Text", typeof(RectTransform)).GetComponent<RectTransform>();
-        r.SetParent(parent, false);
-        Stretch(r);
-        var t = r.gameObject.AddComponent<TextMeshProUGUI>();
-        t.font = head ? headFont : bodyFont;
-        t.fontSize = size; t.color = Ink; t.alignment = al; t.text = s;
-        t.textWrappingMode = TextWrappingModes.NoWrap; t.raycastTarget = false;
-        return t;
-    }
-
-    Button Btn(Transform parent, string label, float x, float y, float w, float h, UnityAction click, float size = 8f)
-    {
-        var r = Rt(parent, label, x, y, w, h);
-        var img = Img(r, normalColor);
-        var b = r.gameObject.AddComponent<Button>();
-        b.targetGraphic = img;
-        b.onClick.AddListener(click);
-        Style(b);
-        Txt(r, label, size, TextAlignmentOptions.Center);
-        return b;
-    }
+    void Toast(string msg, bool bad = false) => Hud.Toast(msg);
 
     static void Tip(GameObject go, string text) => go.AddComponent<TooltipTrigger>().text = text;
 
-    Image Icon(Transform parent, string id, float x, float y, float w, float h)
-    {
-        var r = Rt(parent, "Icon", x, y, w, h);
-        var i = r.gameObject.AddComponent<Image>();
-        i.sprite = library.Icon(id); i.preserveAspect = true; i.raycastTarget = false;
-        i.enabled = i.sprite != null;
-        return i;
-    }
-
-    Transform ScrollList(Transform parent, string name, float x, float y, float w, float h, Color bg)
-    {
-        var root = Rt(parent, name, x, y, w, h);
-        Img(root, bg);
-        var vp = Rt(root, "Viewport", 0, 0, w, h); Stretch(vp, 1, 1, 1, 1);
-        vp.gameObject.AddComponent<RectMask2D>();
-        var content = Rt(vp, "Content", 0, 0, w - 2, 10);
-        content.anchorMin = new Vector2(0, 1); content.anchorMax = new Vector2(1, 1); content.pivot = new Vector2(0.5f, 1f);
-        content.offsetMin = Vector2.zero; content.offsetMax = Vector2.zero;
-        var v = content.gameObject.AddComponent<VerticalLayoutGroup>();
-        v.spacing = 2; v.padding = new RectOffset(1, 1, 1, 1);
-        v.childControlWidth = true; v.childControlHeight = true; v.childForceExpandWidth = true; v.childForceExpandHeight = false;
-        content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-        var sr = root.gameObject.AddComponent<ScrollRect>();
-        sr.viewport = vp; sr.content = content; sr.horizontal = false; sr.scrollSensitivity = 14f; sr.movementType = ScrollRect.MovementType.Clamped;
-        return content;
-    }
-
-    TMP_Text ScrollText(Transform parent, string name, float x, float y, float w, float h)
-    {
-        var root = Rt(parent, name, x, y, w, h);
-        Img(root, Well);
-        var vp = Rt(root, "Viewport", 0, 0, w, h); Stretch(vp, 1, 1, 1, 1);
-        vp.gameObject.AddComponent<RectMask2D>();
-        var t = new GameObject("Text", typeof(RectTransform)).GetComponent<RectTransform>();
-        t.SetParent(vp, false);
-        t.anchorMin = new Vector2(0, 1); t.anchorMax = new Vector2(1, 1); t.pivot = new Vector2(0.5f, 1f);
-        t.offsetMin = new Vector2(3, 0); t.offsetMax = new Vector2(-3, 0);
-        var tm = t.gameObject.AddComponent<TextMeshProUGUI>();
-        tm.font = bodyFont; tm.fontSize = 7.5f; tm.color = Ink; tm.alignment = TextAlignmentOptions.TopLeft;
-        tm.textWrappingMode = TextWrappingModes.Normal; tm.raycastTarget = false; tm.lineSpacing = -5f;
-        t.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-        var sr = root.gameObject.AddComponent<ScrollRect>();
-        sr.viewport = vp; sr.content = t; sr.horizontal = false; sr.scrollSensitivity = 14f; sr.movementType = ScrollRect.MovementType.Clamped;
-        return tm;
-    }
-
-    TMP_InputField Input(Transform parent, float x, float y, float w, float h, string hint)
-    {
-        var r = Rt(parent, "Name", x, y, w, h);
-        var bg = Img(r, normalColor);
-        var inp = r.gameObject.AddComponent<TMP_InputField>();
-        var area = Rt(r, "Text Area", 0, 0, w, h); Stretch(area, 4, 0, 4, 0);
-        area.gameObject.AddComponent<RectMask2D>();
-        var txt = Txt(area, "", 8f, TextAlignmentOptions.MidlineLeft);
-        var ph = Txt(area, hint, 8f, TextAlignmentOptions.MidlineLeft); ph.color = Dim; ph.fontStyle = FontStyles.Italic;
-        inp.textViewport = area; inp.textComponent = txt; inp.placeholder = ph; inp.targetGraphic = bg;
-        inp.characterLimit = 18; inp.lineType = TMP_InputField.LineType.SingleLine;
-        return inp;
-    }
+    Image PartIcon(Transform parent, string id, float x, float y, float w, float h)
+        => UIKit.IconAt(parent, library.Icon(id), x, y, w, h);
 
     // =============================================================== layout
     void Build()
@@ -269,146 +134,186 @@ public class RocketBuilderUI : MonoBehaviour
         W = root.rect.width > 10 ? root.rect.width : 640f;
         H = root.rect.height > 10 ? root.rect.height : 360f;
 
-        // ---- full-screen 3D view ----
-        int rtW = Mathf.Clamp(Screen.width, 1280, 2560);
-        preview = RocketPreview.Create(rtW, Mathf.RoundToInt(rtW * H / W));          // as many pixels as the screen: stays sharp when zoomed out
-        var view = Rt(root, "View", 0, 0, W, H); Stretch(view);
-        var raw = view.gameObject.AddComponent<RawImage>(); raw.texture = preview.Texture;
-        var pin = view.gameObject.AddComponent<RocketPreviewInput>(); pin.preview = preview;
-        pin.picked = pr => { sel = pr == null ? Sel.None : Sel.Of(pr.kind, pr.index); RefreshAll(); };
-        var hint = Txt(Rt(root, "Hint", LB + 114, H - 14, W - LB - RB - 120, 12), "drag: rotate    right-drag: move view    scroll: zoom    click a part: select", 7f, TextAlignmentOptions.Center);
-        hint.color = Dim;
-        float cx = LB + 114 + (W - LB - RB - 120) / 2f;
-        Image rotImg = null, panImg = null;
-        var bRot = Btn(root, "Rotate", cx - 80, 30, 50, 14, () => { pin.panMode = false; rotImg.color = activeColor; panImg.color = normalColor; }, 7.5f);
-        var bPan = Btn(root, "Move", cx - 28, 30, 50, 14, () => { pin.panMode = true; rotImg.color = normalColor; panImg.color = activeColor; }, 7.5f);
-        Btn(root, "Reset view", cx + 24, 30, 58, 14, () => preview.ResetView(), 7.5f);
-        rotImg = (Image)bRot.targetGraphic; panImg = (Image)bPan.targetGraphic; rotImg.color = activeColor;
-        Tip(bRot.gameObject, "Drag the view to rotate around the rocket");
-        Tip(bPan.gameObject, "Drag the view to move it anywhere.\nRight or middle mouse button does this too.");
+        // the old full-screen dark backdrop is gone: the game stays visible behind the two cards
+        var bg = GetComponent<Image>();
+        if (bg != null) { bg.color = Color.clear; bg.raycastTarget = false; }
 
-        BuildTopBar(root);
-        BuildLeftBar(root);
-        BuildFlyout(root);
-        BuildRightBar(root);
-        BuildBottom(root);
+        float leftX = W - 8f - (LW + Gap + RW), rightX = leftX + LW + Gap;
+        BuildLeftCard(root, leftX);
+        BuildRightCard(root, rightX);
         BuildDeployDialog(root);
         built = true;
     }
 
-    void BuildTopBar(RectTransform root)
+    void BuildLeftCard(RectTransform root, float x)
     {
-        var top = Rt(root, "TopBar", 0, 0, W, 26);
-        Img(top, Bar);
-        var title = Txt(Rt(top, "Title", 38, 0, 110, 26), "Rocket Builder", 9f, TextAlignmentOptions.MidlineLeft, true);
-        title.color = Ink;
-        undoBtn = Btn(top, "Undo", 152, 5, 34, 16, Undo);
-        redoBtn = Btn(top, "Redo", 188, 5, 34, 16, Redo);
-        deleteBtn = Btn(top, "Delete", 226, 5, 40, 16, DeleteSelected);
-        var auto = Btn(top, "Auto order", 270, 5, 58, 16, AutoOrderClicked);
+        var card = UIKit.Card(root, "Left Card", x, CardY, LW, CardH);
+
+        // ---- 3D preview ----
+        int rtW = 1024, rtH = Mathf.RoundToInt(rtW * 150f / 180f);
+        preview = RocketPreview.Create(rtW, rtH);
+        var frame = UIKit.At(card, "Preview", 5, 5, 180, 150);
+        UIKit.Tint(frame, new Color(0.02f, 0.04f, 0.08f, 1f));
+        var clip = UIKit.At(frame, "Clip", 0, 0, 180, 150); UIKit.Fill(clip, 1, 1, 1, 1);
+        clip.gameObject.AddComponent<RectMask2D>();
+        var viewRt = UIKit.At(clip, "View", 0, 0, 178, 148); UIKit.Fill(viewRt);
+        var raw = viewRt.gameObject.AddComponent<RawImage>(); raw.texture = preview.Texture;
+        previewInput = viewRt.gameObject.AddComponent<RocketPreviewInput>(); previewInput.preview = preview;
+        previewInput.picked = pr => { sel = pr == null ? Sel.None : Sel.Of(pr.kind, pr.index); RefreshAll(); };
+        Tip(viewRt.gameObject, "Drag: rotate   Right-drag: move   Scroll: zoom\nClick a part to select it");
+
+        // top row: undo / redo / delete / auto
+        var T = UIKit.T;
+        undoBtn = UIKit.Btn(frame, "Undo", 4, 4, 26, 12, T.chip, Undo, 6f);
+        redoBtn = UIKit.Btn(frame, "Redo", 32, 4, 26, 12, T.chip, Redo, 6f);
+        deleteBtn = UIKit.Btn(frame, "Delete", 60, 4, 30, 12, T.red, DeleteSelected, 6f);
+        var auto = UIKit.Btn(frame, "Auto order", 92, 4, 38, 12, T.chip, AutoOrderClicked, 6f);
         Tip(auto.gameObject, "Fix the part order automatically\n<color=" + Soft + ">stages, decouplers, adapters, head on top</color>");
-        summaryText = Txt(Rt(top, "Summary", 334, 0, 118, 26), "", 7.5f, TextAlignmentOptions.MidlineLeft);
-        nameInput = Input(top, W - 186, 5, 76, 16, "Rocket name");
-        Btn(top, "Save", W - 108, 5, 36, 16, SaveRocket);
-        deployBtn = Btn(top, "Deploy", W - 70, 5, 46, 16, OpenDeploy);
-        Btn(top, "x", W - 22, 5, 18, 16, () => gameObject.SetActive(false));
-    }
 
-    void BuildLeftBar(RectTransform root)
-    {
-        var bar = Rt(root, "LeftBar", 0, 26, LB, H - 26);
-        Img(bar, Bar);
-        tabImages.Clear();
-        for (int i = 0; i < Tabs.Length; i++)
+        // bottom row: view controls
+        var bRot = UIKit.Btn(frame, "Rotate", 4, 134, 26, 12, T.teal, () => SetPan(false), 6f);
+        var bPan = UIKit.Btn(frame, "Move", 32, 134, 26, 12, T.chip, () => SetPan(true), 6f);
+        UIKit.Btn(frame, "Reset", 60, 134, 26, 12, T.chip, () => preview.ResetView(), 6f);
+        rotImg = (Image)bRot.targetGraphic; panImg = (Image)bPan.targetGraphic;
+        Tip(bRot.gameObject, "Drag the view to rotate around it");
+        Tip(bPan.gameObject, "Drag the view to move it anywhere.\nRight or middle mouse button does this too.");
+
+        // selected part caption
+        var sc = UIKit.At(frame, "Selected", 4, 100, 172, 30);
+        UIKit.Tint(sc, new Color(0.02f, 0.05f, 0.1f, 0.82f));
+        cardText = UIKit.Text(sc, "", 6.2f, TextAlignmentOptions.MidlineLeft);
+        UIKit.Fill((RectTransform)cardText.transform, 4, 1, 4, 1);
+        cardText.textWrappingMode = TextWrappingModes.Normal; cardText.lineSpacing = -8f;
+        selCard = sc.gameObject;
+
+        // ---- info area: stats / order / checks (and the blueprint lists) ----
+        string[] tabs = { "Stats", "Order", "Checks" };
+        infoTabImages.Clear();
+        for (int i = 0; i < tabs.Length; i++)
         {
             int idx = i;
-            var r = Rt(bar, Tabs[i].label, 5, 5 + i * 27, 24, 24);
-            var img = Img(r, normalColor);
-            var b = r.gameObject.AddComponent<Button>(); b.targetGraphic = img; Style(b);
-            b.onClick.AddListener(() => { openTab = openTab == idx ? -1 : idx; RefreshAll(); });
-            Icon(r, Tabs[i].icon, 2, 2, 20, 20);
-            Tip(r.gameObject, Tabs[i].label);
-            tabImages.Add(img);
+            var b = UIKit.Btn(card, tabs[i], 5 + i * 42, 159, 40, 12, T.chip, () => { infoView = idx; RefreshAll(); }, 6.5f);
+            infoTabImages.Add((Image)b.targetGraphic);
+        }
+        summaryText = UIKit.TextAt(card, "Summary", 5 + 3 * 42, 159, 180 - 3 * 42, 12, "", 6.2f, TextAlignmentOptions.MidlineRight);
+
+        const float ay = 174f, ah = 82f;
+        infoViews = new GameObject[5];
+        var vStats = UIKit.At(card, "StatsView", 5, ay, 180, ah);
+        statsText = ScrollText(vStats, 180, ah);
+        var vOrder = UIKit.At(card, "OrderView", 5, ay, 180, ah);
+        hierList = UIKit.ScrollList(vOrder, "Order", 0, 0, 180, ah, T.well, 2f);
+        var vChecks = UIKit.At(card, "ChecksView", 5, ay, 180, ah);
+        UIKit.Btn(vChecks, "<", 0, 0, 14, 12, T.chip, () => ChangeMission(-1), 7f);
+        missionLabel = UIKit.TextAt(vChecks, "Contract", 16, 0, 148, 12, "", 6.5f, TextAlignmentOptions.Center);
+        UIKit.Btn(vChecks, ">", 166, 0, 14, 12, T.chip, () => ChangeMission(1), 7f);
+        var chk = UIKit.At(vChecks, "Checks", 0, 14, 180, ah - 14);
+        checksText = ScrollText(chk, 180, ah - 14);
+        var vBp = UIKit.At(card, "BlueprintView", 5, ay, 180, ah);
+        bpList = UIKit.ScrollList(vBp, "Blueprints", 0, 0, 180, ah, T.well, 2f);
+        var vBuy = UIKit.At(card, "BuyView", 5, ay, 180, ah);
+        buyList = UIKit.ScrollList(vBuy, "Buy", 0, 0, 180, ah, T.well, 2f);
+        infoViews[0] = vStats.gameObject; infoViews[1] = vOrder.gameObject; infoViews[2] = vChecks.gameObject; infoViews[3] = vBp.gameObject; infoViews[4] = vBuy.gameObject;
+
+        // ---- name / save / deploy ----
+        nameInput = UIKit.Input(card, 5, 261, 88, 14, "Rocket name", 18, 7f);
+        UIKit.Btn(card, "SAVE", 96, 261, 40, 14, T.chip, SaveRocket, 6.5f);
+        deployBtn = UIKit.Btn(card, "DEPLOY", 139, 261, 46, 14, T.chip, OpenDeploy, 6.5f);
+
+        // ---- blueprints (as in the reference) ----
+        var bp = UIKit.Btn(card, "BLUEPRINTS", 5, 280, 89, 18, T.blue, () => { infoView = infoView == 3 ? 0 : 3; RefreshAll(); }, 7f);
+        var buy = UIKit.Btn(card, "BUY BLUEPRINTS", 96, 280, 89, 18, T.purple, () => { infoView = infoView == 4 ? 0 : 4; RefreshAll(); }, 6.5f);
+        bpBtnImg = (Image)bp.targetGraphic; buyBtnImg = (Image)buy.targetGraphic;
+    }
+
+    TMP_Text ScrollText(RectTransform parent, float w, float h)
+    {
+        var root = UIKit.At(parent, "Scroll", 0, 0, w, h);
+        UIKit.Tint(root, UIKit.T.well);
+        var vp = UIKit.At(root, "Viewport", 0, 0, w, h); UIKit.Fill(vp, 2, 2, 2, 2);
+        vp.gameObject.AddComponent<RectMask2D>();
+        var t = UIKit.At(vp, "Text", 0, 0, w - 4, 10);
+        t.anchorMin = new Vector2(0, 1); t.anchorMax = new Vector2(1, 1); t.pivot = new Vector2(0.5f, 1f);
+        t.offsetMin = new Vector2(2, 0); t.offsetMax = new Vector2(-2, 0);
+        var tm = t.gameObject.AddComponent<TextMeshProUGUI>();
+        tm.font = UIKit.T.body; tm.fontSize = 6.8f; tm.color = UIKit.T.ink; tm.alignment = TextAlignmentOptions.TopLeft;
+        tm.textWrappingMode = TextWrappingModes.Normal; tm.raycastTarget = false; tm.lineSpacing = -6f;
+        t.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        var sr = root.gameObject.AddComponent<ScrollRect>();
+        sr.viewport = vp; sr.content = t; sr.horizontal = false; sr.scrollSensitivity = 14f; sr.movementType = ScrollRect.MovementType.Clamped;
+        return tm;
+    }
+
+    void SetPan(bool pan)
+    {
+        previewInput.panMode = pan;
+        rotImg.color = pan ? UIKit.T.chip : UIKit.T.teal;
+        panImg.color = pan ? UIKit.T.teal : UIKit.T.chip;
+    }
+
+    void BuildRightCard(RectTransform root, float x)
+    {
+        var card = UIKit.Card(root, "Right Card", x, CardY, RW, CardH);
+        titleText = UIKit.TitleBar(card, "ROCKET DESIGNER", UIKit.T.orange, RW, () => gameObject.SetActive(false));
+        titleBar = titleText.transform.parent.GetComponent<Image>();
+        chipRow = UIKit.At(card, "Categories", 6, 26, RW - 12, 20);
+        gridContent = UIKit.ScrollList(card, "Parts", 6, 50, RW - 12, CardH - 56, UIKit.T.well, 3f, true, new Vector2(56, 78), 3);
+        ((GridLayoutGroup)gridContent.GetComponent<GridLayoutGroup>()).padding = new RectOffset(3, 3, 3, 3);
+    }
+
+    void ApplyMode()
+    {
+        bool rocket = mode == DesignerMode.Rocket;
+        titleText.text = rocket ? "ROCKET DESIGNER" : "SATELLITE DESIGNER";
+        titleBar.color = Accent;
+        previewInput.panMode = false; SetPan(false);
+        nameInput.placeholder.GetComponent<TMP_Text>().text = rocket ? "Rocket name" : "Rocket name";
+        // category chips
+        UIKit.Clear(chipRow);
+        chipImages.Clear();
+        var cats = Cats;
+        float cw = Mathf.Min(26f, (RW - 12 - 2f * (cats.Length - 1)) / cats.Length);
+        for (int i = 0; i < cats.Length; i++)
+        {
+            int idx = i;
+            string cat = cats[i].cat;
+            var r = UIKit.At(chipRow, cats[i].label, i * (cw + 2f), 0, cw, 20);
+            var b = UIKit.MakeButton(r, "", UIKit.T.chip, () => { catIdx = idx; RefreshAll(); });
+            var first = library.Parts.FirstOrDefault(p => p.category == cat);
+            if (first != null) PartIcon(r, first.id, 2, 2, cw - 4, 16);
+            else UIKit.Text(r, cats[i].label.Substring(0, 1), 8f);
+            Tip(r.gameObject, cats[i].label);
+            chipImages.Add((Image)b.targetGraphic);
         }
     }
 
-    void BuildFlyout(RectTransform root)
-    {
-        var f = Rt(root, "Flyout", LB + 2, 26, 108, H - 26);
-        Img(f, Bar);
-        flyTitle = Txt(Rt(f, "Title", 0, 0, 108, 16), "", 8f, TextAlignmentOptions.Center);
-        flyTitle.color = new Color(0.5f, 0.86f, 1f, 1f);
-        flyList = ScrollList(f, "Parts", 2, 17, 104, H - 26 - 20, Well);
-        flyout = f.gameObject;
-    }
-
-    void BuildRightBar(RectTransform root)
-    {
-        float x0 = W - RB, vw = RB - 8, vh = H - 26 - 22 - 4;
-        var bar = Rt(root, "RightBar", x0, 26, RB, H - 26);
-        Img(bar, Bar);
-        rightTabImages.Clear();
-        float tw = (RB - 8 - 3 * 2) / 4f;
-        for (int i = 0; i < RightTabs.Length; i++)
-        {
-            int idx = i;
-            var b = Btn(bar, RightTabs[i], 4 + i * (tw + 2), 3, tw, 14, () => { rightTab = idx; RefreshAll(); }, 7f);
-            rightTabImages.Add(b.targetGraphic as Image);
-        }
-        rightViews = new GameObject[4];
-        var vBuild = Rt(bar, "BuildView", 4, 20, vw, vh); hierList = ScrollList(vBuild, "Hierarchy", 0, 0, vw, vh, Well);
-        var vStats = Rt(bar, "StatsView", 4, 20, vw, vh); statsText = ScrollText(vStats, "Stats", 0, 0, vw, vh);
-        var vMission = Rt(bar, "MissionView", 4, 20, vw, vh);
-        Btn(vMission, "<", 0, 0, 14, 14, () => ChangeMission(-1));
-        missionLabel = Txt(Rt(vMission, "Contract", 16, 0, vw - 32, 14), "", 7.5f, TextAlignmentOptions.Midline);
-        Btn(vMission, ">", vw - 14, 0, 14, 14, () => ChangeMission(1));
-        checksText = ScrollText(vMission, "Checks", 0, 17, vw, vh - 17);
-        var vSaved = Rt(bar, "SavedView", 4, 20, vw, vh); savedList = ScrollList(vSaved, "Saved", 0, 0, vw, vh, Well);
-        rightViews[0] = vBuild.gameObject; rightViews[1] = vStats.gameObject; rightViews[2] = vMission.gameObject; rightViews[3] = vSaved.gameObject;
-    }
-
-    void BuildBottom(RectTransform root)
-    {
-        // short message line + selected-part card
-        toastText = Txt(Rt(root, "Toast", LB + 114, H - 52, W - LB - RB - 120, 14), "", 8f, TextAlignmentOptions.Center);
-        var card = Rt(root, "SelectedCard", LB + 114, H - 38, W - LB - RB - 120, 32);
-        Img(card, Bar);
-        var info = Rt(card, "Info", 0, 0, 10, 10);
-        Stretch(info, 6, 0, 52, 0);
-        cardText = Txt(info, "", 7.5f, TextAlignmentOptions.MidlineLeft);
-        cardText.textWrappingMode = TextWrappingModes.Normal; cardText.lineSpacing = -5f;
-        var del = Btn(card, "Delete", 0, 8, 44, 16, DeleteSelected);
-        var dr = (RectTransform)del.transform; dr.anchorMin = dr.anchorMax = new Vector2(1, 1); dr.pivot = new Vector2(1, 1); dr.anchoredPosition = new Vector2(-4, -8);
-        selCard = card.gameObject;
-    }
-
+    // =============================================================== deploy dialog
     void BuildDeployDialog(RectTransform root)
     {
-        var dim = Rt(root, "DeployDialog", 0, 0, W, H); Stretch(dim);
-        Img(dim, new Color(0, 0, 0, 0.62f));
+        var dim = UIKit.At(root, "DeployDialog", 0, 0, W, H); UIKit.Fill(dim);
+        var dimImg = dim.gameObject.AddComponent<Image>(); dimImg.color = new Color(0, 0, 0, 0.55f);
         deployDialog = dim.gameObject;
-        float bw = 232, bh = 214, bx = (W - bw) / 2, by = (H - bh) / 2;
-        var box = Rt(dim, "Box", bx, by, bw, bh);
-        Img(box, new Color(0.07f, 0.1f, 0.15f, 1f));
-        var title = Txt(Rt(box, "Title", 0, 4, bw, 16), "Deploy to the launch pad", 9f, TextAlignmentOptions.Center, true);
-        deployInfo = Txt(Rt(box, "Info", 10, 22, bw - 20, 24), "", 7.5f, TextAlignmentOptions.TopLeft);
-        deployInfo.textWrappingMode = TextWrappingModes.Normal; deployInfo.lineSpacing = -5f;
-        Btn(box, "<", 12, 50, 16, 14, () => ShiftMonth(-1));
-        monthLabel = Txt(Rt(box, "Month", 30, 50, bw - 60, 14), "", 8f, TextAlignmentOptions.Midline);
-        Btn(box, ">", bw - 28, 50, 16, 14, () => ShiftMonth(1));
+        float bw = 232, bh = 222, bx = (W - bw) / 2, by = (H - bh) / 2;
+        var box = UIKit.Card(dim, "Box", bx, by, bw, bh);
+        UIKit.TitleBar(box, "DEPLOY TO THE LAUNCH PAD", UIKit.T.green, bw, () => deployDialog.SetActive(false));
+        deployInfo = UIKit.TextAt(box, "Info", 10, 26, bw - 20, 30, "", 6.8f, TextAlignmentOptions.TopLeft);
+        deployInfo.textWrappingMode = TextWrappingModes.Normal; deployInfo.lineSpacing = -6f;
+        UIKit.Btn(box, "<", 12, 60, 16, 13, UIKit.T.chip, () => ShiftMonth(-1), 8f);
+        monthLabel = UIKit.TextAt(box, "Month", 30, 60, bw - 60, 13, "", 8f, TextAlignmentOptions.Center, true);
+        UIKit.Btn(box, ">", bw - 28, 60, 16, 13, UIKit.T.chip, () => ShiftMonth(1), 8f);
         string[] wd = { "Su", "Mo", "Tu", "We", "Th", "Fr", "Sa" };
         float gx = (bw - 7 * 28) / 2;
-        for (int i = 0; i < 7; i++) { var t = Txt(Rt(box, "WD" + i, gx + i * 28, 67, 28, 11), wd[i], 7f, TextAlignmentOptions.Center); t.color = Dim; }
+        for (int i = 0; i < 7; i++) UIKit.TextAt(box, "WD" + i, gx + i * 28, 76, 28, 11, wd[i], 6.5f, TextAlignmentOptions.Center, false, UIKit.T.dim);
         dayButtons.Clear();
         for (int i = 0; i < 42; i++)
         {
             int idx = i;
-            var b = Btn(box, "Day" + i, gx + (i % 7) * 28 + 1, 79 + (i / 7) * 15, 26, 13, () => PickDay(idx), 7.5f);
+            var b = UIKit.Btn(box, "Day" + i, gx + (i % 7) * 28 + 1, 88 + (i / 7) * 15, 26, 13, UIKit.T.chip, () => PickDay(idx), 7f, false);
             dayButtons.Add(b);
         }
-        deployDate = Txt(Rt(box, "Picked", 0, 172, bw, 12), "", 8f, TextAlignmentOptions.Center);
-        Btn(box, "Confirm deploy", 12, 190, 104, 16, ConfirmDeploy);
-        Btn(box, "Cancel", bw - 116, 190, 104, 16, () => deployDialog.SetActive(false));
+        deployDate = UIKit.TextAt(box, "Picked", 0, 182, bw, 12, "", 7.5f, TextAlignmentOptions.Center);
+        UIKit.Btn(box, "CONFIRM DEPLOY", 12, 200, 104, 16, UIKit.T.green, ConfirmDeploy, 6.8f);
+        UIKit.Btn(box, "CANCEL", bw - 116, 200, 104, 16, UIKit.T.chip, () => deployDialog.SetActive(false), 6.8f);
     }
 
     // =============================================================== history (undo / redo)
@@ -437,18 +342,12 @@ public class RocketBuilderUI : MonoBehaviour
     }
 
     // =============================================================== actions
-    void Toast(string msg, bool bad = false)
-    {
-        toastText.text = bad ? "<color=" + Bad + ">" + msg + "</color>" : msg;
-        toastTimer = 3.5f;
-    }
-
     void AddPart(PartInfo p)
     {
         RocketRules.CanAdd(design, p, library, out var note);
         sel = RocketRules.Add(design, p, library);
         Changed();
-        if (!string.IsNullOrEmpty(note)) Toast(note, true);
+        Toast(string.IsNullOrEmpty(note) ? p.DisplayName + " equipped" : note, !string.IsNullOrEmpty(note));
     }
 
     void DeleteSelected()
@@ -500,16 +399,14 @@ public class RocketBuilderUI : MonoBehaviour
         var prev = Mission;
         missions.Clear(); missions.Add(null);
         if (mm != null)
-        {
             foreach (var m in mm.Running) if (m.Definition != null && !missions.Contains(m.Definition)) missions.Add(m.Definition);
-        }
         missionIndex = Mathf.Max(0, missions.IndexOf(prev));
         if (prev == null && mm != null && mm.Tracked != null) missionIndex = Mathf.Max(0, missions.IndexOf(mm.Tracked.Definition));
     }
 
     void SaveRocket()
     {
-        if (design.stack.Count == 0) { Toast("Nothing to save yet.", true); return; }
+        if (design.stack.Count == 0 && design.payloadId == null) { Toast("Nothing to save yet.", true); return; }
         string nm = (nameInput.text ?? "").Trim();
         if (nm.Length == 0) nm = "Rocket " + (RocketSaves.All().Count + 1);
         nameInput.text = nm;
@@ -520,11 +417,12 @@ public class RocketBuilderUI : MonoBehaviour
             valid = report.valid, savedAt = DateTime.Now.ToString("g", CultureInfo.InvariantCulture),
         });
         Toast("Saved \"" + nm + "\"");
-        RefreshSaved();
+        RefreshLists();
     }
 
     // ---- deploy ----
     DateTime Today => GameClock.Instance != null ? GameClock.Instance.Now.Date : DateTime.Today;
+    long DeployCost => (long)(report.costM * 1_000_000.0 * Agency.CostFactor);
 
     void OpenDeploy()
     {
@@ -533,7 +431,7 @@ public class RocketBuilderUI : MonoBehaviour
         {
             var first = report.checks.FirstOrDefault(c => c.sev == Sev.Error);
             Toast("Not ready: " + (first != null ? first.text : "fix the rocket"), true);
-            rightTab = 2; RefreshAll();
+            infoView = 2; RefreshAll();
             return;
         }
         if (DeploymentManager.Instance == null) { Toast("No launch pad found in this scene.", true); return; }
@@ -545,7 +443,10 @@ public class RocketBuilderUI : MonoBehaviour
         pickDate = cur.HasValue && cur.Value >= minDate ? cur.Value : minDate.AddDays(1);
         viewMonth = new DateTime(pickDate.Value.Year, pickDate.Value.Month, 1);
         var m = Mission;
-        deployInfo.text = "Rocket: <b>" + nm + "</b>   $" + report.costM.ToString("0.0") + "M\nContract: " + (m == null ? "<color=" + Soft + ">none (free launch)</color>" : "<color=" + Cyan + ">" + m.id + "</color> " + m.displayName)
+        bool afford = Agency.CanAfford(DeployCost);
+        deployInfo.text = "Rocket: <b>" + nm + "</b>   Build cost <b>$" + UIKit.Money(DeployCost) + "</b>"
+                          + (afford ? "" : "  <color=" + Bad + ">(not enough money)</color>")
+                          + "\nContract: " + (m == null ? "<color=" + Soft + ">none (free launch)</color>" : "<color=" + Cyan + ">" + m.id + "</color> " + m.displayName)
                           + (DeploymentManager.Instance.Current != null ? "\n<color=" + Warn + ">Replaces the rocket now on the pad.</color>" : "");
         deployDialog.SetActive(true);
         RefreshCalendar();
@@ -577,8 +478,8 @@ public class RocketBuilderUI : MonoBehaviour
             bool ok = d >= minDate;
             bool picked = pickDate.HasValue && pickDate.Value.Date == d.Date;
             var img = (Image)b.targetGraphic;
-            img.color = picked ? activeColor : (scheduled.HasValue && scheduled.Value.Date == d.Date) ? new Color(0.62f, 0.36f, 0.22f, 1f) : ok ? normalColor : Well;
-            var t = b.GetComponentInChildren<TMP_Text>(); t.text = d.Day.ToString(); t.color = ok ? Ink : Dim;
+            img.color = picked ? UIKit.T.teal : (scheduled.HasValue && scheduled.Value.Date == d.Date) ? UIKit.T.orange : ok ? UIKit.T.chip : new Color(1, 1, 1, 0.04f);
+            var t = b.GetComponentInChildren<TMP_Text>(); t.text = d.Day.ToString(); t.color = ok ? UIKit.T.ink : UIKit.T.dim;
             b.interactable = ok;
         }
         deployDate.text = pickDate.HasValue ? "Launch date: <b>" + pickDate.Value.ToString("ddd, dd MMM yyyy", CultureInfo.InvariantCulture) + "</b>" : "";
@@ -587,11 +488,13 @@ public class RocketBuilderUI : MonoBehaviour
     void ConfirmDeploy()
     {
         if (!pickDate.HasValue || DeploymentManager.Instance == null) return;
+        long cost = DeployCost;
+        if (!Agency.TrySpend(cost)) { Toast("Not enough money to build this rocket.", true); return; }
         SaveRocket();
         string nm = nameInput.text;
         DeploymentManager.Instance.Schedule(nm, design, Mission, pickDate.Value);
         deployDialog.SetActive(false);
-        Toast("\"" + nm + "\" is on the launch pad. Launch: " + pickDate.Value.ToString("dd MMM yyyy", CultureInfo.InvariantCulture));
+        Toast("\"" + nm + "\" is on the launch pad. Launch " + pickDate.Value.ToString("dd MMM yyyy", CultureInfo.InvariantCulture) + "   (-$" + UIKit.Money(cost) + ")");
     }
 
     // =============================================================== refresh
@@ -599,25 +502,59 @@ public class RocketBuilderUI : MonoBehaviour
     {
         if (!built) return;
         ValidateSel();
-        for (int i = 0; i < tabImages.Count; i++) tabImages[i].color = i == openTab ? activeColor : normalColor;
-        for (int i = 0; i < rightTabImages.Count; i++) { rightTabImages[i].color = i == rightTab ? activeColor : normalColor; rightViews[i].SetActive(i == rightTab); }
+        for (int i = 0; i < chipImages.Count; i++) chipImages[i].color = i == catIdx ? Accent : UIKit.T.chip;
+        for (int i = 0; i < infoTabImages.Count; i++) infoTabImages[i].color = i == infoView ? UIKit.T.teal : UIKit.T.chip;
+        bpBtnImg.color = infoView == 3 ? new Color(0.4f, 0.75f, 1f, 1f) : UIKit.T.blue;
+        buyBtnImg.color = infoView == 4 ? new Color(0.85f, 0.65f, 1f, 1f) : UIKit.T.purple;
+        for (int i = 0; i < infoViews.Length; i++) infoViews[i].SetActive(i == infoView);
         undoBtn.interactable = hIdx > 0;
         redoBtn.interactable = hIdx < history.Count - 1;
         deleteBtn.interactable = !sel.IsNone;
 
-        RefreshFlyout();
-        RefreshHierarchy();
-        RefreshSaved();
-
         report = RocketStats.Evaluate(design, library, Mission);
+        RefreshGrid();
+        RefreshHierarchy();
+        RefreshLists();
         RefreshTexts();
         RefreshCard();
-        ((Image)deployBtn.targetGraphic).color = report.valid ? Ready : normalColor;
+        ((Image)deployBtn.targetGraphic).color = report.valid ? UIKit.T.green : UIKit.T.chip;
 
-        var rocket = RocketAssembler.Build(design, library, out var b, true);
+        Bounds b;
+        GameObject rocket = mode == DesignerMode.Rocket ? RocketAssembler.Build(design, library, out b, true) : BuildSatellite(out b);
         preview.Show(rocket, b);
         RocketAssembler.Highlight(rocket, sel, library.outlineMaterial, Mathf.Max(0.04f, preview.ViewDistance * 0.006f));
         PlayerPrefs.SetString(SaveKey, design.ToJson());
+    }
+
+    // The satellite designer shows just the payload and the equipment around it (the rocket hides the payload in its fairing).
+    GameObject BuildSatellite(out Bounds bounds)
+    {
+        var root = new GameObject("Satellite");
+        var mat = library.Livery(design.livery);
+        GameObject Spawn(PartInfo p, Vector3 pos, Quaternion rot, SelKind kind, int index)
+        {
+            var prefab = library.Prefab(p.id);
+            if (prefab == null) return null;
+            var go = Instantiate(prefab, root.transform);
+            go.transform.localPosition = pos; go.transform.localRotation = rot;
+            var pr = go.AddComponent<PartRef>(); pr.kind = kind; pr.index = index;
+            if (mat != null) foreach (var rd in go.GetComponentsInChildren<MeshRenderer>()) rd.sharedMaterial = mat;
+            return go;
+        }
+        float r = 0.6f;
+        var pay = library.Get(design.payloadId);
+        if (pay != null) { Spawn(pay, Vector3.zero, Quaternion.identity, SelKind.Payload, 0); r = Mathf.Max(r, pay.Radius); }
+        for (int i = 0; i < design.equipment.Count; i++)
+        {
+            var e = library.Get(design.equipment[i]); if (e == null) continue;
+            float a = 360f * i / Mathf.Max(1, design.equipment.Count) + 20f;
+            Vector3 dir = Quaternion.Euler(0, a, 0) * Vector3.forward;
+            Spawn(e, dir * (r + 0.04f) + Vector3.up * (pay != null ? Mathf.Max(0f, pay.heightM * 0.3f) : 0f), Quaternion.FromToRotation(Vector3.forward, dir), SelKind.Equip, i);
+        }
+        var rends = root.GetComponentsInChildren<Renderer>();
+        bounds = rends.Length > 0 ? rends[0].bounds : new Bounds(Vector3.up, Vector3.one * 2f);
+        foreach (var rd in rends) bounds.Encapsulate(rd.bounds);
+        return root;
     }
 
     void ValidateSel()
@@ -647,7 +584,7 @@ public class RocketBuilderUI : MonoBehaviour
         }
     }
 
-    static string Describe(PartInfo p, bool rich)
+    static string Describe(PartInfo p)
     {
         var sb = new StringBuilder();
         sb.Append("<b>" + p.DisplayName + "</b>  <color=" + Soft + ">" + p.category + " " + p.size + "</color>");
@@ -669,64 +606,78 @@ public class RocketBuilderUI : MonoBehaviour
         return sb.ToString();
     }
 
-    void RefreshFlyout()
+    bool IsEquipped(PartInfo p)
     {
-        flyout.SetActive(openTab >= 0);
-        foreach (Transform c in flyList) { c.gameObject.SetActive(false); Destroy(c.gameObject); }
-        if (openTab < 0) return;
-        flyTitle.text = Tabs[openTab].label;
-        var cats = Tabs[openTab].cats;
-        foreach (var p in library.Parts.Where(x => cats.Contains(x.category)).OrderBy(x => x.category).ThenBy(x => PartInfo.SizeRank(x.size)).ThenBy(x => x.costM))
+        switch (RocketRules.SlotOf(p))
         {
-            var part = p;
-            RocketRules.CanAdd(design, part, library, out var advisory);
-            bool ok = string.IsNullOrEmpty(advisory);
-            var r = Rt(flyList, part.id, 0, 0, 100, 28);
-            r.gameObject.AddComponent<LayoutElement>().preferredHeight = 28;
-            var img = Img(r, normalColor);
-            var b = r.gameObject.AddComponent<Button>(); b.targetGraphic = img;
-            Style(b); b.onClick.AddListener(() => AddPart(part));
-            Icon(r, part.id, 3, 3, 22, 22);
-            var name = Txt(r, part.DisplayName, 7.5f, TextAlignmentOptions.MidlineLeft); Stretch((RectTransform)name.transform, 28, 2, 2, 14); name.color = Ink;
-            var info = Txt(r, "$" + part.costM.ToString("0.#") + "M  " + part.size, 6.5f, TextAlignmentOptions.MidlineLeft); Stretch((RectTransform)info.transform, 28, 14, 2, 2); info.color = Dim;
-            Tip(r.gameObject, Describe(part, true) + (ok ? "" : "\n<color=" + Warn + ">" + advisory + "</color>"));
+            case PartSlot.Booster: return design.boosterId == p.id;
+            case PartSlot.Fin: return design.finId == p.id;
+            case PartSlot.Payload: return design.payloadId == p.id;
+            default: return false;
         }
     }
 
+    // ---- the parts grid: icon, name, price, EQUIP ----
+    void RefreshGrid()
+    {
+        UIKit.Clear(gridContent);
+        var cats = Cats;
+        if (catIdx >= cats.Length) catIdx = 0;
+        string cat = cats[catIdx].cat;
+        foreach (var p in library.Parts.Where(x => x.category == cat).OrderBy(x => PartInfo.SizeRank(x.size)).ThenBy(x => x.costM))
+        {
+            var part = p;
+            RocketRules.CanAdd(design, part, library, out var advisory);
+            bool equipped = IsEquipped(part);
+            var cell = UIKit.At(gridContent, part.id, 0, 0, 56, 78);
+            UIKit.Tint(cell, new Color(1f, 1f, 1f, 0.12f));
+            PartIcon(cell, part.id, 5, 3, 46, 36);
+            UIKit.TextAt(cell, "Name", 2, 40, 52, 9, part.DisplayName, 5.5f, TextAlignmentOptions.Center, false, UIKit.T.dim).overflowMode = TextOverflowModes.Ellipsis;
+            UIKit.TextAt(cell, "Price", 2, 49, 52, 11, "$" + part.costM.ToString("0.#") + " M", 7f, TextAlignmentOptions.Center, true, UIKit.T.priceText);
+            var b = UIKit.Btn(cell, equipped ? "EQUIPPED" : "EQUIP", 4, 62, 48, 13, equipped ? UIKit.T.chip : UIKit.T.green, () => AddPart(part), 6.5f);
+            b.interactable = !equipped;
+            Tip(cell.gameObject, Describe(part) + (string.IsNullOrEmpty(advisory) ? "" : "\n<color=" + Warn + ">" + advisory + "</color>"));
+        }
+    }
+
+    // ---- build order (drag rows to reorder) ----
     void RefreshHierarchy()
     {
-        foreach (Transform c in hierList) { c.gameObject.SetActive(false); Destroy(c.gameObject); }
+        UIKit.Clear(hierList);
+        var T = UIKit.T;
         int n = design.stack.Count;
-        for (int r = 0; r < n; r++)
-        {
-            int si = n - 1 - r;
-            var p = library.Get(design.stack[si]);
-            if (p == null) continue;
-            var row = Rt(hierList, "Row", 0, 0, 100, 17);
-            row.gameObject.AddComponent<LayoutElement>().preferredHeight = 17;
-            bool isSel = sel.kind == SelKind.Stack && sel.index == si;
-            var img = Img(row, isSel ? activeColor : RowColor);
-            var b = row.gameObject.AddComponent<Button>(); b.targetGraphic = img;
-            int idx = si;
-            b.onClick.AddListener(() => { sel = Sel.Of(SelKind.Stack, idx); RefreshAll(); });
-            row.gameObject.AddComponent<RocketHierarchyRow>().Init(this, si);
-            var grip = Txt(row, "=", 8f, TextAlignmentOptions.Center); Stretch((RectTransform)grip.transform, 0, 0, 0, 0); grip.rectTransform.sizeDelta = new Vector2(10, 17);
-            grip.rectTransform.anchorMin = new Vector2(0, 0); grip.rectTransform.anchorMax = new Vector2(0, 1); grip.rectTransform.pivot = new Vector2(0, 0.5f); grip.rectTransform.anchoredPosition = Vector2.zero; grip.color = Dim;
-            Icon(row, p.id, 11, 2, 13, 13);
-            var t = Txt(row, p.DisplayName, 7.5f, TextAlignmentOptions.MidlineLeft); Stretch((RectTransform)t.transform, 27, 0, 3, 0);
-        }
+        bool rocket = mode == DesignerMode.Rocket;
+        if (rocket)
+            for (int r = 0; r < n; r++)
+            {
+                int si = n - 1 - r;
+                var p = library.Get(design.stack[si]);
+                if (p == null) continue;
+                var row = UIKit.At(hierList, "Row", 0, 0, 100, 17);
+                row.gameObject.AddComponent<LayoutElement>().preferredHeight = 17;
+                bool isSel = sel.kind == SelKind.Stack && sel.index == si;
+                var img = UIKit.Tint(row, isSel ? T.teal : T.chip);
+                var b = row.gameObject.AddComponent<Button>(); b.targetGraphic = img; UIKit.StyleButton(b);
+                int idx = si;
+                b.onClick.AddListener(() => { sel = Sel.Of(SelKind.Stack, idx); RefreshAll(); });
+                row.gameObject.AddComponent<RocketHierarchyRow>().Init(this, si);
+                UIKit.TextAt(row, "Grip", 0, 0, 10, 17, "=", 7f, TextAlignmentOptions.Center, false, T.dim);
+                PartIcon(row, p.id, 11, 2, 13, 13);
+                var t = UIKit.TextAt(row, "Name", 27, 0, 140, 17, p.DisplayName, 7f);
+                t.raycastTarget = false;
+            }
         if (n > 0 || design.boosterId != null || design.finId != null || design.payloadId != null || design.equipment.Count > 0)
         {
-            AttachedRow("side boosters", design.boosterId, SelKind.Booster, 0, design.boosterCount, -1, 6);
-            AttachedRow("fins", design.finId, SelKind.Fin, 0, design.finCount, 2, 6);
+            if (rocket) { AttachedRow("side boosters", design.boosterId, SelKind.Booster, 0, design.boosterCount, -1, 6); AttachedRow("fins", design.finId, SelKind.Fin, 0, design.finCount, 2, 6); }
             AttachedRow("payload", design.payloadId, SelKind.Payload, 0, 0, 0, 0);
             for (int i = 0; i < design.equipment.Count; i++) AttachedRow("equipment", design.equipment[i], SelKind.Equip, i, 0, 0, 0);
         }
         if (hierList.childCount == 0)
         {
-            var t = Txt(Rt(hierList, "Empty", 0, 0, 100, 60), "Empty rocket.\nPick a category on the left and click a part to add it.", 7.5f, TextAlignmentOptions.Center);
-            t.color = Dim; t.textWrappingMode = TextWrappingModes.Normal;
-            t.transform.parent.gameObject.AddComponent<LayoutElement>().preferredHeight = 60;
+            var r = UIKit.At(hierList, "Empty", 0, 0, 100, 50);
+            r.gameObject.AddComponent<LayoutElement>().preferredHeight = 50;
+            var t = UIKit.Text(r, mode == DesignerMode.Rocket ? "Empty rocket.\nPick a category on the right and press EQUIP." : "Empty satellite.\nPick a payload, then add power and comms.", 7f, TextAlignmentOptions.Center, false, T.dim);
+            t.textWrappingMode = TextWrappingModes.Normal;
         }
     }
 
@@ -734,90 +685,121 @@ public class RocketBuilderUI : MonoBehaviour
     {
         var p = library.Get(id);
         if (p == null) return;
-        var row = Rt(hierList, "Attached", 0, 0, 100, 17);
+        var row = UIKit.At(hierList, "Attached", 0, 0, 100, 17);
         row.gameObject.AddComponent<LayoutElement>().preferredHeight = 17;
         bool isSel = sel.kind == kind && (kind == SelKind.Equip ? sel.index == index : true);
-        var img = Img(row, isSel ? activeColor : AttachColor);
-        var b = row.gameObject.AddComponent<Button>(); b.targetGraphic = img;
+        var img = UIKit.Tint(row, isSel ? UIKit.T.teal : new Color(0.3f, 0.7f, 0.95f, 0.18f));
+        var b = row.gameObject.AddComponent<Button>(); b.targetGraphic = img; UIKit.StyleButton(b);
         b.onClick.AddListener(() => { sel = Sel.Of(kind, index); RefreshAll(); });
-        Icon(row, p.id, 3, 2, 13, 13);
+        PartIcon(row, p.id, 3, 2, 13, 13);
         string cnt = count > 0 ? "  x" + count : "";
         bool stepper = kind == SelKind.Booster || kind == SelKind.Fin;
-        var t = Txt(row, p.DisplayName + cnt, 7.5f, TextAlignmentOptions.MidlineLeft); Stretch((RectTransform)t.transform, 19, 0, stepper ? 34 : 3, 0);
+        var t = UIKit.TextAt(row, "Name", 19, 0, 110, 17, p.DisplayName + cnt, 7f); t.raycastTarget = false;
         Tip(row.gameObject, char.ToUpper(label[0]) + label.Substring(1));
         if (stepper)
         {
-            AddSmall(row, "-", -17, () => { if (kind == SelKind.Booster) design.boosterCount = Mathf.Max(1, design.boosterCount - 1); else design.finCount = Mathf.Max(2, design.finCount - 1); sel = Sel.Of(kind, 0); Changed(); });
-            AddSmall(row, "+", -2, () => { if (kind == SelKind.Booster) design.boosterCount = Mathf.Min(6, design.boosterCount + 1); else design.finCount = Mathf.Min(6, design.finCount + 1); sel = Sel.Of(kind, 0); Changed(); });
+            AddSmall(row, "-", 31, () => { if (kind == SelKind.Booster) design.boosterCount = Mathf.Max(1, design.boosterCount - 1); else design.finCount = Mathf.Max(2, design.finCount - 1); sel = Sel.Of(kind, 0); Changed(); });
+            AddSmall(row, "+", 16, () => { if (kind == SelKind.Booster) design.boosterCount = Mathf.Min(6, design.boosterCount + 1); else design.finCount = Mathf.Min(6, design.finCount + 1); sel = Sel.Of(kind, 0); Changed(); });
         }
     }
 
-    void AddSmall(RectTransform row, string label, float xFromRight, UnityAction act)
+    void AddSmall(RectTransform row, string label, float xFromRight, UnityEngine.Events.UnityAction act)
     {
-        var s = Btn(row, label, 0, 2, 13, 13, act, 7.5f);
-        var r = (RectTransform)s.transform;
-        r.anchorMin = r.anchorMax = new Vector2(1, 1); r.pivot = new Vector2(1, 1); r.anchoredPosition = new Vector2(xFromRight, -2);
+        var s = UIKit.Btn(row, label, 0, 2, 13, 13, UIKit.T.chip, act, 7.5f);
+        UIKit.AnchorRight((RectTransform)s.transform, xFromRight, 2f);
     }
 
-    void Header(string text)
+    // ---- blueprint lists ----
+    float BlueprintPriceM(RocketDemos.Demo d)
     {
-        var h = Txt(Rt(savedList, "Header", 0, 0, 100, 12), text, 7f, TextAlignmentOptions.MidlineLeft);
-        h.color = new Color(0.5f, 0.86f, 1f, 1f);
-        h.transform.parent.gameObject.AddComponent<LayoutElement>().preferredHeight = 12;
+        var rep = RocketStats.Evaluate(d.design, library, null);
+        return Mathf.Max(1f, Mathf.Round(rep.costM * 0.15f * 10f) / 10f);
     }
 
-    void LoadDemo(RocketDemos.Demo demo)
+    bool DemoOwned(RocketDemos.Demo d) => d == RocketDemos.All[0] || Agency.OwnsBlueprint(d.name);
+
+    void LoadDesign(RocketDesign d, string nm, string note)
     {
-        design = RocketDesign.FromJson(demo.design.ToJson());
-        nameInput.text = demo.name;
+        design = RocketDesign.FromJson(d.ToJson());
+        nameInput.text = nm;
         sel = Sel.None;
-        string note = "";
-        if (!string.IsNullOrEmpty(demo.missionId))
-        {
-            int i = missions.FindIndex(x => x != null && x.id == demo.missionId);
-            if (i >= 0) missionIndex = i;
-            else note = "  Start " + demo.missionId + " to check it against its contract.";
-        }
         Changed();
-        Toast("Loaded \"" + demo.name + "\"." + note);
+        Toast(note);
     }
 
-    void RefreshSaved()
+    void ListHeader(Transform list, string text)
     {
-        foreach (Transform c in savedList) { c.gameObject.SetActive(false); Destroy(c.gameObject); }
-        Header("DEMO ROCKETS");
+        var r = UIKit.At(list, "Header", 0, 0, 100, 11);
+        r.gameObject.AddComponent<LayoutElement>().preferredHeight = 11;
+        UIKit.Text(r, text, 6.2f, TextAlignmentOptions.MidlineLeft, true, UIKit.T.teal);
+    }
+
+    void RefreshLists()
+    {
+        var T = UIKit.T;
+        UIKit.Clear(bpList); UIKit.Clear(buyList);
+
+        // owned blueprints: bought demo designs, then my own saved rockets
+        ListHeader(bpList, "OWNED BLUEPRINTS");
         foreach (var dm in RocketDemos.All)
         {
+            if (!DemoOwned(dm)) continue;
             var demo = dm;
-            var drow = Rt(savedList, "Demo", 0, 0, 100, 24);
-            drow.gameObject.AddComponent<LayoutElement>().preferredHeight = 24;
-            var dimg = Img(drow, AttachColor);
-            var db = drow.gameObject.AddComponent<Button>(); db.targetGraphic = dimg; Style(db);
-            db.onClick.AddListener(() => LoadDemo(demo));
-            var dt = Txt(drow, demo.name, 7.5f, TextAlignmentOptions.TopLeft); Stretch((RectTransform)dt.transform, 4, 2, 3, 11);
-            var dd = Txt(drow, demo.description, 6.5f, TextAlignmentOptions.BottomLeft); Stretch((RectTransform)dd.transform, 4, 11, 3, 2); dd.color = Dim; dd.overflowMode = TextOverflowModes.Ellipsis; dd.textWrappingMode = TextWrappingModes.NoWrap;
-            Tip(drow.gameObject, "<b>" + demo.name + "</b>\n" + demo.description);
+            var row = UIKit.At(bpList, "Demo", 0, 0, 100, 24);
+            row.gameObject.AddComponent<LayoutElement>().preferredHeight = 24;
+            var b = UIKit.MakeButton(row, "", new Color(0.3f, 0.7f, 0.95f, 0.18f), () => { LoadDesign(demo.design, demo.name, "Loaded \"" + demo.name + "\"" + (string.IsNullOrEmpty(demo.missionId) ? "" : "  (made for " + demo.missionId + ")")); });
+            UIKit.TextAt(row, "T", 4, 2, 150, 10, demo.name, 7f, TextAlignmentOptions.TopLeft);
+            var dd = UIKit.TextAt(row, "D", 4, 12, 170, 10, demo.description, 6f, TextAlignmentOptions.TopLeft, false, T.dim); dd.overflowMode = TextOverflowModes.Ellipsis;
+            Tip(row.gameObject, "<b>" + demo.name + "</b>\n" + demo.description);
         }
-        Header("MY ROCKETS");
+        ListHeader(bpList, "MY ROCKETS");
         var all = RocketSaves.All();
         foreach (var sr in all)
         {
             var s = sr;
-            var row = Rt(savedList, "Saved", 0, 0, 100, 22);
+            var row = UIKit.At(bpList, "Saved", 0, 0, 100, 22);
             row.gameObject.AddComponent<LayoutElement>().preferredHeight = 22;
-            var img = Img(row, normalColor);
-            var b = row.gameObject.AddComponent<Button>(); b.targetGraphic = img; Style(b);
-            b.onClick.AddListener(() => { design = RocketDesign.FromJson(s.design); nameInput.text = s.name; sel = Sel.None; Changed(); Toast("Loaded \"" + s.name + "\""); });
-            var t = Txt(row, s.name, 7.5f, TextAlignmentOptions.TopLeft); Stretch((RectTransform)t.transform, 4, 2, 16, 10);
-            var i = Txt(row, "$" + s.costM.ToString("0.#") + "M  " + s.launchKg.ToString("N0") + " kg  " + (s.valid ? "<color=" + Good + ">ready</color>" : "<color=" + Warn + ">draft</color>"), 6.5f, TextAlignmentOptions.BottomLeft);
-            Stretch((RectTransform)i.transform, 4, 10, 16, 2); i.color = Dim;
-            AddSmall(row, "x", -2, () => { RocketSaves.Delete(s.name); RefreshSaved(); });
+            UIKit.MakeButton(row, "", T.chip, () => LoadDesign(RocketDesign.FromJson(s.design), s.name, "Loaded \"" + s.name + "\""));
+            UIKit.TextAt(row, "T", 4, 2, 150, 10, s.name, 7f, TextAlignmentOptions.TopLeft);
+            UIKit.TextAt(row, "I", 4, 12, 150, 10, "$" + s.costM.ToString("0.#") + "M  " + s.launchKg.ToString("N0") + " kg  " + (s.valid ? "<color=" + Good + ">ready</color>" : "<color=" + Warn + ">draft</color>"), 6f, TextAlignmentOptions.TopLeft, false, T.dim);
+            AddSmall(row, "x", 3, () => { RocketSaves.Delete(s.name); RefreshLists(); });
         }
         if (all.Count == 0)
         {
-            var t = Txt(Rt(savedList, "Empty", 0, 0, 100, 50), "No saved rockets yet.\nName your rocket and press Save.", 7.5f, TextAlignmentOptions.Center);
-            t.color = Dim; t.textWrappingMode = TextWrappingModes.Normal;
-            t.transform.parent.gameObject.AddComponent<LayoutElement>().preferredHeight = 50;
+            var r = UIKit.At(bpList, "Empty", 0, 0, 100, 30);
+            r.gameObject.AddComponent<LayoutElement>().preferredHeight = 30;
+            UIKit.Text(r, "No saved rockets yet. Name it and press SAVE.", 6.5f, TextAlignmentOptions.Center, false, T.dim).textWrappingMode = TextWrappingModes.Normal;
+        }
+
+        // shop
+        ListHeader(buyList, "BUY BLUEPRINTS   money: $" + UIKit.Money(Agency.Money));
+        bool any = false;
+        foreach (var dm in RocketDemos.All)
+        {
+            if (DemoOwned(dm)) continue;
+            any = true;
+            var demo = dm;
+            float price = BlueprintPriceM(demo);
+            var row = UIKit.At(buyList, "Shop", 0, 0, 100, 26);
+            row.gameObject.AddComponent<LayoutElement>().preferredHeight = 26;
+            UIKit.Tint(row, T.chip);
+            UIKit.TextAt(row, "T", 4, 2, 112, 10, demo.name, 7f, TextAlignmentOptions.TopLeft);
+            var dd = UIKit.TextAt(row, "D", 4, 13, 112, 10, demo.description, 6f, TextAlignmentOptions.TopLeft, false, T.dim); dd.overflowMode = TextOverflowModes.Ellipsis;
+            var buy = UIKit.Btn(row, "BUY  $" + price.ToString("0.#") + " M", 0, 4, 58, 18, T.purple, () =>
+            {
+                if (!Agency.TrySpend((long)(price * 1_000_000f))) { Toast("Not enough money for this blueprint.", true); return; }
+                Agency.AddBlueprint(demo.name);
+                Toast("Blueprint bought: " + demo.name);
+                RefreshLists();
+            }, 6.2f);
+            UIKit.AnchorRight((RectTransform)buy.transform, 3, 4);
+            Tip(row.gameObject, "<b>" + demo.name + "</b>\n" + demo.description);
+        }
+        if (!any)
+        {
+            var r = UIKit.At(buyList, "Empty", 0, 0, 100, 30);
+            r.gameObject.AddComponent<LayoutElement>().preferredHeight = 30;
+            UIKit.Text(r, "You own every blueprint.", 6.5f, TextAlignmentOptions.Center, false, T.dim);
         }
     }
 
@@ -827,21 +809,20 @@ public class RocketBuilderUI : MonoBehaviour
         selCard.SetActive(p != null);
         if (p == null) return;
         string extra = sel.kind == SelKind.Booster ? "  <color=" + Cyan + ">x" + design.boosterCount + "</color>" : sel.kind == SelKind.Fin ? "  <color=" + Cyan + ">x" + design.finCount + "</color>" : "";
-        cardText.text = Describe(p, false).Replace("\n", "\n") + extra;
+        cardText.text = Describe(p) + extra;
     }
 
     void RefreshTexts()
     {
         var m = Mission;
-        missionLabel.text = m == null ? "<color=" + Soft + ">No mission</color>" : "<color=" + Cyan + ">" + m.id + "</color>";
+        missionLabel.text = m == null ? "<color=" + Soft + ">No mission</color>" : "<color=" + Cyan + ">" + m.id + "</color> " + m.displayName;
         var r = report;
 
         var s = new StringBuilder();
         s.AppendLine("Height <b>" + r.heightM.ToString("0.0") + " m</b>  Width <b>" + r.widthM.ToString("0.0") + " m</b>");
         s.AppendLine("Launch mass <b>" + r.launchKg.ToString("N0") + " kg</b>");
         s.AppendLine("<color=" + Soft + ">dry " + r.dryKg.ToString("N0") + "  fuel " + r.fuelKg.ToString("N0") + "  payload " + r.payloadKg.ToString("N0") + "</color>");
-        s.AppendLine("Thrust <b>" + r.thrustKn.ToString("N0") + " kN</b>");
-        s.AppendLine("Liftoff TWR <b>" + r.liftoffTwr.ToString("0.00") + "</b>");
+        s.AppendLine("Thrust <b>" + r.thrustKn.ToString("N0") + " kN</b>   Liftoff TWR <b>" + r.liftoffTwr.ToString("0.00") + "</b>");
         s.AppendLine("Delta-v <b>" + r.dvTotal.ToString("N0") + " m/s</b>");
         for (int i = 0; i < r.stages.Count; i++)
             if (r.stages[i].parts.Count > 0) s.AppendLine("<color=" + Soft + ">stage " + (i + 1) + ": " + r.stages[i].dv.ToString("N0") + " m/s, TWR " + r.stages[i].twr.ToString("0.0") + "</color>");
@@ -852,8 +833,7 @@ public class RocketBuilderUI : MonoBehaviour
 
         var c = new StringBuilder();
         c.AppendLine(r.valid ? "<color=" + Good + "><b>READY TO DEPLOY</b></color>" : "<color=" + Bad + "><b>NOT READY</b></color>");
-        if (m != null) c.AppendLine("<color=" + Soft + ">" + m.displayName + "</color>");
-        else c.AppendLine("<color=" + Soft + ">No active mission. Start a contract in the Mission Manager to check your rocket against it.</color>");
+        if (m == null) c.AppendLine("<color=" + Soft + ">No active contract. Accept one in CONTRACTS to check your rocket against it.</color>");
         foreach (var ch in r.checks)
         {
             string col = ch.sev == Sev.Ok ? Good : ch.sev == Sev.Warn ? Warn : Bad;
@@ -863,12 +843,11 @@ public class RocketBuilderUI : MonoBehaviour
         if (r.checks.Count == 0) c.AppendLine("<color=" + Soft + ">Add parts to see checks.</color>");
         checksText.text = c.ToString();
 
-        string status = r.valid ? "<color=" + Good + ">ready</color>" : "<color=" + Warn + ">not ready</color>";
-        summaryText.text = "$" + r.costM.ToString("0.0") + "M  " + (r.launchKg / 1000f).ToString("0.0") + " t  dv " + (r.dvTotal / 1000f).ToString("0.0") + " km/s  " + status;
+        summaryText.text = "$" + r.costM.ToString("0.0") + "M  " + (r.launchKg / 1000f).ToString("0.0") + " t  " + (r.valid ? "<color=" + Good + ">ready</color>" : "<color=" + Warn + ">not ready</color>");
     }
 }
 
-/// <summary>A row in the build hierarchy that can be dragged up or down to re-order the stack.</summary>
+/// <summary>A row in the build order list that can be dragged up or down to re-order the stack.</summary>
 class RocketHierarchyRow : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
     RocketBuilderUI owner; int stackIndex;
