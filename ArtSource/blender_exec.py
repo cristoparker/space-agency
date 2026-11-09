@@ -20,5 +20,8 @@ while not buf.endswith(b"\0"):
         break
     buf += d
 resp = json.loads(buf.rstrip(b"\0").decode("utf-8"))
-print(json.dumps(resp, indent=2))
+if resp.get("status") == "ok":
+    print(json.dumps(resp.get("result"), indent=1)[:6000])
+else:
+    print(resp.get("message", resp))
 sys.exit(0 if resp.get("status") == "ok" else 1)

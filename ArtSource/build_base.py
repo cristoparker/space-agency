@@ -138,9 +138,18 @@ class B:
                 polys.append(p)
             bvhs.append(BVHTree.FromPolygons(cos, polys))
 
+        bounds = []
+        for faces in self.parts:
+            cs = [v.co for f in faces for v in f.verts]
+            bounds.append((Vector((min(c.x for c in cs), min(c.y for c in cs), min(c.z for c in cs))) - Vector((0.03,) * 3),
+                           Vector((max(c.x for c in cs), max(c.y for c in cs), max(c.z for c in cs))) + Vector((0.03,) * 3)))
+
         def inside(p, skip):
             for j, t in enumerate(bvhs):
                 if j == skip:
+                    continue
+                lo, hi = bounds[j]
+                if not (lo.x <= p.x <= hi.x and lo.y <= p.y <= hi.y and lo.z <= p.z <= hi.z):
                     continue
                 o, n = p, 0
                 for _ in range(32):
@@ -153,11 +162,22 @@ class B:
                     return True
             return False
 
+        BARY = [(.5, .5, 0), (0, .5, .5), (.5, 0, .5), (.2, .2, .6), (.2, .6, .2), (.6, .2, .2), (1 / 3, 1 / 3, 1 / 3)]
+
+        def samples(f):
+            vs = [v.co.copy() for v in f.verts]
+            pts = [f.calc_center_median()] + vs
+            for i in range(1, len(vs) - 1):
+                a, b2, c = vs[0], vs[i], vs[i + 1]
+                for wa, wb, wc in BARY:
+                    pts.append(a * wa + b2 * wb + c * wc)
+            return pts
+
         kill = set()
         for i, faces in enumerate(self.parts):
             for f in faces:
                 n = f.normal
-                pts = [f.calc_center_median()] + [v.co.copy() for v in f.verts]
+                pts = samples(f)
                 if n.z < -0.9 and max(p.z for p in pts) < 0.02:
                     kill.add(f)
                 elif all(inside(p + n * 0.01, i) for p in pts):
