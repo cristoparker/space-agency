@@ -379,7 +379,60 @@ public static class RocketStats
 /// <summary>Builds the 3D rocket from a design (stack, boosters, fins and equipment).</summary>
 public static class RocketAssembler
 {
-    public static GameObject Build(RocketDesign d, PartLibrary lib, out Bounds bounds)
+    static readonly Dictionary<int, Material> ghostCache = new Dictionary<int, Material>();
+
+    static Material Ghost(PartLibrary lib, int livery)
+    {
+        if (lib.ghostMaterial == null) return lib.Livery(livery);
+        if (!ghostCache.TryGetValue(livery, out var m) || m == null)
+        {
+            m = new Material(lib.ghostMaterial) { name = "Ghost cover " + livery };
+            m.SetTextureOffset("_BaseMap", new Vector2(livery / 8f, 0f));
+            ghostCache[livery] = m;
+        }
+        return m;
+    }
+
+    // An open tube around an upper-stage engine: dark ring at each end, livery colour in between.
+    static GameObject MakeCover(Transform parent, float radius, float height, Material mat)
+    {
+        const int seg = 28;
+        float band = Mathf.Min(0.22f, height * 0.25f);
+        float[] ys = { 0f, band, height - band, height };
+        Vector2[] uv = { new Vector2(0.5f / 8f, 5.5f / 16f), new Vector2(0.5f / 8f, 0.5f / 16f), new Vector2(0.5f / 8f, 5.5f / 16f) };   // dark / livery / dark
+        var verts = new List<Vector3>(); var norms = new List<Vector3>(); var uvs = new List<Vector2>(); var tris = new List<int>();
+        for (int b = 0; b < 3; b++)
+        {
+            int start = verts.Count;
+            for (int ring = 0; ring < 2; ring++)
+                for (int i = 0; i <= seg; i++)
+                {
+                    float a = i * Mathf.PI * 2f / seg;
+                    var dir = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
+                    verts.Add(dir * radius + Vector3.up * ys[b + ring]); norms.Add(dir); uvs.Add(uv[b]);
+                }
+            for (int i = 0; i < seg; i++)
+            {
+                int a0 = start + i, a1 = start + i + 1, b0 = start + seg + 1 + i, b1 = start + seg + 1 + i + 1;
+                tris.AddRange(new[] { a0, b0, a1, a1, b0, b1 });
+            }
+        }
+        var mesh = new Mesh { name = "InterstageCover" };
+        mesh.SetVertices(verts); mesh.SetNormals(norms); mesh.SetUVs(0, uvs); mesh.SetTriangles(tris, 0);
+        mesh.RecalculateBounds();
+        var go = new GameObject("InterstageCover", typeof(MeshFilter), typeof(MeshRenderer));
+        go.transform.SetParent(parent, false);
+        go.GetComponent<MeshFilter>().sharedMesh = mesh;
+        var mr = go.GetComponent<MeshRenderer>();
+        mr.sharedMaterial = mat; mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        return go;
+    }
+
+    static float ClassRadius(string cls) => cls == "S" ? 0.6f : cls == "L" ? 1.5f : 1.0f;
+
+    /// <param name="ghostCovers">true in the builder: the cover over an upper-stage engine is translucent so you can see the engine.
+    /// false everywhere else (launch pad, flight): the cover is solid and hides the engine.</param>
+    public static GameObject Build(RocketDesign d, PartLibrary lib, out Bounds bounds, bool ghostCovers = false)
     {
         var root = new GameObject("Rocket");
         var mat = lib.Livery(d.livery);
@@ -400,7 +453,9 @@ public static class RocketAssembler
         for (int si = 0; si < d.stack.Count; si++)
         {
             var p = lib.Get(d.stack[si]); if (p == null) continue;
-            Spawn(p, new Vector3(0f, y, 0f), Quaternion.identity, SelKind.Stack, si);
+            var spawned = Spawn(p, new Vector3(0f, y, 0f), Quaternion.identity, SelKind.Stack, si);
+            if (spawned != null && RocketRules.IsEngine(p) && si > 0)         // upper-stage engine: close the gap between the stages
+                MakeCover(spawned.transform, ClassRadius(p.TopClass) + 0.01f, p.heightM, ghostCovers ? Ghost(lib, d.livery) : lib.Livery(d.livery));
             if (inFirst) firstStageR = Mathf.Max(firstStageR, p.Radius);
             if (RocketRules.IsDecoupler(p)) inFirst = false;
             if (RocketRules.IsHead(p)) headBase = y;
@@ -454,6 +509,7 @@ public static class RocketAssembler
             if (!pr.Matches(sel)) continue;
             foreach (var mr in pr.GetComponentsInChildren<MeshRenderer>())
             {
+                if (mr.gameObject.name == "InterstageCover") continue;
                 mr.SetPropertyBlock(mpb);
                 var mf = mr.GetComponent<MeshFilter>();
                 if (mf == null || mf.sharedMesh == null || outline == null) continue;

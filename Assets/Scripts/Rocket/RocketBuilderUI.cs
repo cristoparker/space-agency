@@ -614,7 +614,7 @@ public class RocketBuilderUI : MonoBehaviour
         RefreshCard();
         ((Image)deployBtn.targetGraphic).color = report.valid ? Ready : normalColor;
 
-        var rocket = RocketAssembler.Build(design, library, out var b);
+        var rocket = RocketAssembler.Build(design, library, out var b, true);
         preview.Show(rocket, b);
         RocketAssembler.Highlight(rocket, sel, library.outlineMaterial, Mathf.Max(0.04f, preview.ViewDistance * 0.006f));
         PlayerPrefs.SetString(SaveKey, design.ToJson());

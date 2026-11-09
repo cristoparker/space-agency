@@ -44,6 +44,21 @@ public static class RocketBuilderSetup
         return m;
     }
 
+    static Material GhostMaterial()
+    {
+        var path = PartsDir + "Part_Ghost.mat";
+        var shader = Shader.Find("SpaceAgency/Toon/Ghost");
+        var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (m == null) { m = new Material(shader); AssetDatabase.CreateAsset(m, path); }
+        m.shader = shader;
+        m.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(PartsDir + "parts-palette.png"));
+        m.SetColor("_BaseColor", new Color(1f, 1f, 1f, 0.32f));
+        m.SetVector("_ToonParams", new Vector4(0.05f, 0.5f, 0.02f, 0.45f));
+        m.SetVector("_ToonLevels", new Vector4(0.35f, 0.72f, 0f, 0f));
+        EditorUtility.SetDirty(m);
+        return m;
+    }
+
     static PartLibrary BuildLibrary()
     {
         var lib = AssetDatabase.LoadAssetAtPath<PartLibrary>(LibraryPath);
@@ -60,6 +75,7 @@ public static class RocketBuilderSetup
         lib.models = models.OrderBy(m => m.id).ToArray();
         lib.liveryMaterials = Enumerable.Range(0, 8).Select(i => AssetDatabase.LoadAssetAtPath<Material>(PartsDir + "Part_" + i + ".mat")).ToArray();
         lib.outlineMaterial = OutlineMaterial();
+        lib.ghostMaterial = GhostMaterial();
 
         // icons: make every png a sprite first
         var icons = new List<PartLibrary.IconEntry>();

@@ -68,6 +68,8 @@ public class PartLibrary : ScriptableObject
     public IconEntry[] icons;
     [Tooltip("Unlit, cull front: the cyan outline drawn around the selected part.")]
     public Material outlineMaterial;
+    [Tooltip("Translucent livery material for the interstage covers shown in the rocket builder (engine stays visible through it).")]
+    public Material ghostMaterial;
 
     List<PartInfo> parts;
     Dictionary<string, PartInfo> infoById;
