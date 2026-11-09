@@ -13,8 +13,8 @@ public class MissionManagerUI : MonoBehaviour
     public Button contractsTab;
     public GameObject dashboardPage;
     public GameObject contractsPage;
-    public Sprite tabNormalSprite;
-    public Sprite tabActiveSprite;
+    public Color tabNormalColor = new Color(1f, 1f, 1f, 0.14f);
+    public Color tabActiveColor = new Color(0.25f, 0.8f, 1f, 0.38f);
 
     [Header("Dashboard")]
     public Transform runningContent;
@@ -76,11 +76,8 @@ public class MissionManagerUI : MonoBehaviour
     {
         dashboardPage.SetActive(dashboard);
         contractsPage.SetActive(!dashboard);
-        dashboardTab.GetComponent<Image>().sprite = dashboard ? tabActiveSprite : tabNormalSprite;
-        contractsTab.GetComponent<Image>().sprite = dashboard ? tabNormalSprite : tabActiveSprite;
-        // Dark text on the yellow (active) tab, white on the green one.
-        dashboardTab.GetComponentInChildren<TMP_Text>().color = dashboard ? Color.black : Color.white;
-        contractsTab.GetComponentInChildren<TMP_Text>().color = dashboard ? Color.white : Color.black;
+        dashboardTab.GetComponent<Image>().color = dashboard ? tabActiveColor : tabNormalColor;
+        contractsTab.GetComponent<Image>().color = dashboard ? tabNormalColor : tabActiveColor;
         if (!dashboard) RefreshDetails();
     }
 

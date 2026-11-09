@@ -10,8 +10,8 @@ public class ContractCardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitH
     public Image background;
     public TMP_Text titleText;
     public TMP_Text typeText;
-    public Sprite normalSprite;
-    public Sprite selectedSprite;
+    public Color normalColor = new Color(1f, 1f, 1f, 0.14f);
+    public Color selectedColor = new Color(0.25f, 0.8f, 1f, 0.38f);
 
     public MissionDefinition Mission { get; private set; }
 
@@ -28,7 +28,7 @@ public class ContractCardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitH
 
     public void SetSelected(bool selected)
     {
-        if (background != null) background.sprite = selected ? selectedSprite : normalSprite;
+        if (background != null) background.color = selected ? selectedColor : normalColor;
     }
 
     public void OnPointerEnter(PointerEventData e) => onHover?.Invoke(this);

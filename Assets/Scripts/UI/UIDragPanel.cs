@@ -1,28 +1,31 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 
-/// <summary>Put on a window's header: dragging it moves the whole window (target), clamped to the screen.</summary>
+/// <summary>Put on a window's header: dragging it moves the whole window (target), clamped inside its parent canvas.</summary>
 public class UIDragPanel : MonoBehaviour, IBeginDragHandler, IDragHandler
 {
     public RectTransform target;
-    Vector2 grabOffset;
-    Canvas canvas;
+    Vector3 grabOffset;
 
-    void Awake() => canvas = GetComponentInParent<Canvas>();
+    RectTransform Parent => (RectTransform)target.parent;
 
     public void OnBeginDrag(PointerEventData e)
     {
         target.SetAsLastSibling();
-        grabOffset = (Vector2)target.position - e.position;
+        if (RectTransformUtility.ScreenPointToWorldPointInRectangle(Parent, e.position, e.pressEventCamera, out var world))
+            grabOffset = target.position - world;
     }
 
     public void OnDrag(PointerEventData e)
     {
-        Vector2 pos = e.position + grabOffset;
-        float s = canvas != null ? canvas.scaleFactor : 1f;
-        Vector2 half = target.rect.size * 0.5f * s;
-        pos.x = Mathf.Clamp(pos.x, half.x, Screen.width - half.x);
-        pos.y = Mathf.Clamp(pos.y, half.y, Screen.height - half.y);
-        target.position = pos;
+        if (!RectTransformUtility.ScreenPointToWorldPointInRectangle(Parent, e.position, e.pressEventCamera, out var world)) return;
+        target.position = world + grabOffset;
+
+        // Keep the window fully inside its parent (window is centre-anchored).
+        Vector2 half = (Parent.rect.size - target.rect.size) * 0.5f;
+        Vector2 p = target.anchoredPosition;
+        p.x = Mathf.Clamp(p.x, -Mathf.Max(0f, half.x), Mathf.Max(0f, half.x));
+        p.y = Mathf.Clamp(p.y, -Mathf.Max(0f, half.y), Mathf.Max(0f, half.y));
+        target.anchoredPosition = p;
     }
 }

@@ -40,7 +40,7 @@ public class TooltipUI : MonoBehaviour
         var corners = new Vector3[4];
         target.GetWorldCorners(corners);
         Vector3 rightMiddle = (corners[2] + corners[3]) * 0.5f;
-        float scale = canvas != null ? canvas.scaleFactor : 1f;
+        float scale = canvas != null ? canvas.rootCanvas.transform.lossyScale.x : 1f;
         rect.position = rightMiddle + new Vector3(gap * scale, 0f, 0f);
 
         transform.SetAsLastSibling();
