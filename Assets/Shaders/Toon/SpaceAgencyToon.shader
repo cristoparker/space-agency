@@ -25,6 +25,8 @@ Shader "SpaceAgency/Toon/Lit"
             #pragma fragment frag
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
+            #pragma multi_compile _ _ADDITIONAL_LIGHTS
+            #pragma multi_compile _ _CLUSTER_LIGHT_LOOP
             #pragma multi_compile_instancing
             #pragma multi_compile _ DOTS_INSTANCING_ON
 
@@ -66,7 +68,7 @@ Shader "SpaceAgency/Toon/Lit"
             {
                 UNITY_SETUP_INSTANCE_ID(IN);
                 half4 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, IN.uv) * _BaseColor;
-                half3 col = ToonShade(albedo.rgb, normalize(IN.normalWS), IN.positionWS, _ToonParams, _ToonLevels);
+                half3 col = ToonShade(albedo.rgb, normalize(IN.normalWS), IN.positionWS, GetNormalizedScreenSpaceUV(IN.positionCS), _ToonParams, _ToonLevels);
                 return half4(col, 1);
             }
             ENDHLSL

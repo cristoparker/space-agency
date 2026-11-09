@@ -30,6 +30,8 @@ Shader "SpaceAgency/Toon/Terrain"
             #pragma fragment frag
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
+            #pragma multi_compile _ _ADDITIONAL_LIGHTS
+            #pragma multi_compile _ _CLUSTER_LIGHT_LOOP
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
@@ -63,7 +65,7 @@ Shader "SpaceAgency/Toon/Terrain"
                 half sum = max(w.r + w.g + w.b + w.a, 0.0001h);
                 w /= sum;
                 half3 albedo = _Color0.rgb * w.r + _Color1.rgb * w.g + _Color2.rgb * w.b + _Color3.rgb * w.a;
-                half3 col = ToonShade(albedo, normalize(IN.normalWS), IN.positionWS, _ToonParams, _ToonLevels);
+                half3 col = ToonShade(albedo, normalize(IN.normalWS), IN.positionWS, GetNormalizedScreenSpaceUV(IN.positionCS), _ToonParams, _ToonLevels);
                 return half4(col, 1);
             }
             ENDHLSL

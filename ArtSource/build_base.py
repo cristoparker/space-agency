@@ -68,27 +68,30 @@ class B:
         self.uv = self.bm.loops.layers.uv.new("UVMap")
         self.parts = []
 
-    def _paint(self, verts, cell):
+    def _paint(self, verts, cell, mat=0):
         u = cell_uv(cell)
         faces = {f for v in verts for f in v.link_faces}
         for f in faces:
+            f.material_index = mat          # slot 1 = lamp glass (Unity switches it on at night)
             for l in f.loops:
                 l[self.uv].uv = u
         self.parts.append(faces)
 
-    def box(self, c, s, cell):
+    def box(self, c, s, cell, rot=None, mat=0):
         v = bmesh.ops.create_cube(self.bm, size=1.0)["verts"]
         bmesh.ops.scale(self.bm, vec=s, verts=v)
+        if rot is not None:
+            bmesh.ops.rotate(self.bm, cent=(0, 0, 0), matrix=rot, verts=v)
         bmesh.ops.translate(self.bm, vec=c, verts=v)
-        self._paint(v, cell)
+        self._paint(v, cell, mat)
 
-    def cyl(self, c, r, h, cell, seg=10, r2=None, rot=None):
+    def cyl(self, c, r, h, cell, seg=10, r2=None, rot=None, mat=0):
         v = bmesh.ops.create_cone(self.bm, cap_ends=True, cap_tris=False, segments=seg,
                                   radius1=r, radius2=r if r2 is None else r2, depth=h)["verts"]
         if rot is not None:
             bmesh.ops.rotate(self.bm, cent=(0, 0, 0), matrix=rot, verts=v)
         bmesh.ops.translate(self.bm, vec=c, verts=v)
-        self._paint(v, cell)
+        self._paint(v, cell, mat)
 
     def prism(self, c, w, d, h, cell):
         """Gabled roof, ridge along Y. c = centre of the base."""
@@ -165,8 +168,11 @@ class B:
 
     def finish(self, name):
         stats = self.cleanup()
+        used = max([f.material_index for f in self.bm.faces] + [0]) + 1
         me = bpy.data.meshes.new(name)
         self.bm.to_mesh(me)
+        for mname in ("Base", "Lamp")[:used]:
+            me.materials.append(bpy.data.materials.get(mname) or bpy.data.materials.new(mname))
         self.bm.free()
         ob = bpy.data.objects.new(name, me)
         bpy.context.scene.collection.objects.link(ob)
@@ -353,10 +359,6 @@ def launch_pad():
     b.box((-6.2, -6.0, 0.9), (1.8, 1.8, 1.4), GRAY)                # equipment shed
     b.box((-6.2, -6.0, 1.7), (2.0, 2.0, 0.18), SLATE)
     b.box((-6.2, -6.92, 0.8), (0.75, 0.08, 1.3), DOOR)
-    for a in (35, 125, 215, 305):                                  # flood-light poles
-        x, y = math.cos(math.radians(a)) * 7.0, math.sin(math.radians(a)) * 7.0
-        b.cyl((x, y, 3.2), 0.09, 6.0, DARK, seg=6)
-        b.box((x, y, 6.2), (0.6, 0.4, 0.22), HAZ)
     b.cyl((tx - 3.2, -1.2, 0.55), 0.18, 7.0, STEEL, seg=6, rot=RY(90))   # ground pipes
     b.cyl((tx - 3.2, -1.6, 0.55), 0.18, 7.0, ORANGE, seg=6, rot=RY(90))
     return b.finish("LaunchPad")
@@ -459,6 +461,51 @@ def fuel_truck():
     return b.finish("CarFuelTruck")
 
 
+# ============================== LAMPS (slot 1 = lamp glass) ==============================
+def street_lamp():
+    b = B()
+    b.cyl((0, 0, 0.15), 0.3, 0.3, CONC, seg=8)
+    b.cyl((0, 0, 3.2), 0.07, 6.0, DARK, seg=8)
+    b.box((0, -0.65, 6.05), (0.12, 1.3, 0.12), DARK)               # arm
+    b.box((0, -1.3, 6.02), (0.55, 0.95, 0.14), DARK)               # housing
+    b.box((0, -1.3, 5.93), (0.44, 0.84, 0.04), LCONC, mat=1)       # lamp glass
+    return b.finish("LampStreet")
+
+
+def floodlight_tower():
+    b = B()
+    b.cyl((0, 0, 0.2), 0.55, 0.4, CONC, seg=8)
+    b.cyl((0, 0, 4.7), 0.13, 9.0, DARK, seg=8)
+    b.box((0, 0, 9.0), (0.9, 0.9, 0.12), DARK)                      # platform
+    tilt = RX(22)
+    head = Vector((0, -0.45, 9.55))
+    b.box(head, (1.7, 0.2, 1.1), DARK, rot=tilt)                    # lamp bank frame
+    for sx in (-0.4, 0.4):
+        for sz in (-0.25, 0.25):
+            b.box(head + tilt @ Vector((sx, -0.12, sz)), (0.62, 0.05, 0.4), LCONC, rot=tilt, mat=1)
+    b.box((0, -0.1, 9.25), (0.12, 0.12, 0.5), DARK)                 # yoke
+    return b.finish("LampFloodTower")
+
+
+def bollard_light():
+    b = B()
+    b.cyl((0, 0, 0.05), 0.17, 0.1, CONC, seg=8)
+    b.box((0, 0, 0.4), (0.15, 0.15, 0.7), DARK)
+    b.cyl((0, 0, 0.88), 0.13, 0.22, LCONC, seg=8, mat=1)           # glowing head
+    b.cyl((0, 0, 1.02), 0.17, 0.05, DARK, seg=8)
+    return b.finish("LampBollard")
+
+
+def uplight():
+    b = B()
+    b.box((0, 0, 0.1), (0.7, 0.55, 0.2), DARK)
+    tilt = RX(-55)
+    c = Vector((0, -0.05, 0.38))
+    b.box(c, (0.55, 0.14, 0.55), DARK, rot=tilt)
+    b.box(c + tilt @ Vector((0, -0.09, 0)), (0.42, 0.04, 0.42), LCONC, rot=tilt, mat=1)
+    return b.finish("LampUplight")
+
+
 # ============================== BUILD + EXPORT ==============================
 def export(ob, name):
     bpy.ops.object.select_all(action="DESELECT")
@@ -476,7 +523,8 @@ for m in list(bpy.data.meshes):
     bpy.data.meshes.remove(m)
 write_palette(os.path.join(OUT, "base-palette.png"))
 makers = [mission_control, hangar, fuel_depot, admin_office, radar_tower, launch_pad,
-          sedan, hatchback, pickup, service_van, fuel_truck]
+          sedan, hatchback, pickup, service_van, fuel_truck,
+          street_lamp, floodlight_tower, bollard_light, uplight]
 objs = [(fn.__name__, fn()) for fn in makers]
 for _, ob in objs:
     export(ob, ob.name)

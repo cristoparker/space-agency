@@ -2,10 +2,11 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Spawns cars and trucks that wander randomly along the base's dirt roads.
-/// The roads are the same curves that were painted on the terrain (Catmull-Rom through the points below),
-/// merged into one graph so vehicles can turn at junctions. Vehicle speed follows the game's time scale
-/// (Time.deltaTime), so they stop when paused and go fast when the game is fast.
+/// Spawns a few cars and trucks that wander randomly along the base's dirt roads.
+/// The roads are the same curves painted on the terrain (Catmull-Rom through the points below), merged into one
+/// graph so vehicles can turn at junctions. Road points that fall inside a building (or any blocker) are
+/// removed from the graph, so vehicles never drive through buildings. Speed follows the game's time scale
+/// (Time.deltaTime): vehicles stop when paused and go fast when the game is fast.
 /// </summary>
 public class TrafficManager : MonoBehaviour
 {
@@ -16,13 +17,23 @@ public class TrafficManager : MonoBehaviour
     public GameObject[] vehiclePrefabs;
     [Tooltip("Materials that share the palette but shift its UV so only the body colour changes.")]
     public Material[] bodyMaterials;
-    public int vehicleCount = 10;
+    public int minVehicles = 8;
+    public int maxVehicles = 10;
     public Vector2 speedRange = new Vector2(5f, 8f);
     [Tooltip("Sideways offset from the road centre (drive on the right).")]
     public float laneOffset = 0.75f;
     public float turnSpeed = 6f;
     [Tooltip("Stop when another vehicle is this close in front.")]
     public float followDistance = 4f;
+
+    [Header("Obstacles")]
+    [Tooltip("Every child of this object blocks the roads under it (its renderer bounds plus the margin).")]
+    public Transform obstacleRoot;
+    public string[] ignoreObstacleNames = { "LaunchPad" };
+    [Tooltip("Clearance around a building: car half-width + lane offset + some room.")]
+    public float obstacleMargin = 2.5f;
+    [Tooltip("Extra blocked rectangles: x = centre X, y = centre Z, z = half width X, w = half width Z (margin included).")]
+    public Vector4[] extraBlockers;
 
     [Header("Roads (world X,Z) - match the painted terrain paths")]
     public Road[] roads = DefaultRoads();
@@ -34,15 +45,24 @@ public class TrafficManager : MonoBehaviour
         return new Road { points = p };
     }
 
-    static Road[] DefaultRoads() => new[]
+    public static Road[] DefaultRoads() => new[]
     {
-        R(-2,-45, -2,-30, -10,-18, 0,-8, 4,-3, 8,0),
-        R(-50,13, -30,12, -18,9, -8,5, 0,-2, 8,0),
-        R(8,0, 16,3, 24,16, 40,22, 60,22),
-        R(8,0, 10,18, 14,32, 12,50),
-        R(-18,9, -18,17),
-        R(-8,5, -18,0),
-        R(16,3, 20,-12),
+        // spine (south -> north) west of the pad
+        R(-2,-60, -2,-35, -2,-18, -2,-11, -2,0, -3,7, -3,18, -3,28, -6,45, -8,70, -6,100, -4,125),
+        // south avenue (west -> east), passes south of the pad and the admin office
+        R(-125,-12, -90,-5, -50,-6, -28,-7, -12,-9, -2,-11, 10,-13, 14,-20, 22,-24, 34,-22),
+        // east connector
+        R(34,-22, 40,-10, 42,6, 40,20, 36,27),
+        // north avenue
+        R(-3,28, 10,30, 24,31, 36,27),
+        // long roads leaving the base
+        R(36,27, 55,24, 80,30, 110,22, 130,28),
+        R(34,-22, 55,-25, 80,-15, 105,-22, 130,-12),
+        // west avenue
+        R(-3,7, -14,7, -30,9, -55,12, -90,10, -125,16),
+        // short spurs to building fronts
+        R(42,6, 31,8),
+        R(22,-24, 22,-19.5f),
     };
 
     // ---- graph ----
@@ -50,6 +70,7 @@ public class TrafficManager : MonoBehaviour
     readonly List<List<int>> links = new List<List<int>>();
     readonly Dictionary<Vector2Int, List<int>> grid = new Dictionary<Vector2Int, List<int>>();
     readonly List<Vehicle> vehicles = new List<Vehicle>();
+    readonly List<int> spawnNodes = new List<int>();
     Terrain terrain;
 
     const float Spacing = 0.5f, Merge = 0.25f;
@@ -58,12 +79,15 @@ public class TrafficManager : MonoBehaviour
     {
         terrain = Terrain.activeTerrain;
         BuildGraph();
+        RemoveBlocked();
+        FindSpawnNodes();
     }
 
     void Start()
     {
-        if (vehiclePrefabs == null || vehiclePrefabs.Length == 0 || nodes.Count < 2) return;
-        for (int i = 0; i < vehicleCount; i++) Spawn(i);
+        if (vehiclePrefabs == null || vehiclePrefabs.Length == 0 || spawnNodes.Count == 0) return;
+        int count = Random.Range(minVehicles, maxVehicles + 1);
+        for (int i = 0; i < count; i++) Spawn(i);
     }
 
     // ----- graph building -----
@@ -112,6 +136,70 @@ public class TrafficManager : MonoBehaviour
         }
     }
 
+    // ----- obstacles -----
+    List<Vector4> CollectBlockers()
+    {
+        var rects = new List<Vector4>();
+        if (obstacleRoot != null)
+        {
+            foreach (Transform child in obstacleRoot)
+            {
+                if (System.Array.IndexOf(ignoreObstacleNames, child.name) >= 0) continue;
+                bool any = false; Bounds b = default;
+                foreach (var r in child.GetComponentsInChildren<Renderer>())
+                {
+                    if (!any) { b = r.bounds; any = true; } else b.Encapsulate(r.bounds);
+                }
+                if (any) rects.Add(new Vector4(b.center.x, b.center.z, b.extents.x + obstacleMargin, b.extents.z + obstacleMargin));
+            }
+        }
+        if (extraBlockers != null) rects.AddRange(extraBlockers);
+        return rects;
+    }
+
+    void RemoveBlocked()
+    {
+        var rects = CollectBlockers();
+        int removed = 0;
+        for (int i = 0; i < nodes.Count; i++)
+        {
+            foreach (var r in rects)
+            {
+                if (Mathf.Abs(nodes[i].x - r.x) < r.z && Mathf.Abs(nodes[i].y - r.y) < r.w)
+                {
+                    foreach (int n in links[i]) links[n].Remove(i);
+                    links[i].Clear();
+                    removed++;
+                    break;
+                }
+            }
+        }
+        Debug.Log($"TrafficManager: {nodes.Count} road nodes, {removed} blocked by {rects.Count} obstacles.");
+    }
+
+    // only spawn on connected stretches of road that are long enough to be worth driving
+    void FindSpawnNodes()
+    {
+        var comp = new int[nodes.Count];
+        var stack = new Stack<int>();
+        int id = 0;
+        var sizes = new List<int> { 0 };
+        for (int i = 0; i < nodes.Count; i++)
+        {
+            if (comp[i] != 0 || links[i].Count == 0) continue;
+            id++; int size = 0;
+            comp[i] = id; stack.Push(i);
+            while (stack.Count > 0)
+            {
+                int n = stack.Pop(); size++;
+                foreach (int m in links[n]) if (comp[m] == 0) { comp[m] = id; stack.Push(m); }
+            }
+            sizes.Add(size);
+        }
+        for (int i = 0; i < nodes.Count; i++)
+            if (comp[i] != 0 && sizes[comp[i]] >= 200) spawnNodes.Add(i);
+    }
+
     // ----- spawning -----
     void Spawn(int index)
     {
@@ -124,13 +212,12 @@ public class TrafficManager : MonoBehaviour
             foreach (var r in go.GetComponentsInChildren<MeshRenderer>()) r.sharedMaterial = m;
         }
 
-        int from = Random.Range(0, nodes.Count);
-        while (links[from].Count == 0) from = Random.Range(0, nodes.Count);
+        int from = spawnNodes[Random.Range(0, spawnNodes.Count)];
         int to = links[from][Random.Range(0, links[from].Count)];
         var v = new Vehicle
         {
             tr = go.transform, from = from, to = to,
-            t = Random.value * Vector2.Distance(nodes[from], nodes[to]),
+            t = 0f,
             speed = Random.Range(speedRange.x, speedRange.y),
         };
         v.heading = Dir(from, to);
@@ -221,6 +308,9 @@ public class TrafficManager : MonoBehaviour
         foreach (var road in roads)
             for (int i = 0; i < road.points.Length - 1; i++)
                 Gizmos.DrawLine(new Vector3(road.points[i].x, 8f, road.points[i].y), new Vector3(road.points[i + 1].x, 8f, road.points[i + 1].y));
+        Gizmos.color = Color.red;
+        if (extraBlockers != null)
+            foreach (var r in extraBlockers) Gizmos.DrawWireCube(new Vector3(r.x, 8f, r.y), new Vector3(r.z * 2f, 0.1f, r.w * 2f));
     }
 #endif
 }
