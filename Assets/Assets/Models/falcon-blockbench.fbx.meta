@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 3c4278fbb38f83741a27503e093e321e
+guid: eff75c16e3a456f4ab8c37095d0bd0f8
 ModelImporter:
   serializedVersion: 24600
   internalIDToNameTable: []
@@ -7,8 +7,8 @@ ModelImporter:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: rocket-palette
-    second: {fileID: 2100000, guid: ae8c6793e91ad4c4b9b6f1ab2bf3bef8, type: 2}
+      name: falcon-palette
+    second: {fileID: 2100000, guid: 3cb410bedc96249499ea8e336f7e7a20, type: 2}
   materials:
     materialImportMode: 2
     materialName: 0
