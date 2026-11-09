@@ -1,0 +1,133 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1f773932dd3a7584cab87a51157eb906, type: 3}
+  m_Name: PartLibrary
+  m_EditorClassIdentifier: Assembly-CSharp::PartLibrary
+  catalog: {fileID: 4900000, guid: d597e25051a06f94c8aa5e68f4ac76ea, type: 3}
+  models:
+  - id: Adp_M_L
+    prefab: {fileID: 919132149155446097, guid: bea23ea5970dceb4d931abb1880c9ea9, type: 3}
+  - id: Adp_S_M
+    prefab: {fileID: 919132149155446097, guid: 5d776c02c3b8b624e9e56a87939ea20a, type: 3}
+  - id: Avi_L
+    prefab: {fileID: 919132149155446097, guid: 1d783a2b44d55714aa428fd4a52d7ec9, type: 3}
+  - id: Avi_M
+    prefab: {fileID: 919132149155446097, guid: dc214f82fe018d841b6d4bb8a85b6798, type: 3}
+  - id: Avi_S
+    prefab: {fileID: 919132149155446097, guid: b6afeca023283374baf6371c612cc404, type: 3}
+  - id: Booster_L
+    prefab: {fileID: 919132149155446097, guid: 5bda923222f4a154596d8e264c1b9fdc, type: 3}
+  - id: Booster_M
+    prefab: {fileID: 919132149155446097, guid: 9804421333a24fa47bd19c8d41ea8a79, type: 3}
+  - id: Booster_S
+    prefab: {fileID: 919132149155446097, guid: ce25c1ea48b516343a9100bdf851f760, type: 3}
+  - id: Com_Dish_L
+    prefab: {fileID: 919132149155446097, guid: 2e63a5e8b69f2424e92e00cc347227f5, type: 3}
+  - id: Com_Dish_S
+    prefab: {fileID: 919132149155446097, guid: 7b057eb3c29bb464abac42bff75dbf6e, type: 3}
+  - id: Com_Patch
+    prefab: {fileID: 919132149155446097, guid: 9b46b3c526edfc140a92064990168cca, type: 3}
+  - id: Com_PhasedArray
+    prefab: {fileID: 919132149155446097, guid: 75e943b8791250a45b3940ea9b57d940, type: 3}
+  - id: Com_Whip
+    prefab: {fileID: 919132149155446097, guid: 11d49db1bb49359449d23dca1016fd32, type: 3}
+  - id: Dec_L
+    prefab: {fileID: 919132149155446097, guid: 1a39fa27021f1fd4fae4c84247a0ffe4, type: 3}
+  - id: Dec_M
+    prefab: {fileID: 919132149155446097, guid: 365f65d1a32a8c54bbe88c01d1fbd29b, type: 3}
+  - id: Dec_S
+    prefab: {fileID: 919132149155446097, guid: c97dc6a8c70d52145bb448037763886b, type: 3}
+  - id: Eng_L_Cluster4
+    prefab: {fileID: 919132149155446097, guid: 2a09bf8bc6913c24b99b9c923dfddf8b, type: 3}
+  - id: Eng_L_Vac
+    prefab: {fileID: 919132149155446097, guid: 2bd51293e21e33a4bbce8b346fabad08, type: 3}
+  - id: Eng_M_Cluster3
+    prefab: {fileID: 919132149155446097, guid: 3d1672867e8ce79498639305c0aa53cb, type: 3}
+  - id: Eng_M_Lifter
+    prefab: {fileID: 919132149155446097, guid: c73f667ad3c964d4baa0bb4c4889cb77, type: 3}
+  - id: Eng_M_Vac
+    prefab: {fileID: 919132149155446097, guid: 0b54756f66edeaf4db4352c8bad075ef, type: 3}
+  - id: Eng_S_SolidKick
+    prefab: {fileID: 919132149155446097, guid: f37e2e5260d3c754a81a0de1faa77a5f, type: 3}
+  - id: Eng_S_Spark
+    prefab: {fileID: 919132149155446097, guid: fb4bd177e6d6b58429567f49e7fa84ac, type: 3}
+  - id: Eng_S_Vac
+    prefab: {fileID: 919132149155446097, guid: 25f013ad02d753f4ebd2ed0c87da4c36, type: 3}
+  - id: Fin_L
+    prefab: {fileID: 919132149155446097, guid: dd4cb29737e5a7e46a71a99fdfd2db5e, type: 3}
+  - id: Fin_S
+    prefab: {fileID: 919132149155446097, guid: 394bb509c7b917d45b85b566841bdced, type: 3}
+  - id: Head_Capsule_L
+    prefab: {fileID: 919132149155446097, guid: 34f24504743d3ca4fb34a405d3c0737a, type: 3}
+  - id: Head_Capsule_M
+    prefab: {fileID: 919132149155446097, guid: 0ab06b00f4162964ebf6ea6891216774, type: 3}
+  - id: Head_Fairing_L
+    prefab: {fileID: 919132149155446097, guid: 8a068b03f57327c49b59a4fb46a4486c, type: 3}
+  - id: Head_Fairing_M
+    prefab: {fileID: 919132149155446097, guid: 9037a4af04ad1c14d810784151f7b87b, type: 3}
+  - id: Head_Fairing_S
+    prefab: {fileID: 919132149155446097, guid: f38846db9bb246f4faba25a14a8316d9, type: 3}
+  - id: Head_Nose_L
+    prefab: {fileID: 919132149155446097, guid: 112491eb84f57604b8c21a585dbd335e, type: 3}
+  - id: Head_Nose_M
+    prefab: {fileID: 919132149155446097, guid: 1fc7f1acf703c66428e3d80b77b5cfaf, type: 3}
+  - id: Head_Nose_S
+    prefab: {fileID: 919132149155446097, guid: c5c9b8ed4759b9c42a4058c08807661b, type: 3}
+  - id: Pay_Lander
+    prefab: {fileID: 919132149155446097, guid: 05a62311286aa1045ae422690842079b, type: 3}
+  - id: Pay_Rover
+    prefab: {fileID: 919132149155446097, guid: 2aae3310b65df7a418fdc2d7344d6c9b, type: 3}
+  - id: Pay_Satellite_M
+    prefab: {fileID: 919132149155446097, guid: d653edee477a2ff47bd8ba680715f331, type: 3}
+  - id: Pay_Satellite_S
+    prefab: {fileID: 919132149155446097, guid: da3d47c4b1b966846929091667729128, type: 3}
+  - id: Pow_Battery
+    prefab: {fileID: 919132149155446097, guid: fc343bd4cc514924da35f0187ef7029c, type: 3}
+  - id: Pow_RTG
+    prefab: {fileID: 919132149155446097, guid: 9abafc34bc1e800439e7cd9ad53d4d49, type: 3}
+  - id: Pow_Solar_L
+    prefab: {fileID: 919132149155446097, guid: 89b7f235a366c5a4a97c329d765ad4c7, type: 3}
+  - id: Pow_Solar_S
+    prefab: {fileID: 919132149155446097, guid: 8490017906e3029459330ab742620133, type: 3}
+  - id: Rec_GridFin
+    prefab: {fileID: 919132149155446097, guid: 0e521723c1e9c1141aea62b737cbd445, type: 3}
+  - id: Rec_LandingLeg
+    prefab: {fileID: 919132149155446097, guid: 6a07f6fdf3fb36046a4e283cee3c1398, type: 3}
+  - id: Rec_Parachute_M
+    prefab: {fileID: 919132149155446097, guid: 4fb4110dea7bdc943a57861d05262833, type: 3}
+  - id: Rec_Parachute_S
+    prefab: {fileID: 919132149155446097, guid: edb295d5b3d72c04d86ce5f84bc43fa0, type: 3}
+  - id: Tank_L_Long
+    prefab: {fileID: 919132149155446097, guid: 13cdc42ec42fab94ea1a475e5142f0b6, type: 3}
+  - id: Tank_L_Short
+    prefab: {fileID: 919132149155446097, guid: 64ae9e07a9e1dd1439142537fee6093c, type: 3}
+  - id: Tank_M_Long
+    prefab: {fileID: 919132149155446097, guid: 9ad6ada74c06fbd4eb22641b11a013c1, type: 3}
+  - id: Tank_M_Short
+    prefab: {fileID: 919132149155446097, guid: 2cdc3c2c40cead1419ace13c32ab7603, type: 3}
+  - id: Tank_S_Long
+    prefab: {fileID: 919132149155446097, guid: a278eb0704c92b04cb8519362af6d8a5, type: 3}
+  - id: Tank_S_Short
+    prefab: {fileID: 919132149155446097, guid: 06553601d25fa164d9ac8adf6b37774c, type: 3}
+  - id: Thr_Ion
+    prefab: {fileID: 919132149155446097, guid: e4ac330269eaf5b4fb312c99dc5b2be2, type: 3}
+  - id: Thr_RCS_Block
+    prefab: {fileID: 919132149155446097, guid: 640b52375ac51414b8cbe0d3707073e2, type: 3}
+  liveryMaterials:
+  - {fileID: 2100000, guid: 44495278eb003554a976566aaab9bdb2, type: 2}
+  - {fileID: 2100000, guid: 8b6518413838bfa409e32046c8887160, type: 2}
+  - {fileID: 2100000, guid: 30e167fee6b84de41a707c0a71e118aa, type: 2}
+  - {fileID: 2100000, guid: 01fb8b8bbd535bc4bae31c2d9e8a7f3a, type: 2}
+  - {fileID: 2100000, guid: 8bdc19c0f02eaf642b0496c3f5f1ca8d, type: 2}
+  - {fileID: 2100000, guid: ccef12cdb3e86aa4eaabefc0fb96f7f5, type: 2}
+  - {fileID: 2100000, guid: 7686e083eb5102443856581c5a3456ab, type: 2}
+  - {fileID: 2100000, guid: f72e87f7ab363f341907b9b3e28031b4, type: 2}
