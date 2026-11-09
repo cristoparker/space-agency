@@ -34,6 +34,9 @@ public class RunningMissionRowUI : MonoBehaviour, IPointerClickHandler
         if (Mission == null) return;
         progressSlider.value = Mission.Progress;
         percentText.text = Mission.Percent + "%";
+        var dep = DeploymentManager.Instance;
+        string launch = dep != null && dep.IsMissionDeployed(Mission.Definition.id) && dep.LaunchDate.HasValue ? "  |  launch " + dep.LaunchDate.Value.ToString("dd MMM", System.Globalization.CultureInfo.InvariantCulture) : "";
+        infoText.text = Mission.Definition.missionType + " - " + Mission.Definition.target + launch;
         if (background != null)
             background.color = MissionManager.Instance != null && MissionManager.Instance.Tracked == Mission ? trackedColor : normalColor;
     }

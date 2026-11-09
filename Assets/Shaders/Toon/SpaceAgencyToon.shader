@@ -18,6 +18,7 @@ Shader "SpaceAgency/Toon/Lit"
         {
             Name "ForwardLit"
             Tags { "LightMode" = "UniversalForward" }
+            Cull Off
 
             HLSLPROGRAM
             #pragma target 4.5
@@ -64,11 +65,12 @@ Shader "SpaceAgency/Toon/Lit"
                 return OUT;
             }
 
-            half4 frag(Varyings IN) : SV_Target
+            half4 frag(Varyings IN, FRONT_FACE_TYPE face : FRONT_FACE_SEMANTIC) : SV_Target
             {
                 UNITY_SETUP_INSTANCE_ID(IN);
                 half4 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, IN.uv) * _BaseColor;
-                half3 col = ToonShade(albedo.rgb, normalize(IN.normalWS), IN.positionWS, GetNormalizedScreenSpaceUV(IN.positionCS), _ToonParams, _ToonLevels);
+                float3 n = normalize(IN.normalWS) * IS_FRONT_VFACE(face, 1.0, -1.0);      // double sided: light the back faces correctly
+                half3 col = ToonShade(albedo.rgb, n, IN.positionWS, GetNormalizedScreenSpaceUV(IN.positionCS), _ToonParams, _ToonLevels);
                 return half4(col, 1);
             }
             ENDHLSL
@@ -81,7 +83,7 @@ Shader "SpaceAgency/Toon/Lit"
             ZWrite On
             ZTest LEqual
             ColorMask 0
-            Cull Back
+            Cull Off
 
             HLSLPROGRAM
             #pragma target 4.5
@@ -141,7 +143,7 @@ Shader "SpaceAgency/Toon/Lit"
             Tags { "LightMode" = "DepthOnly" }
             ZWrite On
             ColorMask R
-            Cull Back
+            Cull Off
 
             HLSLPROGRAM
             #pragma target 4.5

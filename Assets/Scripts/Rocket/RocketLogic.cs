@@ -52,10 +52,13 @@ public static class RocketRules
     public static bool IsEngine(PartInfo p) => p != null && p.category == "Engine";
     public static bool IsDecoupler(PartInfo p) => p != null && p.id.StartsWith("Dec_");
 
-    /// <summary>Index at which a stack part would be inserted, or -1 when it does not fit.</summary>
-    public static int StackInsertIndex(RocketDesign d, PartInfo p, PartLibrary lib, out string reason)
+    /// <summary>
+    /// Where a stack part would be inserted. Parts are never refused: if the size does not fit,
+    /// `advisory` says so (the rocket checks will show the error until it is fixed, e.g. with an adapter or Auto order).
+    /// </summary>
+    public static int StackInsertIndex(RocketDesign d, PartInfo p, PartLibrary lib, out string advisory)
     {
-        reason = "";
+        advisory = "";
         var stack = d.stack.Select(lib.Get).Where(x => x != null).ToList();
         bool hasHead = stack.Count > 0 && IsHead(stack[stack.Count - 1]);
         int top = stack.Count - (hasHead ? 1 : 0);            // number of parts below the head
@@ -65,47 +68,118 @@ public static class RocketRules
         {
             // first-stage engine goes at the bottom
             if (stack.Count > 0 && stack[0].BottomClass != p.TopClass)
-            {
-                reason = "Engine is size " + p.size + " but the stack starts with size " + stack[0].BottomClass + ".";
-                return -1;
-            }
+                advisory = "Engine is size " + p.size + " but the stack starts with size " + stack[0].BottomClass + ".";
             return 0;
         }
         if (IsHead(p))
         {
-            if (last != null && last.TopClass != p.BottomClass) { reason = "Head is size " + p.size + " but the stack ends in size " + last.TopClass + ". Add an adapter."; return -1; }
+            if (last != null && last.TopClass != p.BottomClass) advisory = "Head is size " + p.size + " but the stack ends in size " + last.TopClass + ". Add an adapter.";
             return hasHead ? stack.Count - 1 : stack.Count;   // replaces the current head
         }
         if (last != null && last.TopClass != p.BottomClass)
-        {
-            reason = "Size " + p.BottomClass + " part on top of size " + last.TopClass + ". Add an adapter.";
-            return -1;
-        }
+            advisory = "Size " + p.BottomClass + " part on top of size " + last.TopClass + ". Add an adapter.";
         return top;                                           // goes just under the head, if there is one
     }
 
+    /// <summary>Always true. `reason` holds a size warning when the part does not fit well.</summary>
     public static bool CanAdd(RocketDesign d, PartInfo p, PartLibrary lib, out string reason)
     {
         reason = "";
-        if (SlotOf(p) == PartSlot.Stack) return StackInsertIndex(d, p, lib, out reason) >= 0;
+        if (SlotOf(p) == PartSlot.Stack) StackInsertIndex(d, p, lib, out reason);
         return true;
     }
 
-    public static void Add(RocketDesign d, PartInfo p, PartLibrary lib)
+    public static Sel Add(RocketDesign d, PartInfo p, PartLibrary lib)
     {
         switch (SlotOf(p))
         {
             case PartSlot.Stack:
                 int i = StackInsertIndex(d, p, lib, out _);
-                if (i < 0) return;
                 if (IsHead(p) && d.stack.Count > 0 && IsHead(lib.Get(d.stack[d.stack.Count - 1]))) d.stack.RemoveAt(d.stack.Count - 1);
-                d.stack.Insert(Mathf.Min(i, d.stack.Count), p.id);
-                break;
-            case PartSlot.Booster: if (d.boosterId != p.id && d.boosterCount < 2) d.boosterCount = 2; d.boosterId = p.id; break;
-            case PartSlot.Fin: d.finId = p.id; if (d.finCount < 3) d.finCount = 4; break;
-            case PartSlot.Payload: d.payloadId = p.id; break;
-            case PartSlot.Equipment: if (d.equipment.Count < 10) d.equipment.Add(p.id); break;
+                i = Mathf.Min(i, d.stack.Count);
+                d.stack.Insert(i, p.id);
+                return Sel.Of(SelKind.Stack, i);
+            case PartSlot.Booster: if (d.boosterId != p.id && d.boosterCount < 2) d.boosterCount = 2; d.boosterId = p.id; return Sel.Of(SelKind.Booster);
+            case PartSlot.Fin: d.finId = p.id; if (d.finCount < 3) d.finCount = 4; return Sel.Of(SelKind.Fin);
+            case PartSlot.Payload: d.payloadId = p.id; return Sel.Of(SelKind.Payload);
+            default:
+                if (d.equipment.Count < 10) d.equipment.Add(p.id);
+                return Sel.Of(SelKind.Equip, d.equipment.Count - 1);
         }
+    }
+
+    static PartInfo Take(List<PartInfo> pool, System.Func<PartInfo, bool> pred)
+    {
+        var p = pool.FirstOrDefault(pred);
+        if (p != null) pool.Remove(p);
+        return p;
+    }
+
+    class Stg
+    {
+        public List<PartInfo> eng = new List<PartInfo>(), tanks = new List<PartInfo>();
+        public string Cls => eng.Count > 0 ? eng[0].TopClass : tanks.Count > 0 ? tanks[0].BottomClass : "M";
+        public string TopCls => tanks.Count > 0 ? tanks[tanks.Count - 1].TopClass : Cls;
+    }
+
+    /// <summary>
+    /// Puts the stack in a sensible physical order: biggest stage at the bottom, each stage = engines then tanks,
+    /// a decoupler between stages (adapters where the size changes), avionics near the top and the head last.
+    /// </summary>
+    public static string AutoOrder(RocketDesign d, PartLibrary lib)
+    {
+        var all = d.stack.Select(lib.Get).Where(x => x != null).ToList();
+        if (all.Count < 2) return "Nothing to order yet.";
+        var heads = all.Where(IsHead).ToList();
+        var engines = all.Where(IsEngine).ToList();
+        var tanks = all.Where(p => p.category == "Tank").ToList();
+        var decs = all.Where(IsDecoupler).ToList();
+        var adps = all.Where(p => p.id.StartsWith("Adp_")).ToList();
+        var avis = all.Where(p => p.id.StartsWith("Avi_")).ToList();
+        var rest = all.Where(p => !IsHead(p) && !IsEngine(p) && p.category != "Tank" && !IsDecoupler(p) && !p.id.StartsWith("Adp_") && !p.id.StartsWith("Avi_")).ToList();
+
+        // sea-level engines first (bigger first); vacuum-only engines go to the upper stages
+        engines = engines.OrderByDescending(e => e.thrustKn > 0 ? 1 : 0).ThenByDescending(e => PartInfo.SizeRank(e.TopClass)).ThenByDescending(e => e.thrustKn + e.thrustVacKn).ToList();
+        int n = Mathf.Max(1, Mathf.Min(decs.Count + 1, Mathf.Max(1, engines.Count)));
+        var st = Enumerable.Range(0, n).Select(_ => new Stg()).ToList();
+        for (int i = 0; i < engines.Count; i++)
+        {
+            int target = i < n ? i : st.FindIndex(s => s.Cls == engines[i].TopClass);
+            st[target < 0 ? 0 : target].eng.Add(engines[i]);
+        }
+        foreach (var t in tanks.OrderByDescending(t => PartInfo.SizeRank(t.TopClass)).ThenByDescending(t => t.fuelKg))
+        {
+            var match = st.Where(s => s.eng.Count > 0 && s.Cls == t.BottomClass).OrderBy(s => s.tanks.Count).FirstOrDefault()
+                        ?? st.Where(s => s.eng.Count == 0).OrderBy(s => s.tanks.Count).FirstOrDefault() ?? st[0];
+            match.tanks.Add(t);
+        }
+        st = st.Where(s => s.eng.Count + s.tanks.Count > 0).OrderByDescending(s => PartInfo.SizeRank(s.Cls)).ToList();
+
+        var result = new List<PartInfo>();
+        for (int i = 0; i < st.Count; i++)
+        {
+            result.AddRange(st[i].eng);
+            result.AddRange(st[i].tanks.OrderByDescending(t => t.heightM));
+            if (i < st.Count - 1)
+            {
+                string top = st[i].TopCls, nextBottom = st[i + 1].Cls;
+                var dec = Take(decs, x => x.BottomClass == top) ?? Take(decs, x => true);
+                if (dec != null) result.Add(dec);
+                if (top != nextBottom)
+                {
+                    var ad = Take(adps, x => x.BottomClass == top && x.TopClass == nextBottom);
+                    if (ad != null) result.Add(ad);
+                }
+            }
+        }
+        // whatever is left (extra decouplers, adapters, odd parts), then avionics, then the head
+        result.AddRange(adps); result.AddRange(decs); result.AddRange(rest);
+        string cls = result.Count > 0 ? result[result.Count - 1].TopClass : "M";
+        var avi = Take(avis, x => x.BottomClass == cls) ?? Take(avis, x => true);
+        while (avi != null) { result.Add(avi); avi = Take(avis, x => true); }
+        if (heads.Count > 0) result.Add(heads[heads.Count - 1]);
+        d.stack = result.Select(p => p.id).ToList();
+        return "Auto order: " + st.Count + " stage" + (st.Count == 1 ? "" : "s") + ", " + result.Count + " parts.";
     }
 }
 
@@ -139,9 +213,9 @@ public static class RocketStats
     {
         switch ((target ?? "").ToLowerInvariant())
         {
-            case "moon": return 12600f;
-            case "mars": return 14500f;
-            default: return 9400f;                  // Earth orbit
+            case "moon": return 10500f;
+            case "mars": return 13500f;
+            default: return 9000f;                  // Earth orbit
         }
     }
 
@@ -168,7 +242,8 @@ public static class RocketStats
             {
                 float thrust = si == 0 ? p.thrustKn : p.thrustVacKn;
                 float isp = si == 0 ? (p.ispSl > 0 ? (p.ispSl + p.ispVac) * 0.5f : p.ispVac) : p.ispVac;
-                if (thrust > 0 && isp > 0) { st.thrustKn += thrust; st.thrustOverIsp += thrust / isp; st.engines++; }
+                st.engines++;
+                if (thrust > 0 && isp > 0) { st.thrustKn += thrust; st.thrustOverIsp += thrust / isp; }
             }
             if (RocketRules.IsDecoupler(p)) r.stages.Add(new StageInfo());
         }
@@ -217,15 +292,17 @@ public static class RocketStats
             if (!RocketRules.IsHead(stack[stack.Count - 1])) Add(r, Sev.Error, "No head. Add a fairing, nose cone or capsule on top.");
             for (int i = 1; i < stack.Count; i++)
                 if (stack[i - 1].TopClass != stack[i].BottomClass)
-                    Add(r, Sev.Error, "Size mismatch: " + stack[i - 1].DisplayName + " / " + stack[i].DisplayName + ". Add an adapter.");
+                    Add(r, Sev.Error, "Size mismatch: " + stack[i - 1].DisplayName + " (" + stack[i - 1].TopClass + ") under " + stack[i].DisplayName + " (" + stack[i].BottomClass + "). Add an adapter or press Auto order.");
+            if (r.fuelKg <= 0) Add(r, Sev.Error, "No fuel. Add a fuel tank.");
             for (int i = 0; i < r.stages.Count; i++)
             {
                 var st = r.stages[i];
-                if (st.fuel > 0 && st.engines == 0) Add(r, Sev.Error, "Stage " + (i + 1) + " has fuel but no engine.");
+                if (st.parts.Count == 0) continue;
+                if (st.fuel > 0 && st.engines == 0 && !(i == 0 && bn > 0)) Add(r, Sev.Error, "Stage " + (i + 1) + " has fuel but no engine. Put an engine at the bottom of that stage.");
                 else if (st.engines > 0 && st.fuel <= 0) Add(r, Sev.Warn, "Stage " + (i + 1) + " has an engine but no fuel.");
+                if (i == 0 && st.engines > 0 && st.thrustKn <= 0 && bn == 0) Add(r, Sev.Error, "Stage 1 only has vacuum engines. They cannot start in the atmosphere: use a sea-level engine.");
             }
-            if (!stack.Any(p => p.id.StartsWith("Avi_"))) Add(r, Sev.Warn, "No avionics: the rocket cannot be steered.");
-            if (r.stages.Count > 1 && !stack.Any(RocketRules.IsDecoupler)) Add(r, Sev.Warn, "Add decouplers to drop empty stages.");
+            if (!stack.Any(p => p.id.StartsWith("Avi_"))) Add(r, Sev.Error, "No avionics. Add one (Structure tab) so the rocket can be steered.");
             if (stack.Count > 0 && RocketRules.IsEngine(stack[0]))
             {
                 if (r.liftoffTwr < 1f) Add(r, Sev.Error, "Cannot lift off: thrust-to-weight " + r.liftoffTwr.ToString("0.00") + " (needs > 1.0).");
@@ -307,22 +384,23 @@ public static class RocketAssembler
         var root = new GameObject("Rocket");
         var mat = lib.Livery(d.livery);
 
-        GameObject Spawn(PartInfo p, Vector3 pos, Quaternion rot)
+        GameObject Spawn(PartInfo p, Vector3 pos, Quaternion rot, SelKind kind, int index)
         {
             var prefab = lib.Prefab(p.id);
             if (prefab == null) return null;
             var go = UnityEngine.Object.Instantiate(prefab, root.transform);
             go.transform.localPosition = pos; go.transform.localRotation = rot;
+            var pr = go.AddComponent<PartRef>(); pr.kind = kind; pr.index = index;
             if (mat != null) foreach (var rd in go.GetComponentsInChildren<MeshRenderer>()) rd.sharedMaterial = mat;
             return go;
         }
 
         float y = 0f, firstStageR = 0f, topR = 0.6f, headBase = -1f;
         bool inFirst = true;
-        foreach (var id in d.stack)
+        for (int si = 0; si < d.stack.Count; si++)
         {
-            var p = lib.Get(id); if (p == null) continue;
-            Spawn(p, new Vector3(0f, y, 0f), Quaternion.identity);
+            var p = lib.Get(d.stack[si]); if (p == null) continue;
+            Spawn(p, new Vector3(0f, y, 0f), Quaternion.identity, SelKind.Stack, si);
             if (inFirst) firstStageR = Mathf.Max(firstStageR, p.Radius);
             if (RocketRules.IsDecoupler(p)) inFirst = false;
             if (RocketRules.IsHead(p)) headBase = y;
@@ -337,7 +415,7 @@ public static class RocketAssembler
             {
                 float a = 360f * i / d.boosterCount + 90f;
                 Vector3 dir = Quaternion.Euler(0, a, 0) * Vector3.forward;
-                Spawn(booster, dir * (firstStageR + booster.Radius + 0.08f), Quaternion.identity);
+                Spawn(booster, dir * (firstStageR + booster.Radius + 0.08f), Quaternion.identity, SelKind.Booster, 0);
             }
 
         var fin = lib.Get(d.finId);
@@ -346,17 +424,17 @@ public static class RocketAssembler
             {
                 float a = 360f * i / d.finCount + 45f;
                 Vector3 dir = Quaternion.Euler(0, a, 0) * Vector3.forward;
-                Spawn(fin, dir * (firstStageR * 0.98f) + Vector3.up * 0.4f, Quaternion.FromToRotation(Vector3.left, dir));
+                Spawn(fin, dir * (firstStageR * 0.98f) + Vector3.up * 0.4f, Quaternion.FromToRotation(Vector3.left, dir), SelKind.Fin, 0);
             }
 
         // equipment rides on the ring just under the head
         float ey = headBase >= 0f ? headBase : top;
-        var equip = d.equipment.Select(lib.Get).Where(p => p != null).ToList();
-        for (int i = 0; i < equip.Count; i++)
+        for (int i = 0; i < d.equipment.Count; i++)
         {
-            float a = 360f * i / equip.Count + 20f;
+            var e = lib.Get(d.equipment[i]); if (e == null) continue;
+            float a = 360f * i / d.equipment.Count + 20f;
             Vector3 dir = Quaternion.Euler(0, a, 0) * Vector3.forward;
-            Spawn(equip[i], dir * (topR + 0.04f) + Vector3.up * Mathf.Max(0f, ey - 0.5f), Quaternion.FromToRotation(Vector3.forward, dir));
+            Spawn(e, dir * (topR + 0.04f) + Vector3.up * Mathf.Max(0f, ey - 0.5f), Quaternion.FromToRotation(Vector3.forward, dir), SelKind.Equip, i);
         }
 
         var rends = root.GetComponentsInChildren<Renderer>();
@@ -364,4 +442,66 @@ public static class RocketAssembler
         foreach (var rd in rends) bounds.Encapsulate(rd.bounds);
         return root;
     }
+
+    /// <summary>Selected part: brighter colours plus a cyan outline (an inflated back-face copy of its meshes).</summary>
+    public static void Highlight(GameObject rocket, Sel sel, Material outline, float thickness)
+    {
+        if (sel.IsNone || rocket == null) return;
+        var mpb = new MaterialPropertyBlock();
+        mpb.SetColor("_BaseColor", new Color(1.45f, 1.6f, 1.75f, 1f));
+        foreach (var pr in rocket.GetComponentsInChildren<PartRef>())
+        {
+            if (!pr.Matches(sel)) continue;
+            foreach (var mr in pr.GetComponentsInChildren<MeshRenderer>())
+            {
+                mr.SetPropertyBlock(mpb);
+                var mf = mr.GetComponent<MeshFilter>();
+                if (mf == null || mf.sharedMesh == null || outline == null) continue;
+                var go = new GameObject("Outline");
+                go.transform.SetParent(mr.transform, false);
+                go.AddComponent<MeshFilter>().sharedMesh = mf.sharedMesh;
+                var orr = go.AddComponent<MeshRenderer>();
+                orr.sharedMaterial = outline;
+                orr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                Vector3 ext = mf.sharedMesh.bounds.extents, c = mf.sharedMesh.bounds.center;
+                Vector3 scale = new Vector3(1f + thickness / Mathf.Max(0.02f, ext.x), 1f + thickness / Mathf.Max(0.02f, ext.y), 1f + thickness / Mathf.Max(0.02f, ext.z));
+                go.transform.localScale = scale;
+                go.transform.localPosition = c - Vector3.Scale(c, scale);     // inflate around the mesh centre
+            }
+        }
+    }
+}
+
+/// <summary>Ready-made rockets that pass all the checks. The three contract demos meet MISSION-001/002/003.</summary>
+public static class RocketDemos
+{
+    public class Demo
+    {
+        public string name, description, missionId;
+        public RocketDesign design;
+    }
+
+    static Demo D(string name, string desc, string mission, string[] stack, string payload, string[] equip, string booster = null, int bn = 2, string fin = null, int fn = 3)
+    {
+        var d = new RocketDesign { boosterId = booster, boosterCount = bn, finId = fin, finCount = fn, payloadId = payload };
+        d.stack.AddRange(stack); d.equipment.AddRange(equip);
+        return new Demo { name = name, description = desc, missionId = mission, design = d };
+    }
+
+    public static readonly List<Demo> All = new List<Demo>
+    {
+        D("Demo Pathfinder", "Small satellite launcher. Cheap, single stage.", "",
+          new[] { "Eng_S_Spark", "Tank_S_Long", "Avi_S", "Head_Fairing_S" }, "Pay_Satellite_S", new[] { "Com_Patch" }, null, 2, "Fin_S", 3),
+        D("Demo Crew Ferry", "Two-stage capsule rocket with two side boosters.", "",
+          new[] { "Eng_M_Lifter", "Tank_M_Long", "Dec_M", "Eng_M_Vac", "Tank_M_Short", "Avi_M", "Head_Capsule_M" }, null, new[] { "Pow_Solar_S" }, "Booster_S", 2, "Fin_S", 4),
+        D("Demo Earth Watch", "For MISSION-002: sun-sync climate satellite. Two medium stages.", "MISSION-002",
+          new[] { "Eng_M_Cluster3", "Tank_M_Long", "Tank_M_Long", "Dec_M", "Eng_M_Vac", "Tank_M_Long", "Avi_M", "Head_Fairing_M" },
+          "Pay_Satellite_M", new[] { "Thr_RCS_Block", "Com_Patch" }),
+        D("Demo Lunar Lander", "For MISSION-003: soft-landing lunar station lander. Three large stages.", "MISSION-003",
+          new[] { "Eng_L_Cluster4", "Tank_L_Short", "Tank_L_Short", "Dec_L", "Eng_L_Vac", "Tank_L_Short", "Tank_L_Short", "Tank_L_Short", "Dec_L", "Eng_L_Vac", "Tank_L_Short", "Avi_L", "Head_Fairing_L" },
+          "Pay_Lander", new[] { "Rec_Parachute_M", "Rec_LandingLeg", "Pow_Solar_L" }, "Booster_S", 2),
+        D("Demo Mars Explorer", "For MISSION-001: Mars rover carrier with solar power. Three stages and two big boosters.", "MISSION-001",
+          new[] { "Eng_L_Cluster4", "Tank_L_Short", "Tank_L_Long", "Tank_L_Long", "Dec_L", "Adp_L_M", "Eng_M_Vac", "Tank_M_Long", "Tank_M_Long", "Tank_M_Long", "Dec_M", "Eng_M_Vac", "Tank_M_Long", "Avi_M", "Head_Fairing_M" },
+          "Pay_Rover", new[] { "Pow_Solar_L" }, "Booster_L", 2),
+    };
 }

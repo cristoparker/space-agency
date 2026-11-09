@@ -15,6 +15,8 @@ public class CalendarUI : MonoBehaviour
 
     public Color todayColor = new Color(0.25f, 0.8f, 1f, 0.55f);
     public Color normalColor = new Color(1f, 1f, 1f, 0f);
+    [Tooltip("Day a rocket on the launch pad is scheduled to launch.")]
+    public Color scheduledColor = new Color(1f, 0.6f, 0.35f, 0.55f);
 
     DateTime viewMonth;
 
@@ -32,12 +34,14 @@ public class CalendarUI : MonoBehaviour
             viewMonth = new DateTime(clock.Now.Year, clock.Now.Month, 1);
             clock.DayChanged += OnDayChanged;
         }
+        if (DeploymentManager.Instance != null) DeploymentManager.Instance.Changed += Refresh;
         Refresh();
     }
 
     void OnDisable()
     {
         if (GameClock.Instance != null) GameClock.Instance.DayChanged -= OnDayChanged;
+        if (DeploymentManager.Instance != null) DeploymentManager.Instance.Changed -= Refresh;
     }
 
     void OnDayChanged(DateTime _) => Refresh();
@@ -65,7 +69,8 @@ public class CalendarUI : MonoBehaviour
             if (i < dayCellBackgrounds.Length && dayCellBackgrounds[i] != null)
             {
                 bool isToday = inMonth && new DateTime(viewMonth.Year, viewMonth.Month, day) == today;
-                dayCellBackgrounds[i].color = isToday ? todayColor : normalColor;
+                bool launch = inMonth && DeploymentManager.Instance != null && DeploymentManager.Instance.IsScheduledFor(new DateTime(viewMonth.Year, viewMonth.Month, day));
+                dayCellBackgrounds[i].color = isToday ? todayColor : launch ? scheduledColor : normalColor;
             }
         }
     }

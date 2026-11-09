@@ -59,15 +59,20 @@ public class PartCatalogFile { public PartInfo[] parts; }
 public class PartLibrary : ScriptableObject
 {
     [Serializable] public struct ModelEntry { public string id; public GameObject prefab; }
+    [Serializable] public struct IconEntry { public string id; public Sprite sprite; }
 
     public TextAsset catalog;
     public ModelEntry[] models;
     [Tooltip("Part_0..Part_7: same palette, shifted so only the livery colours change.")]
     public Material[] liveryMaterials;
+    public IconEntry[] icons;
+    [Tooltip("Unlit, cull front: the cyan outline drawn around the selected part.")]
+    public Material outlineMaterial;
 
     List<PartInfo> parts;
     Dictionary<string, PartInfo> infoById;
     Dictionary<string, GameObject> prefabById;
+    Dictionary<string, Sprite> iconById;
 
     void Init()
     {
@@ -75,6 +80,8 @@ public class PartLibrary : ScriptableObject
         parts = new List<PartInfo>();
         infoById = new Dictionary<string, PartInfo>();
         prefabById = new Dictionary<string, GameObject>();
+        iconById = new Dictionary<string, Sprite>();
+        if (icons != null) foreach (var i in icons) if (i.sprite != null) iconById[i.id] = i.sprite;
         if (catalog != null)
         {
             var file = JsonUtility.FromJson<PartCatalogFile>(catalog.text);
@@ -97,6 +104,12 @@ public class PartLibrary : ScriptableObject
     {
         Init();
         return prefabById.TryGetValue(id, out var g) ? g : null;
+    }
+
+    public Sprite Icon(string id)
+    {
+        Init();
+        return !string.IsNullOrEmpty(id) && iconById.TryGetValue(id, out var s) ? s : null;
     }
 
     public Material Livery(int i) => liveryMaterials != null && liveryMaterials.Length > 0 ? liveryMaterials[Mathf.Clamp(i, 0, liveryMaterials.Length - 1)] : null;

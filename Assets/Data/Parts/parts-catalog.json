@@ -640,6 +640,21 @@
   },
   {
    "category": "Structure",
+   "size": "LM",
+   "diameterClass": "L-M",
+   "dryMassKg": 120,
+   "costM": 0.4,
+   "note": "joins stack sizes L -> M (bottom -> top)",
+   "id": "Adp_L_M",
+   "model": "Adp_L_M",
+   "bottomZ": 0.0,
+   "heightM": 1.2,
+   "widthM": 3.06,
+   "depthM": 3.06,
+   "tris": 280
+  },
+  {
+   "category": "Structure",
    "size": "ML",
    "diameterClass": "M-L",
    "dryMassKg": 180,
@@ -651,6 +666,21 @@
    "heightM": 1.2,
    "widthM": 3.06,
    "depthM": 3.06,
+   "tris": 280
+  },
+  {
+   "category": "Structure",
+   "size": "MS",
+   "diameterClass": "M-S",
+   "dryMassKg": 72,
+   "costM": 0.24,
+   "note": "joins stack sizes M -> S (bottom -> top)",
+   "id": "Adp_M_S",
+   "model": "Adp_M_S",
+   "bottomZ": 0.0,
+   "heightM": 1.0,
+   "widthM": 2.04,
+   "depthM": 2.04,
    "tris": 280
   },
   {

@@ -540,6 +540,8 @@ def reg_all():
         make_avionics("Avi_" + sz, sz, r)
     make_adapter("Adp_S_M", RS, RM, 1.0, "S", "M")
     make_adapter("Adp_M_L", RM, RL, 1.2, "M", "L")
+    make_adapter("Adp_M_S", RM, RS, 1.0, "M", "S")      # tapering adapters: big stage below, smaller stage above
+    make_adapter("Adp_L_M", RL, RM, 1.2, "L", "M")
     make_fin("Fin_S", "S", 0.6)
     make_fin("Fin_L", "L", 1.1)
 

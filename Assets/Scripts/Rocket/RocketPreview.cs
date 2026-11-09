@@ -15,6 +15,7 @@ public class RocketPreview : MonoBehaviour
     GameObject current;
     Bounds bounds = new Bounds(Vector3.up * 3f, Vector3.one * 6f);
     float yaw = 35f, pitch = 12f, dist = 20f, targetDist = 20f;
+    Vector3 panOffset;
 
     public static RocketPreview Create(int width, int height)
     {
@@ -27,7 +28,7 @@ public class RocketPreview : MonoBehaviour
 
     void Init(int w, int h)
     {
-        Texture = new RenderTexture(w, h, 24) { antiAliasing = 4, name = "RocketPreviewRT" };
+        Texture = new RenderTexture(w, h, 24) { antiAliasing = 4, name = "RocketPreviewRT", filterMode = FilterMode.Bilinear, useMipMap = false };
         stage = new GameObject("Stage").transform;
         stage.SetParent(transform, false);
 
@@ -73,7 +74,7 @@ public class RocketPreview : MonoBehaviour
         rocket.transform.localPosition = Vector3.zero;
         bounds = worldBoundsAtOrigin;
         float radius = Mathf.Max(bounds.extents.magnitude, 1.5f);
-        targetDist = radius / Mathf.Sin(cam.fieldOfView * 0.5f * Mathf.Deg2Rad) * 1.05f;
+        targetDist = radius / Mathf.Sin(cam.fieldOfView * 0.5f * Mathf.Deg2Rad) * 1.28f;
     }
 
     public void Orbit(Vector2 delta)
@@ -82,15 +83,43 @@ public class RocketPreview : MonoBehaviour
         pitch = Mathf.Clamp(pitch - delta.y * 0.3f, -15f, 70f);
     }
 
+    public float ViewDistance => dist;
+    public GameObject Current => current;
+
+    /// <summary>Which part is under this point of the preview image (0..1 on both axes)? Uses each part's bounding box.</summary>
+    public PartRef Pick(Vector2 normalized)
+    {
+        if (cam == null || current == null) return null;
+        var ray = cam.ViewportPointToRay(new Vector3(normalized.x, normalized.y, 0f));
+        PartRef best = null; float bestT = float.MaxValue;
+        foreach (var pr in current.GetComponentsInChildren<PartRef>())
+        {
+            var rends = pr.GetComponentsInChildren<Renderer>();
+            if (rends.Length == 0) continue;
+            var b = rends[0].bounds;
+            foreach (var r in rends) b.Encapsulate(r.bounds);
+            if (b.IntersectRay(ray, out float t) && t < bestT) { bestT = t; best = pr; }
+        }
+        return best;
+    }
+
     public void Zoom(float scroll) => targetDist = Mathf.Clamp(targetDist * (1f - scroll * 0.1f), 3f, 150f);
 
-    public void ResetView() { yaw = 35f; pitch = 12f; }
+    /// <summary>Slide the view sideways / up and down (screen pixels), so any part of the rocket can be brought to the middle.</summary>
+    public void Pan(Vector2 pixels)
+    {
+        float k = 2f * dist * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad) / Mathf.Max(1f, Screen.height);
+        panOffset -= (cam.transform.right * pixels.x + cam.transform.up * pixels.y) * k;
+        panOffset = Vector3.ClampMagnitude(panOffset, 200f);
+    }
+
+    public void ResetView() { yaw = 35f; pitch = 12f; panOffset = Vector3.zero; }
 
     void LateUpdate()
     {
         if (cam == null || !cam.enabled) return;
         dist = Mathf.Lerp(dist, targetDist, 0.2f);
-        Vector3 center = stage.position + bounds.center;
+        Vector3 center = stage.position + bounds.center + panOffset;
         Quaternion rot = Quaternion.Euler(pitch, yaw, 0f);
         cam.transform.position = center - rot * Vector3.forward * dist;
         cam.transform.rotation = rot;
@@ -105,9 +134,28 @@ public class RocketPreview : MonoBehaviour
 }
 
 /// <summary>On the RawImage that shows the preview: drag to orbit, scroll to zoom.</summary>
-public class RocketPreviewInput : MonoBehaviour, IDragHandler, IScrollHandler
+public class RocketPreviewInput : MonoBehaviour, IDragHandler, IScrollHandler, IPointerClickHandler
 {
     public RocketPreview preview;
-    public void OnDrag(PointerEventData e) => preview?.Orbit(e.delta);
+    /// <summary>Left-drag pans instead of rotating (right or middle mouse button always pans).</summary>
+    public bool panMode;
+    /// <summary>Called with the part that was clicked (null = empty space).</summary>
+    public System.Action<PartRef> picked;
+
+    public void OnDrag(PointerEventData e)
+    {
+        if (preview == null) return;
+        if (panMode || e.button == PointerEventData.InputButton.Right || e.button == PointerEventData.InputButton.Middle) preview.Pan(e.delta);
+        else preview.Orbit(e.delta);
+    }
     public void OnScroll(PointerEventData e) => preview?.Zoom(e.scrollDelta.y);
+
+    public void OnPointerClick(PointerEventData e)
+    {
+        if (e.button != PointerEventData.InputButton.Left) return;
+        var rt = (RectTransform)transform;
+        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(rt, e.position, e.pressEventCamera, out var lp)) return;
+        var n = new Vector2((lp.x - rt.rect.xMin) / rt.rect.width, (lp.y - rt.rect.yMin) / rt.rect.height);
+        picked?.Invoke(preview?.Pick(n));
+    }
 }

@@ -14,8 +14,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PartLibrary
   catalog: {fileID: 4900000, guid: d597e25051a06f94c8aa5e68f4ac76ea, type: 3}
   models:
+  - id: Adp_L_M
+    prefab: {fileID: 919132149155446097, guid: 7cd6007c7481f2542a1c1b06d3444db4, type: 3}
   - id: Adp_M_L
     prefab: {fileID: 919132149155446097, guid: bea23ea5970dceb4d931abb1880c9ea9, type: 3}
+  - id: Adp_M_S
+    prefab: {fileID: 919132149155446097, guid: 38fbeada1e9b8b04f9d64a2012d0837d, type: 3}
   - id: Adp_S_M
     prefab: {fileID: 919132149155446097, guid: 5d776c02c3b8b624e9e56a87939ea20a, type: 3}
   - id: Avi_L
@@ -131,3 +135,117 @@ MonoBehaviour:
   - {fileID: 2100000, guid: ccef12cdb3e86aa4eaabefc0fb96f7f5, type: 2}
   - {fileID: 2100000, guid: 7686e083eb5102443856581c5a3456ab, type: 2}
   - {fileID: 2100000, guid: f72e87f7ab363f341907b9b3e28031b4, type: 2}
+  icons:
+  - id: Adp_L_M
+    sprite: {fileID: 21300000, guid: deef7025bb290df4586c8e35eb5ee99a, type: 3}
+  - id: Adp_M_L
+    sprite: {fileID: 21300000, guid: cd88435b4e271aa47923c86f643e9826, type: 3}
+  - id: Adp_M_S
+    sprite: {fileID: 21300000, guid: ebb73ea7b883e0947af7402298ca9c4f, type: 3}
+  - id: Adp_S_M
+    sprite: {fileID: 21300000, guid: 4059ced323818f84ba3cdc1ed00af97a, type: 3}
+  - id: Avi_L
+    sprite: {fileID: 21300000, guid: 7cdd825a9431f7549829739228e7cff6, type: 3}
+  - id: Avi_M
+    sprite: {fileID: 21300000, guid: 68e0f9ebc7fa6b3429bba2749d6df860, type: 3}
+  - id: Avi_S
+    sprite: {fileID: 21300000, guid: c7949d5794364514b8eb79024490a9cd, type: 3}
+  - id: Booster_L
+    sprite: {fileID: 21300000, guid: f9165807beb66e741a91842956acc753, type: 3}
+  - id: Booster_M
+    sprite: {fileID: 21300000, guid: 8958a3b2ab4433a4098a5f8b3b5fa809, type: 3}
+  - id: Booster_S
+    sprite: {fileID: 21300000, guid: 2109b828f0a5c974caefaaa0d824557a, type: 3}
+  - id: Com_Dish_L
+    sprite: {fileID: 21300000, guid: 0180b740663fa5f4aa58193b3ed4aa37, type: 3}
+  - id: Com_Dish_S
+    sprite: {fileID: 21300000, guid: f5289d3654e1d484eb0801c142495322, type: 3}
+  - id: Com_Patch
+    sprite: {fileID: 21300000, guid: 5a204282f3ff36a4e958cec5824c1c9b, type: 3}
+  - id: Com_PhasedArray
+    sprite: {fileID: 21300000, guid: f4f6e5e4c07dca84ca5dbec19d043c8a, type: 3}
+  - id: Com_Whip
+    sprite: {fileID: 21300000, guid: 3ef1cc12f9059d348af5e32357e5b235, type: 3}
+  - id: Dec_L
+    sprite: {fileID: 21300000, guid: 3fcafa1ff5d67804e8b00bf1086b24c9, type: 3}
+  - id: Dec_M
+    sprite: {fileID: 21300000, guid: c78ce1667eb207342aef4072db8bff0d, type: 3}
+  - id: Dec_S
+    sprite: {fileID: 21300000, guid: 8175578b787eb9e418d4c54a55779736, type: 3}
+  - id: Eng_L_Cluster4
+    sprite: {fileID: 21300000, guid: 1e3243341ee1594459b8fad653ab3a52, type: 3}
+  - id: Eng_L_Vac
+    sprite: {fileID: 21300000, guid: 46b23a0d739504948b9d4cfba5050254, type: 3}
+  - id: Eng_M_Cluster3
+    sprite: {fileID: 21300000, guid: 9369adec4044cd842ae6b37aa522b39c, type: 3}
+  - id: Eng_M_Lifter
+    sprite: {fileID: 21300000, guid: 7c32307ad772cd943ada1d761ddc1a28, type: 3}
+  - id: Eng_M_Vac
+    sprite: {fileID: 21300000, guid: f5e432e6b58134f4bb991e4c70d1b4fe, type: 3}
+  - id: Eng_S_SolidKick
+    sprite: {fileID: 21300000, guid: 7734399c448fa204ab8c0c0227c56861, type: 3}
+  - id: Eng_S_Spark
+    sprite: {fileID: 21300000, guid: 680837d9301e277488182de96e899920, type: 3}
+  - id: Eng_S_Vac
+    sprite: {fileID: 21300000, guid: d54db019bf5867241a7681d2b46f9e2a, type: 3}
+  - id: Fin_L
+    sprite: {fileID: 21300000, guid: fed97951fcd24d248b00e2109133368f, type: 3}
+  - id: Fin_S
+    sprite: {fileID: 21300000, guid: b21df1b96216ba4488dd4746a03f4fea, type: 3}
+  - id: Head_Capsule_L
+    sprite: {fileID: 21300000, guid: e7ca87241e2a78549bf392ad208a0aad, type: 3}
+  - id: Head_Capsule_M
+    sprite: {fileID: 21300000, guid: 43730958d12b7e94d80e662a7415cf82, type: 3}
+  - id: Head_Fairing_L
+    sprite: {fileID: 21300000, guid: ed8c112fcc4d310499b2be403cbc66ee, type: 3}
+  - id: Head_Fairing_M
+    sprite: {fileID: 21300000, guid: 34cd7d569e618dc4cb6dd780992dc592, type: 3}
+  - id: Head_Fairing_S
+    sprite: {fileID: 21300000, guid: ca618f6b5fd86ac4ba67e352099bce6c, type: 3}
+  - id: Head_Nose_L
+    sprite: {fileID: 21300000, guid: fe32c75f713e6134db6b440de4811f47, type: 3}
+  - id: Head_Nose_M
+    sprite: {fileID: 21300000, guid: a2a5384b1a411c74a834c7996b9df836, type: 3}
+  - id: Head_Nose_S
+    sprite: {fileID: 21300000, guid: 05477ad8e875df74fb029ff224173349, type: 3}
+  - id: Pay_Lander
+    sprite: {fileID: 21300000, guid: 137128ecfecf16e49a4654c4aab2855d, type: 3}
+  - id: Pay_Rover
+    sprite: {fileID: 21300000, guid: 5c2bf6e41a8f1614c962d07e8bde03a9, type: 3}
+  - id: Pay_Satellite_M
+    sprite: {fileID: 21300000, guid: 7f57eb17b5f6ca649967f786457a5796, type: 3}
+  - id: Pay_Satellite_S
+    sprite: {fileID: 21300000, guid: fb7ec168386ebd244ba07169222fe31e, type: 3}
+  - id: Pow_Battery
+    sprite: {fileID: 21300000, guid: dd68455e1931f5d419c981b459df367e, type: 3}
+  - id: Pow_RTG
+    sprite: {fileID: 21300000, guid: f26bd96ff46c5bf4aad42ec27243eb48, type: 3}
+  - id: Pow_Solar_L
+    sprite: {fileID: 21300000, guid: f98f9d1ad85f958459459a16c278fca2, type: 3}
+  - id: Pow_Solar_S
+    sprite: {fileID: 21300000, guid: 203f0a842007dd74bbdc9e20ae243c71, type: 3}
+  - id: Rec_GridFin
+    sprite: {fileID: 21300000, guid: 8988b7714a5abd542a666ef187b9e895, type: 3}
+  - id: Rec_LandingLeg
+    sprite: {fileID: 21300000, guid: 1e344ad821e374c43bd1b104c5aab926, type: 3}
+  - id: Rec_Parachute_M
+    sprite: {fileID: 21300000, guid: 10ee0334218f6d54e8336ce2c5512cfa, type: 3}
+  - id: Rec_Parachute_S
+    sprite: {fileID: 21300000, guid: a612ab1d0a38cb540a6f25599f93d3e4, type: 3}
+  - id: Tank_L_Long
+    sprite: {fileID: 21300000, guid: f14b1b43dd56a8d4d9df0ad3de7a623f, type: 3}
+  - id: Tank_L_Short
+    sprite: {fileID: 21300000, guid: e3557b30da503ac409dcb24f41d32bf0, type: 3}
+  - id: Tank_M_Long
+    sprite: {fileID: 21300000, guid: 7663cea766f2811478a65de7daca8066, type: 3}
+  - id: Tank_M_Short
+    sprite: {fileID: 21300000, guid: 4a4f876ac07b35e4ebf16dd76fc6cd04, type: 3}
+  - id: Tank_S_Long
+    sprite: {fileID: 21300000, guid: 1784eb5f410286842a1c023dbeb03c80, type: 3}
+  - id: Tank_S_Short
+    sprite: {fileID: 21300000, guid: e8a97200aaf40534cb22b4c46bd5d722, type: 3}
+  - id: Thr_Ion
+    sprite: {fileID: 21300000, guid: 0d580c0b048f51b45b666c36bf11b703, type: 3}
+  - id: Thr_RCS_Block
+    sprite: {fileID: 21300000, guid: 6b9c957523a068f45a5a6b4f7839adc6, type: 3}
+  outlineMaterial: {fileID: 2100000, guid: 7202a9aeb4f04294d889091ac1e4a0da, type: 2}
