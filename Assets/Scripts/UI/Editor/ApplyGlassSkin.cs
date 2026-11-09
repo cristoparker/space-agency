@@ -22,8 +22,33 @@ public static class ApplyGlassSkin
 
     static readonly Color Dark = new Color(0.04f, 0.07f, 0.12f, 1f);
 
+    const string IconDir = "Assets/Assets/Graphics/modern-icons/";
+    static readonly string[] Scenes = { "Assets/Scenes/1. Main Menu.unity", "Assets/Scenes/2. Game.unity" };
+
+    // GameObject name -> white icon file (put on the button, replacing its old glyph/pixel icon).
+    static readonly System.Collections.Generic.Dictionary<string, string> Icons = new()
+    {
+        { "Money Icon", "paid" }, { "Previous Month Button", "chevron_left" }, { "Next Month Button", "chevron_right" },
+        { "Slow Down Button", "fast_rewind" }, { "Speed Up Button", "fast_forward" }, { "Close Button", "close" },
+        { "Mission Manager Button", "assignment" }, { "Rocket Builder Button", "rocket_launch" },
+        { "Date Button", "calendar_today" },
+        { "Discard Mission Button", "close" },
+    };
+
     [MenuItem("Tools/Space Agency/Apply Glass UI Skin")]
-    public static void Apply()
+    public static void ApplyAll()
+    {
+        if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+        foreach (var path in Scenes)
+        {
+            if (!System.IO.File.Exists(path)) continue;
+            EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
+            Apply();
+            EditorSceneManager.SaveOpenScenes();
+        }
+    }
+
+    static void Apply()
     {
         var glass = AssetDatabase.LoadAssetAtPath<Material>(GlassMat);
         var flat = AssetDatabase.LoadAssetAtPath<Material>(FlatMat);
@@ -84,6 +109,18 @@ public static class ApplyGlassSkin
             EditorUtility.SetDirty(img);
         }
 
+        foreach (var tr in root.GetComponentsInChildren<Transform>(true))
+        {
+            if (!Icons.TryGetValue(tr.name, out var file)) continue;
+            var icon = AssetDatabase.LoadAssetAtPath<Sprite>(IconDir + file + ".png");
+            if (icon == null) continue;
+            Image target = tr.name == "Money Icon" ? tr.GetComponent<Image>() : EnsureIconChild(tr);
+            if (target == null) continue;
+            target.sprite = icon; target.type = Image.Type.Simple; target.preserveAspectRatio = true;
+            target.material = null; target.color = Color.white; target.raycastTarget = false;
+            EditorUtility.SetDirty(target);
+        }
+
         foreach (var t in root.GetComponentsInChildren<TMP_Text>(true))
         {
             bool heading = head != null && (t.name == "Title" || t.name == "Header" || t.fontSize >= 20f);
@@ -91,6 +128,23 @@ public static class ApplyGlassSkin
             t.color = Color.white;
             EditorUtility.SetDirty(t);
         }
+    }
+
+    // Finds/creates a white icon child on a button and hides the button's old text glyph.
+    static Image EnsureIconChild(Transform button)
+    {
+        var existing = button.Find("Icon");
+        if (existing == null)
+        {
+            var go = new GameObject("Icon", typeof(RectTransform), typeof(Image));
+            go.transform.SetParent(button, false);
+            var rt = (RectTransform)go.transform;
+            rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+            rt.offsetMin = new Vector2(3, 3); rt.offsetMax = new Vector2(-3, -3);
+            existing = go.transform;
+        }
+        foreach (var txt in button.GetComponentsInChildren<TMP_Text>(true)) txt.gameObject.SetActive(false);
+        return existing.GetComponent<Image>();
     }
 
     static bool HasGlassAncestor(Transform t, Transform stopAt)
