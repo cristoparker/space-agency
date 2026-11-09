@@ -1,0 +1,79 @@
+{
+  "missions": [
+    {
+      "id": "MISSION-001",
+      "name": "Mars Surface Explorer",
+      "missionType": "Planetary Exploration",
+      "target": "Mars",
+      "budget": 450000000,
+      "massLimit": 2500,
+      "payload": {
+        "type": "Rover",
+        "quantity": 1
+      },
+      "duration": {
+        "value": 180,
+        "unit": "days"
+      },
+      "objective": "Deploy a scientific rover on Mars to explore its surface and analyze soil composition.",
+      "specialRequirements": [
+        {
+          "type": "Power",
+          "minimum": 500,
+          "unit": "W"
+        }
+      ]
+    },
+    {
+      "id": "MISSION-002",
+      "name": "Earth Climate Watch",
+      "missionType": "Earth Observation",
+      "target": "Earth Orbit",
+      "budget": 120000000,
+      "massLimit": 1200,
+      "payload": {
+        "type": "Satellite",
+        "quantity": 1
+      },
+      "duration": {
+        "value": 5,
+        "unit": "years"
+      },
+      "objective": "Deploy an observation satellite to monitor ocean temperatures, atmospheric conditions, and climate changes.",
+      "specialRequirements": [
+        {
+          "type": "Orbit",
+          "value": "Sun-Synchronous Orbit"
+        },
+        {
+          "type": "Communication",
+          "minimum": 1,
+          "unit": "Mbps"
+        }
+      ]
+    },
+    {
+      "id": "MISSION-003",
+      "name": "Lunar Research Station",
+      "missionType": "Lunar Exploration",
+      "target": "Moon",
+      "budget": 300000000,
+      "massLimit": 1800,
+      "payload": {
+        "type": "Lander",
+        "quantity": 1
+      },
+      "duration": {
+        "value": 30,
+        "unit": "days"
+      },
+      "objective": "Deliver a scientific lander to the lunar surface and collect geological data.",
+      "specialRequirements": [
+        {
+          "type": "Landing",
+          "value": "Soft Landing"
+        }
+      ]
+    }
+  ]
+}

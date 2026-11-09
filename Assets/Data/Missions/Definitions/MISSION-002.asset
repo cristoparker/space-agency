@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fd5d15febe4ca4f4bb7c776b5ee338b4, type: 3}
+  m_Name: MISSION-002
+  m_EditorClassIdentifier: Assembly-CSharp::MissionDefinition
+  id: MISSION-002
+  displayName: Earth Climate Watch
+  missionType: Earth Observation
+  target: Earth Orbit
+  budget: 120000000
+  massLimit: 1200
+  payload:
+    type: Satellite
+    quantity: 1
+    description: 
+  duration:
+    value: 5
+    unit: 2
+  objective: Deploy an observation satellite to monitor ocean temperatures, atmospheric conditions, and climate changes.
+  specialRequirements:
+  - type: Orbit
+    value: Sun-Synchronous Orbit
+    hasMinimum: 0
+    minimum: 0
+    unit: 
+  - type: Communication
+    value: 
+    hasMinimum: 1
+    minimum: 1
+    unit: Mbps
+  progressMode: 0
