@@ -9,8 +9,8 @@ public class GameClock : MonoBehaviour
 {
     public static GameClock Instance { get; private set; }
 
-    [Tooltip("In-game minutes that pass per real second. 1 = a full day takes 24 real minutes.")]
-    public float gameMinutesPerSecond = 1f;
+    [Tooltip("In-game minutes that pass per real second at speed x1. 24 = one real minute is one game day (60 s x 24 = 1440 game minutes).")]
+    public float gameMinutesPerSecond = 24f;
 
     [Tooltip("Start from the real current Dhaka time. If off, starts on the date/time below.")]
     public bool startFromRealDhakaTime = true;

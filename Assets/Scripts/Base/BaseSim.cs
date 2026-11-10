@@ -5,18 +5,26 @@ using UnityEngine;
 
 public enum ProgramKind { Training, Testing }
 
-/// <summary>A building the agency can own. Some exist from the start, the others must be constructed (money + time).</summary>
+/// <summary>
+/// A facility the agency can own. Level 1 is the small starter version, levels 2 and 3 are bigger and more scientific.
+/// Each level costs money and game time: costM[0] / days[0] build level 1, costM[1] / days[1] upgrade to level 2, and so on.
+/// </summary>
 public class BuildingDef
 {
     public string id, name, description;
-    public float costM, days;
-    public bool startBuilt;
+    public float[] costM = new float[0], days = new float[0];
+    public int startLevel;                          // 0 = not built yet
+    public bool needsPlot;                          // built by the player on one of the empty plots (P1..P5)
+    public bool listed = true;                      // shown in the Facility window
+    public int MaxLevel => Mathf.Max(startLevel, costM.Length);
+    public static readonly string[] LevelNames = { "Empty plot", "Starter", "Expanded", "Complete" };
 }
 
 /// <summary>A training or testing programme: costs money and game time, and needs a specific building.</summary>
 public class ProgramDef
 {
     public string id, name, description, effect, building, group;
+    public int minLevel = 1;               // the building must be at least this level
     public ProgramKind kind;
     public float costM, days;
     public int level;                     // 1..n inside a group (Scientist I, II, III); 0 = one-off
@@ -25,33 +33,52 @@ public class ProgramDef
 /// <summary>The design data of the base: buildings and programmes. Change numbers here.</summary>
 public static class BaseData
 {
+    /// <summary>Plots on the map. Index 0 = P1 ... 4 = P5 (the order of the site sketch).</summary>
+    public const int PlotCount = 5;
+
     public static readonly BuildingDef[] Buildings =
     {
-        new BuildingDef { id = "LaunchPad", name = "Launch Pad", description = "Rockets stand here until launch day.", startBuilt = true },
-        new BuildingDef { id = "MissionControl", name = "Mission Control", description = "Tracks every contract and flight.", startBuilt = true },
-        new BuildingDef { id = "AdminOffice", name = "Admin Office", description = "Agency offices and the training academy.", startBuilt = true },
-        new BuildingDef { id = "Hangar", name = "Hangar", description = "Rocket assembly hall and the pilot simulator.", costM = 150f, days = 60f },
-        new BuildingDef { id = "FuelDepot", name = "Fuel Depot", description = "Fuel storage and the engine test stand.", costM = 90f, days = 45f },
-        new BuildingDef { id = "RadarTower", name = "Radar Tower", description = "Tracking radar and the communications lab.", costM = 120f, days = 50f },
+        // pre-built, fixed place
+        new BuildingDef { id = "LaunchPad", name = "Launch Complex", description = "Pad, flame trench and a 100 m service tower. Rockets stand here until launch day.", startLevel = 1, costM = new float[] { 0f } },
+        new BuildingDef { id = "AdminOffice", name = "Office", description = "Agency headquarters and the training academy.", startLevel = 1,
+            costM = new[] { 0f, 120f, 400f }, days = new[] { 0f, 60f, 120f } },
+        new BuildingDef { id = "PowerGrid", name = "Power Grid", description = "Substation, solar and batteries. No facility can be upgraded past the grid's level.", startLevel = 1,
+            costM = new[] { 0f, 200f, 520f }, days = new[] { 0f, 70f, 130f } },
+        new BuildingDef { id = "CarParkA", name = "Car Park A", description = "Visitor and contractor parking.", startLevel = 1, costM = new float[] { 0f }, listed = false },
+        new BuildingDef { id = "CarParkB", name = "Car Park B", description = "Staff and delivery parking.", startLevel = 1, costM = new float[] { 0f }, listed = false },
+        new BuildingDef { id = "StaffHousing", name = "Staff Housing", description = "Dormitories and a community hall for your people.", startLevel = 1, costM = new float[] { 0f }, listed = false },
+        // built by the player on any empty plot
+        new BuildingDef { id = "MissionControl", name = "Mission Control", description = "Tracks every contract and flight. Bigger rooms, more dishes.", needsPlot = true,
+            costM = new[] { 180f, 300f, 700f }, days = new[] { 50f, 80f, 130f } },
+        new BuildingDef { id = "Hangar", name = "Assembly Hangar", description = "Rocket assembly hall and the pilot simulator.", needsPlot = true,
+            costM = new[] { 150f, 350f, 900f }, days = new[] { 60f, 90f, 150f } },
+        new BuildingDef { id = "FuelDepot", name = "Fuel Depot", description = "Propellant storage: tanks, spheres and pipe racks.", needsPlot = true,
+            costM = new[] { 90f, 220f, 600f }, days = new[] { 45f, 75f, 120f } },
+        new BuildingDef { id = "RadarTower", name = "Tracking Station", description = "Dishes and radar that follow your rockets and satellites.", needsPlot = true,
+            costM = new[] { 120f, 260f, 700f }, days = new[] { 50f, 80f, 140f } },
+        new BuildingDef { id = "ResearchLab", name = "Research Lab", description = "Scientists, observatory dome and a wind tunnel.", needsPlot = true,
+            costM = new[] { 140f, 320f, 800f }, days = new[] { 60f, 90f, 150f } },
+        new BuildingDef { id = "TestStand", name = "Engine Test Stand", description = "Static-fire stand with a flame deflector and a blast wall.", needsPlot = true,
+            costM = new[] { 110f, 260f, 650f }, days = new[] { 50f, 80f, 130f } },
     };
 
     public static readonly ProgramDef[] Programs =
     {
         new ProgramDef { id = "sci1", group = "sci", level = 1, kind = ProgramKind.Training, name = "Scientist Training I", building = "AdminOffice", costM = 40f, days = 30f,
             description = "Teach your staff the basics of rocket science.", effect = "Tests finish 10% faster, +8% reputation gains" },
-        new ProgramDef { id = "sci2", group = "sci", level = 2, kind = ProgramKind.Training, name = "Scientist Training II", building = "AdminOffice", costM = 80f, days = 60f,
+        new ProgramDef { id = "sci2", group = "sci", level = 2, kind = ProgramKind.Training, name = "Scientist Training II", building = "AdminOffice", minLevel = 2, costM = 80f, days = 60f,
             description = "Advanced propulsion and materials courses.", effect = "Tests finish 20% faster, +16% reputation gains" },
-        new ProgramDef { id = "sci3", group = "sci", level = 3, kind = ProgramKind.Training, name = "Scientist Training III", building = "AdminOffice", costM = 160f, days = 90f,
+        new ProgramDef { id = "sci3", group = "sci", level = 3, kind = ProgramKind.Training, name = "Scientist Training III", building = "AdminOffice", minLevel = 3, costM = 160f, days = 90f,
             description = "A full research fellowship programme.", effect = "Tests finish 30% faster, +24% reputation gains" },
         new ProgramDef { id = "pilot1", group = "pilot", level = 1, kind = ProgramKind.Training, name = "Pilot Training I", building = "Hangar", costM = 60f, days = 45f,
             description = "Simulator hours for your first astronauts.", effect = "Qualifies a crew for capsule flights, +15 reputation" },
-        new ProgramDef { id = "pilot2", group = "pilot", level = 2, kind = ProgramKind.Training, name = "Pilot Training II", building = "Hangar", costM = 120f, days = 75f,
+        new ProgramDef { id = "pilot2", group = "pilot", level = 2, kind = ProgramKind.Training, name = "Pilot Training II", building = "Hangar", minLevel = 2, costM = 120f, days = 75f,
             description = "Emergency drills and orbital rendezvous.", effect = "Safer crews (coming soon), +15 reputation" },
-        new ProgramDef { id = "pilot3", group = "pilot", level = 3, kind = ProgramKind.Training, name = "Pilot Training III", building = "Hangar", costM = 240f, days = 120f,
+        new ProgramDef { id = "pilot3", group = "pilot", level = 3, kind = ProgramKind.Training, name = "Pilot Training III", building = "Hangar", minLevel = 3, costM = 240f, days = 120f,
             description = "Long-duration mission preparation.", effect = "Veteran crews (coming soon), +15 reputation" },
-        new ProgramDef { id = "test_engine", kind = ProgramKind.Testing, name = "Engine Static-Fire Test", building = "FuelDepot", costM = 90f, days = 45f,
+        new ProgramDef { id = "test_engine", kind = ProgramKind.Testing, name = "Engine Static-Fire Test", building = "TestStand", costM = 90f, days = 45f,
             description = "Burn every engine type on the test stand.", effect = "Rockets cost 4% less to build" },
-        new ProgramDef { id = "test_struct", kind = ProgramKind.Testing, name = "Structural Load Test", building = "Hangar", costM = 70f, days = 35f,
+        new ProgramDef { id = "test_struct", kind = ProgramKind.Testing, name = "Structural Load Test", building = "ResearchLab", costM = 70f, days = 35f,
             description = "Shake and stress the airframe.", effect = "Rockets cost 3% less to build" },
         new ProgramDef { id = "test_comms", kind = ProgramKind.Testing, name = "Comms Link Test", building = "RadarTower", costM = 60f, days = 30f,
             description = "Prove your antennas against the radar.", effect = "Contracts pay 10% more" },
@@ -62,13 +89,27 @@ public static class BaseData
     public static string BuildingName(string id) => Building(id)?.name ?? id;
 }
 
-[Serializable] public class BaseJob { public string id; public bool isBuild; public float remaining, total; }
+[Serializable] public class BaseJob { public string id; public bool isBuild; public int level, plot = -1; public float remaining, total; }
 
 [Serializable]
 public class BaseSave
 {
-    public List<string> built = new List<string>(), done = new List<string>();
+    [Serializable] public class LevelEntry { public string id; public int level; }
+    public List<LevelEntry> levels = new List<LevelEntry>();
+    public List<string> done = new List<string>();
     public List<BaseJob> jobs = new List<BaseJob>();
+    [Serializable] public class PlotEntry { public int plot; public string id; }
+    public List<PlotEntry> plots = new List<PlotEntry>();            // which facility stands (or is being built) on which plot
+
+    public string FacilityAt(int plot) { var e = plots.FirstOrDefault(x => x.plot == plot); return e == null ? null : e.id; }
+    public int PlotOf(string id) { var e = plots.FirstOrDefault(x => x.id == id); return e == null ? -1 : e.plot; }
+
+    public int LevelOf(string id) { var e = levels.FirstOrDefault(x => x.id == id); return e == null ? 0 : e.level; }
+    public void SetLevel(string id, int level)
+    {
+        var e = levels.FirstOrDefault(x => x.id == id);
+        if (e == null) levels.Add(new LevelEntry { id = id, level = level }); else e.level = level;
+    }
 
     const string Key = "SpaceAgency.Base";
     static BaseSave cur;
@@ -80,8 +121,8 @@ public class BaseSave
             if (cur != null) return cur;
             try { cur = JsonUtility.FromJson<BaseSave>(PlayerPrefs.GetString(Key, "")); } catch { cur = null; }
             if (cur == null) cur = new BaseSave();
-            if (cur.built.Count == 0 && cur.done.Count == 0 && cur.jobs.Count == 0)
-                cur.built.AddRange(BaseData.Buildings.Where(b => b.startBuilt).Select(b => b.id));
+            if (cur.levels.Count == 0 && cur.done.Count == 0 && cur.jobs.Count == 0)
+                foreach (var b in BaseData.Buildings) if (b.startLevel > 0) cur.SetLevel(b.id, b.startLevel);
             return cur;
         }
     }
@@ -127,7 +168,13 @@ public class BaseSim : MonoBehaviour
     BaseSave D => BaseSave.Current;
 
     // ---------------------------------------------------------------- queries
-    public bool IsBuilt(string id) => D.built.Contains(id);
+    public int LevelOf(string id) => D.LevelOf(id);
+    public string FacilityAt(int plot) => D.FacilityAt(plot);
+    public int PlotOf(string id) => D.PlotOf(id);
+    public int FreePlot() { for (int i = 0; i < BaseData.PlotCount; i++) if (D.FacilityAt(i) == null) return i; return -1; }
+    public bool PlotFree(int i) => D.FacilityAt(i) == null;
+    public int PowerLevel => D.LevelOf("PowerGrid");
+    public bool IsBuilt(string id) => D.LevelOf(id) > 0;
     public BaseJob Job(string id) => D.jobs.FirstOrDefault(j => j.id == id);
     public bool IsDone(string programId) => D.done.Contains(programId);
     public bool BuildingBusy(string buildingId) => D.jobs.Any(j => !j.isBuild && BaseData.Program(j.id)?.building == buildingId);
@@ -151,7 +198,8 @@ public class BaseSim : MonoBehaviour
             var prev = BaseData.Programs.FirstOrDefault(x => x.group == p.group && x.level == p.level - 1);
             if (prev != null && !IsDone(prev.id)) return "Needs " + prev.name;
         }
-        if (!IsBuilt(p.building)) return "Needs the " + BaseData.BuildingName(p.building);
+        if (LevelOf(p.building) < p.minLevel)
+            return p.minLevel <= 1 ? "Needs the " + BaseData.BuildingName(p.building) : "Needs " + BaseData.BuildingName(p.building) + " level " + p.minLevel;
         if (BuildingBusy(p.building)) return BaseData.BuildingName(p.building) + " is busy";
         if (!Agency.CanAfford(MoneyOf(p.costM))) return "Not enough money";
         return null;
@@ -159,13 +207,23 @@ public class BaseSim : MonoBehaviour
 
     static long MoneyOf(float costM) => (long)(costM * 1_000_000f);
 
-    public string WhyNotBuild(BuildingDef b)
+    /// <summary>Why the next level of a building cannot be started (null = it can). For a new facility pass the plot it would go on (-1 = any free one).</summary>
+    public string WhyNotBuild(BuildingDef b, int plot = -1)
     {
-        if (IsBuilt(b.id)) return "Built";
+        int next = LevelOf(b.id) + 1;
+        if (next > b.MaxLevel) return "Fully upgraded";
         if (Job(b.id) != null) return "Under construction";
-        if (!Agency.CanAfford(MoneyOf(b.costM))) return "Not enough money";
+        if (b.needsPlot && next == 1)
+        {
+            if (plot >= 0 ? !PlotFree(plot) : FreePlot() < 0) return "No free plot";
+        }
+        if (b.id != "PowerGrid" && next > PowerLevel) return "Needs Power Grid level " + next;
+        if (!Agency.CanAfford(MoneyOf(CostOf(b, next)))) return "Not enough money";
         return null;
     }
+
+    public static float CostOf(BuildingDef b, int level) => b.costM[Mathf.Clamp(level - 1, 0, b.costM.Length - 1)];
+    public static float DaysOf(BuildingDef b, int level) => b.days[Mathf.Clamp(level - 1, 0, b.days.Length - 1)];
 
     // ---------------------------------------------------------------- actions
     public bool StartProgram(ProgramDef p)
@@ -178,13 +236,21 @@ public class BaseSim : MonoBehaviour
         return true;
     }
 
-    public bool StartBuild(BuildingDef b)
+    public bool StartBuild(BuildingDef b, int plot = -1)
     {
-        if (WhyNotBuild(b) != null || !Agency.TrySpend(MoneyOf(b.costM))) return false;
-        float secs = b.days * 86400f;
-        D.jobs.Add(new BaseJob { id = b.id, isBuild = true, remaining = secs, total = secs });
+        if (WhyNotBuild(b, plot) != null) return false;
+        int next = LevelOf(b.id) + 1;
+        if (b.needsPlot && next == 1)
+        {
+            if (plot < 0) plot = FreePlot();
+            D.plots.Add(new BaseSave.PlotEntry { plot = plot, id = b.id });         // the plot is reserved while it is being built
+        }
+        else plot = D.PlotOf(b.id);
+        if (!Agency.TrySpend(MoneyOf(CostOf(b, next)))) return false;
+        float days = DaysOf(b, next), secs = days * 86400f;
+        D.jobs.Add(new BaseJob { id = b.id, isBuild = true, level = next, plot = plot, remaining = secs, total = secs });
         Commit();
-        Hud.Toast("Construction of the " + b.name + " started (" + Mathf.CeilToInt(b.days) + " days)");
+        Hud.Toast((next == 1 ? "Construction of the " : "Upgrade of the ") + b.name + (plot >= 0 ? " on P" + (plot + 1) : "") + " started (" + Mathf.CeilToInt(days) + " days)");
         return true;
     }
 
@@ -221,9 +287,9 @@ public class BaseSim : MonoBehaviour
     {
         if (j.isBuild)
         {
-            if (!D.built.Contains(j.id)) D.built.Add(j.id);
+            D.SetLevel(j.id, Mathf.Max(j.level, D.LevelOf(j.id)));
             ApplyVisibility();
-            Hud.Toast("The " + BaseData.BuildingName(j.id) + " is finished");
+            Hud.Toast("The " + BaseData.BuildingName(j.id) + " is now level " + D.LevelOf(j.id));
             return;
         }
         var p = BaseData.Program(j.id);
@@ -233,11 +299,54 @@ public class BaseSim : MonoBehaviour
         Hud.Toast(p.name + " complete: " + p.effect);
     }
 
-    /// <summary>Buildings that are not built yet are not in the scene.</summary>
+    FacilityCatalog catalog;
+    readonly Dictionary<int, string> shown = new Dictionary<int, string>();
+
+    /// <summary>
+    /// Fixed buildings ("Base Buildings/*") have children "L1", "L2", "L3": only the one matching the level is shown.
+    /// Plots ("Base Plots/Plot1..5") show their empty "Marker" until a facility is built there; then the facility model of the
+    /// right level is created from the <see cref="FacilityCatalog"/>.
+    /// </summary>
     public void ApplyVisibility()
     {
         var root = GameObject.Find("Base Buildings");
-        if (root == null) return;
-        foreach (Transform c in root.transform) c.gameObject.SetActive(IsBuilt(c.name));
+        if (root != null)
+            foreach (Transform c in root.transform)
+            {
+                int level = LevelOf(c.name);
+                foreach (Transform child in c)
+                {
+                    bool on = child.name == "L" + level;
+                    if (child.gameObject.activeSelf != on) child.gameObject.SetActive(on);
+                }
+            }
+
+        var plots = GameObject.Find("Base Plots");
+        if (plots == null) return;
+        if (catalog == null) catalog = Resources.Load<FacilityCatalog>("FacilityCatalog");
+        for (int i = 0; i < plots.transform.childCount; i++)
+        {
+            var plot = plots.transform.GetChild(i);
+            string id = D.FacilityAt(i);
+            int level = id != null ? LevelOf(id) : 0;
+            string key = level > 0 ? id + ":" + level : "";
+            shown.TryGetValue(i, out var cur);
+            if (cur == key && (key == "" || plot.Find("Facility") != null)) { SetMarker(plot, key == ""); continue; }
+            var old = plot.Find("Facility");
+            if (old != null) { old.gameObject.SetActive(false); Destroy(old.gameObject); }
+            if (key != "" && catalog != null)
+            {
+                var go = catalog.Spawn(id, level, plot);
+                if (go != null) go.name = "Facility";
+            }
+            shown[i] = key;
+            SetMarker(plot, key == "");
+        }
+    }
+
+    static void SetMarker(Transform plot, bool on)
+    {
+        var m = plot.Find("Marker");                              // the paved plot stays under the finished facility
+        if (m != null && !m.gameObject.activeSelf) m.gameObject.SetActive(true);
     }
 }

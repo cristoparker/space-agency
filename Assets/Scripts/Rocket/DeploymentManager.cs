@@ -15,6 +15,8 @@ public class DeploymentManager : MonoBehaviour
     [Tooltip("Old placeholder rocket on the pad; hidden while a deployed rocket stands there.")]
     public GameObject placeholder;
     public Vector3 rocketPosition = new Vector3(8f, 5.26f, 0f);
+    [Tooltip("Parts are modelled at 1:1 for the builder; on the pad the rocket is shown this much bigger to match the full-size launch complex.")]
+    public float rocketScale = 2.2f;
 
     public Deployment Current { get; private set; }
     public event Action Changed;
@@ -75,5 +77,6 @@ public class DeploymentManager : MonoBehaviour
         padRocket.name = "Deployed Rocket (" + Current.rocketName + ")";
         padRocket.transform.SetParent(transform, false);
         padRocket.transform.position = rocketPosition;
+        padRocket.transform.localScale = Vector3.one * rocketScale;
     }
 }

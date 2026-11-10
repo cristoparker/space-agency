@@ -1,0 +1,53 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 660309a65e2374b9f98e95a1cc8d9352, type: 3}
+  m_Name: FacilityCatalog
+  m_EditorClassIdentifier: Assembly-CSharp::FacilityCatalog
+  entries:
+  - id: MissionControl
+    levels:
+    - {fileID: 919132149155446097, guid: 7f0728d4e217d405aba1c2843cb1fc8f, type: 3}
+    - {fileID: 919132149155446097, guid: 8b9d342f2da0740f9b9e7cd37679bbfb, type: 3}
+    - {fileID: 919132149155446097, guid: e781cd878bb8e41a8bc3cfcbca784cc4, type: 3}
+    scale: 1
+  - id: Hangar
+    levels:
+    - {fileID: 919132149155446097, guid: 5c382987ff4434c0a9cf94c8ab3b8384, type: 3}
+    - {fileID: 919132149155446097, guid: 6550704f2d22448d69a7d09ac2cd2559, type: 3}
+    - {fileID: 919132149155446097, guid: d11ebff60bb9c49f0909f3b33f33ae90, type: 3}
+    scale: 0.78
+  - id: FuelDepot
+    levels:
+    - {fileID: 919132149155446097, guid: b44094a30f88c4ef69555404117837bb, type: 3}
+    - {fileID: 919132149155446097, guid: 1ccf243dbcc3e448e8a89a8cfd460244, type: 3}
+    - {fileID: 919132149155446097, guid: 76ea7ae05024c482faece988c03c8b9f, type: 3}
+    scale: 1
+  - id: RadarTower
+    levels:
+    - {fileID: 919132149155446097, guid: 07c57c250700d46c59659b810e126473, type: 3}
+    - {fileID: 919132149155446097, guid: a735a8af9b2fe4fc9b334b5007fe4d84, type: 3}
+    - {fileID: 919132149155446097, guid: a4fc403f0b2764449a5caf872af7258a, type: 3}
+    scale: 1
+  - id: ResearchLab
+    levels:
+    - {fileID: 919132149155446097, guid: 2d88b59facce5457992da126bf0f2a0f, type: 3}
+    - {fileID: 919132149155446097, guid: 62d28169ce8c94b8bb24b4bdce9202f5, type: 3}
+    - {fileID: 919132149155446097, guid: 0a0d1e85e566646d0892636cf0f53bbd, type: 3}
+    scale: 1
+  - id: TestStand
+    levels:
+    - {fileID: 919132149155446097, guid: 3a7259102fe974631bbcfd43b7e757a3, type: 3}
+    - {fileID: 919132149155446097, guid: 0fb521ed8e78243d0ba07bc9868aa81a, type: 3}
+    - {fileID: 919132149155446097, guid: 408620ebfd37e454d951f5897d15eb56, type: 3}
+    scale: 1
+  baseMaterial: {fileID: 2100000, guid: c9f0d36f473f60544952d1b939ac5ed5, type: 2}
+  lampOff: {fileID: 2100000, guid: cdd406f891d224e4884a826f84c9a686, type: 2}

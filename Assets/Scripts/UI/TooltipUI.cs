@@ -10,7 +10,7 @@ public class TooltipUI : MonoBehaviour
 
     public TMP_Text label;
     [Tooltip("Gap between the target and the tooltip, in canvas units.")]
-    public float gap = 4f;
+    public float gap = 3f;
 
     RectTransform rect;
     CanvasGroup group;
@@ -30,7 +30,10 @@ public class TooltipUI : MonoBehaviour
         if (Instance == this) Instance = null;
     }
 
-    /// <summary>Shows the tooltip to the right of the target, vertically centered on it.</summary>
+    /// <summary>
+    /// Shows the tooltip beside the target without covering it (or the bar it belongs to): below it for things in the upper half of the
+    /// screen (top bar), above it for things in the lower half (bottom bar). It is centred on the target and kept inside the screen.
+    /// </summary>
     public void Show(string text, RectTransform target)
     {
         if (label == null || target == null) return;
@@ -38,10 +41,21 @@ public class TooltipUI : MonoBehaviour
         LayoutRebuilder.ForceRebuildLayoutImmediate(rect);
 
         var corners = new Vector3[4];
-        target.GetWorldCorners(corners);
-        Vector3 rightMiddle = (corners[2] + corners[3]) * 0.5f;
+        target.GetWorldCorners(corners);                                   // 0 bottom-left, 1 top-left, 2 top-right, 3 bottom-right
+        var root = canvas != null ? (RectTransform)canvas.rootCanvas.transform : null;
+        var rc = new Vector3[4];
+        if (root != null) root.GetWorldCorners(rc); else { rc[0] = Vector3.zero; rc[2] = new Vector3(Screen.width, Screen.height, 0f); }
         float scale = canvas != null ? canvas.rootCanvas.transform.lossyScale.x : 1f;
-        rect.position = rightMiddle + new Vector3(gap * scale, 0f, 0f);
+
+        float midY = (rc[0].y + rc[2].y) * 0.5f;
+        bool below = (corners[0].y + corners[1].y) * 0.5f > midY;           // target in the upper half -> tooltip goes below it
+        float cx = (corners[0].x + corners[3].x) * 0.5f;
+        float g = gap * scale;
+        rect.pivot = new Vector2(0.5f, below ? 1f : 0f);
+        float w = rect.rect.width * scale, h = rect.rect.height * scale;
+        float x = Mathf.Clamp(cx, rc[0].x + w * 0.5f + 2f * scale, rc[2].x - w * 0.5f - 2f * scale);
+        float y = below ? corners[0].y - g : corners[1].y + g;
+        rect.position = new Vector3(x, y, target.position.z);
 
         transform.SetAsLastSibling();
         group.alpha = 1f;

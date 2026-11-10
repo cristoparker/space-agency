@@ -217,6 +217,14 @@ public static class UIKit
         return radial;
     }
 
+    /// <summary>Money for the top bar: millions written with an M ("24,875M", "12.5M"); below a million just the amount.</summary>
+    public static string MoneyM(long v)
+    {
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        if (System.Math.Abs((double)v) >= 1e6) return (v / 1e6).ToString("#,0.#", inv) + "M";
+        return v.ToString("N0", inv);
+    }
+
     public static string Money(long v)
     {
         double a = System.Math.Abs((double)v);

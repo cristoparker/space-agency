@@ -17,6 +17,8 @@ public class TrafficManager : MonoBehaviour
     public GameObject[] vehiclePrefabs;
     [Tooltip("Materials that share the palette but shift its UV so only the body colour changes.")]
     public Material[] bodyMaterials;
+    [Tooltip("Glowing lens materials for the headlights (white) and tail lights (red).")]
+    public Material headLightMaterial, tailLightMaterial;
     public int minVehicles = 8;
     public int maxVehicles = 10;
     public Vector2 speedRange = new Vector2(5f, 8f);
@@ -211,6 +213,8 @@ public class TrafficManager : MonoBehaviour
             var m = bodyMaterials[Random.Range(0, bodyMaterials.Length)];
             foreach (var r in go.GetComponentsInChildren<MeshRenderer>()) r.sharedMaterial = m;
         }
+
+        if (headLightMaterial != null && tailLightMaterial != null) VehicleLights.Attach(go, headLightMaterial, tailLightMaterial);
 
         int from = spawnNodes[Random.Range(0, spawnNodes.Count)];
         int to = links[from][Random.Range(0, links[from].Count)];

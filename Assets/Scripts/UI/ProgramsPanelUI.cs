@@ -88,8 +88,8 @@ public class ProgramsPanelUI : MonoBehaviour
         var d = UIKit.TextAt(card, "Desc", 7, 15, w - 14, 16, p.description, 6.2f, TextAlignmentOptions.TopLeft, false, T.dim);
         d.textWrappingMode = TextWrappingModes.Normal; d.lineSpacing = -6f;
 
-        bool hasBuilding = sim.IsBuilt(p.building);
-        UIKit.TextAt(card, "Req", 7, 33, w * 0.55f, 10, (hasBuilding ? "Uses: " : "Needs: ") + BaseData.BuildingName(p.building), 6.4f, TextAlignmentOptions.MidlineLeft, true,
+        bool hasBuilding = sim.LevelOf(p.building) >= p.minLevel;
+        UIKit.TextAt(card, "Req", 7, 33, w * 0.55f, 10, (hasBuilding ? "Uses: " : "Needs: ") + BaseData.BuildingName(p.building) + (p.minLevel > 1 ? "  L" + p.minLevel : ""), 6.4f, TextAlignmentOptions.MidlineLeft, true,
             hasBuilding ? new Color(0.62f, 1f, 0.76f, 1f) : new Color(1f, 0.6f, 0.5f, 1f));
         float days = p.days * (p.kind == ProgramKind.Testing ? BaseSim.TestTimeFactor : 1f);
         UIKit.TextAt(card, "Cost", w * 0.45f, 33, w * 0.55f - 7, 10, "$" + p.costM.ToString("0.#", CultureInfo.InvariantCulture) + " M  ·  " + Mathf.CeilToInt(days) + " days", 6.4f, TextAlignmentOptions.MidlineRight);

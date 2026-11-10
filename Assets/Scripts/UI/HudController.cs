@@ -30,7 +30,11 @@ public class HudController : MonoBehaviour
         ("Training", new[] { "Scientist Training", "Pilot Training" }),
         ("Building", new[] { "Facility", "Payload", "Rocket" }),
         ("Testing", new[] { "Engine Test", "Structure Test", "Comms Test" }),
+        ("Layer", new[] { "Labels", "Vehicles", "Greenery", "Haze" }),
     };
+    static float NavWidth(int g) => Nav[g].label == "Layer" ? 33f : 22f;
+    readonly Dictionary<string, TMP_Text> layerChips = new Dictionary<string, TMP_Text>();
+    static readonly Dictionary<string, bool> layerOn = new Dictionary<string, bool> { { "Labels", true }, { "Vehicles", true }, { "Greenery", true }, { "Haze", true } };
 
     RectTransform canvasRt, top;
     readonly List<GameObject> subMenus = new List<GameObject>();
@@ -38,8 +42,8 @@ public class HudController : MonoBehaviour
     int openGroup = -1;
     GameObject facilityPanel;
     TMP_Text toastText, moneyText, repText, resText, agencyName;
-    Image repFill, playIconImg, playBg, fast3Bg, fast6Bg;
-    TMP_Text fast3Label, fast6Label;
+    Image repFill, playIconImg, playBg, fast2Bg, fast6Bg;
+    readonly List<Image> fast2Icons = new List<Image>(), fast6Icons = new List<Image>();
     float toastTimer;
     RectTransform toastBox;
     int resumeIndex = 1;
@@ -126,8 +130,11 @@ public class HudController : MonoBehaviour
     // =============================================================== bottom navigation
     void BuildNav()
     {
-        const float bw = 22f, gap = 3f, pad = 5f, bh = 22f;
-        float w = pad * 2 + Nav.Length * bw + (Nav.Length - 1) * gap, h = bh + pad * 2;
+        foreach (var k in new List<string>(layerOn.Keys)) layerOn[k] = true;                      // a fresh scene starts with every layer on
+        BuildingSelector.LabelsVisible = true; DayNightCycle.HazeEnabled = true;
+        const float gap = 3f, pad = 5f, bh = 22f;
+        float total = 0f; for (int q = 0; q < Nav.Length; q++) total += NavWidth(q);
+        float w = pad * 2 + total + (Nav.Length - 1) * gap, h = bh + pad * 2;
         var bar = new GameObject("Bottom Nav", typeof(RectTransform)).GetComponent<RectTransform>();
         bar.SetParent(transform, false);
         bar.anchorMin = bar.anchorMax = Vector2.zero; bar.pivot = Vector2.zero;
@@ -137,13 +144,15 @@ public class HudController : MonoBehaviour
         for (int g = 0; g < Nav.Length; g++)
         {
             int gi = g;
-            float x = pad + g * (bw + gap);
+            float x = pad; for (int q = 0; q < g; q++) x += NavWidth(q) + gap;
+            float bw = NavWidth(g);
             var r = UIKit.At(bar, Nav[g].label, x, pad, bw, bh);
             var b = UIKit.MakeButton(r, "", UIKit.T.chip, () => OnNav(gi));
             var sprite = navIcons != null && g < navIcons.Length ? navIcons[g] : null;
-            if (sprite != null) UIKit.IconAt(r, sprite, 4.5f, 4.5f, bh - 9f, bh - 9f, UIKit.T.ink);
+            if (Nav[g].label == "Layer") UIKit.Text(r, "Layer", 7f, TextAlignmentOptions.Center, true, UIKit.T.ink);       // the word is written on the button
+            else if (sprite != null) UIKit.IconAt(r, sprite, 4.5f, 4.5f, bh - 9f, bh - 9f, UIKit.T.ink);
             else UIKit.Text(r, Nav[g].label.Substring(0, 1), 9f, TextAlignmentOptions.Center, true);
-            r.gameObject.AddComponent<TooltipTrigger>().text = Nav[g].label;
+            r.gameObject.AddComponent<TooltipTrigger>().text = Nav[g].label == "Layer" ? "Layer\nShow or hide parts of the map." : Nav[g].label;
             navImages.Add((Image)b.targetGraphic);
 
             var items = Nav[g].items;
@@ -159,7 +168,8 @@ public class HudController : MonoBehaviour
                 string item = items[i];
                 var chip = UIKit.At(sub, item, 0, i * (ch + cg), cw, ch);
                 UIKit.Glass(chip, false);
-                UIKit.MakeButton(UIKit.At(chip, "Hit", 0, 0, cw, ch), item, Color.clear, () => OnSubMenu(item), 6.8f, false);
+                var hit = UIKit.MakeButton(UIKit.At(chip, "Hit", 0, 0, cw, ch), Nav[g].label == "Layer" ? LayerText(item) : item, Color.clear, () => OnSubMenu(item), 6.8f, false);
+                if (Nav[g].label == "Layer") layerChips[item] = hit.GetComponentInChildren<TMP_Text>();
             }
             sub.gameObject.SetActive(false);
             subMenus.Add(sub.gameObject);
@@ -184,8 +194,48 @@ public class HudController : MonoBehaviour
         foreach (var i in navImages) i.color = UIKit.T.chip;
     }
 
+    static string LayerText(string item) => (layerOn[item] ? "✓  " : "     ") + item;
+
+    // the Layer menu stays open so several layers can be switched in a row
+    void ToggleLayer(string item)
+    {
+        bool on = !layerOn[item];
+        layerOn[item] = on;
+        if (layerChips.TryGetValue(item, out var t) && t != null) t.text = LayerText(item);
+        switch (item)
+        {
+            case "Labels": BuildingSelector.LabelsVisible = on; break;
+            case "Haze": DayNightCycle.HazeEnabled = on; break;
+            case "Vehicles":
+                var tm = FindAnyObjectByType<TrafficManager>(FindObjectsInactive.Include);
+                if (tm != null) foreach (Transform v in tm.transform) v.gameObject.SetActive(on);
+                break;
+            case "Greenery":
+                foreach (var n in new[] { "Site/Nature", "Site/Road Ends/Valley Trees", "Site/Road Ends/Valley Rocks" })
+                {
+                    var o = FindInactive(n); if (o != null) o.SetActive(on);
+                }
+                break;
+        }
+    }
+
+    // GameObject.Find only sees active objects: walk the path so a hidden layer can be switched back on
+    static GameObject FindInactive(string path)
+    {
+        var parts = path.Split('/');
+        var cur = GameObject.Find(parts[0]);
+        if (cur == null) return null;
+        for (int i = 1; i < parts.Length && cur != null; i++)
+        {
+            var next = cur.transform.Find(parts[i]);
+            cur = next != null ? next.gameObject : null;
+        }
+        return cur;
+    }
+
     void OnSubMenu(string item)
     {
+        if (layerOn.ContainsKey(item)) { ToggleLayer(item); return; }
         CloseMenus();
         switch (item)
         {
@@ -229,7 +279,7 @@ public class HudController : MonoBehaviour
     }
 
     // =============================================================== game speed: pause / 3x / 6x
-    // One real minute is one game hour at normal speed (GameClock.gameMinutesPerSecond = 1); 3x and 6x multiply that.
+    // One real minute is one game day at normal speed (GameClock.gameMinutesPerSecond = 24); 2x and 6x multiply that.
     int IndexOfSpeed(float v)
     {
         var c = GameClock.Instance; if (c == null) return -1;
@@ -261,11 +311,11 @@ public class HudController : MonoBehaviour
         var want = paused ? playIcon : pauseIcon;
         if (want != null && playIconImg.sprite != want) playIconImg.sprite = want;
         playBg.color = paused ? UIKit.T.teal : Color.clear;
-        bool f3 = Mathf.Approximately(c.Speed, 3f), f6 = Mathf.Approximately(c.Speed, 6f);
-        fast3Bg.color = f3 ? new Color(1f, 1f, 1f, 0.26f) : Color.clear;
+        bool f2 = Mathf.Approximately(c.Speed, 2f), f6 = Mathf.Approximately(c.Speed, 6f);
+        fast2Bg.color = f2 ? new Color(1f, 1f, 1f, 0.26f) : Color.clear;
         fast6Bg.color = f6 ? new Color(1f, 1f, 1f, 0.26f) : Color.clear;
-        fast3Label.color = f3 ? UIKit.T.ink : UIKit.T.dim;
-        fast6Label.color = f6 ? UIKit.T.ink : UIKit.T.dim;
+        foreach (var i in fast2Icons) i.color = f2 ? UIKit.T.ink : UIKit.T.dim;
+        foreach (var i in fast6Icons) i.color = f6 ? UIKit.T.ink : UIKit.T.dim;
     }
 
     // =============================================================== top bar (thin): agency, game speed, clock, timeline, resources, money
@@ -314,21 +364,21 @@ public class HudController : MonoBehaviour
         agencyName = UIKit.TextAt(badge, "Name", 18, 0, 60, 13, Agency.Name, 7f, TextAlignmentOptions.MidlineLeft, true);
         badgeRt = badge;
 
-        // ---- game speed: pause/play, 3x, 6x
+        // ---- game speed: pause/play (normal speed), 2x and 6x - shown as play triangles, the tooltip names the speed
         var ctl = UIKit.At(left, "Game Speed", 0, 0, 58, 13);
         UIKit.Tint(ctl, T.track);
         Size(ctl, 58f, 13f);
         var pr = UIKit.At(ctl, "Play", 1.5f, 1.5f, 19, 10);
         var pb = UIKit.MakeButton(pr, "", Color.clear, TogglePause); playBg = (Image)pb.targetGraphic;
         playIconImg = UIKit.IconAt(pr, pauseIcon, 5.5f, 1.5f, 8, 7, T.ink);
-        pr.gameObject.AddComponent<TooltipTrigger>().text = "Pause / play";
-        var r3 = UIKit.At(ctl, "3x", 21.5f, 1.5f, 17, 10);
-        var b3 = UIKit.MakeButton(r3, "", Color.clear, () => SetFast(3f)); fast3Bg = (Image)b3.targetGraphic;
-        fast3Label = UIKit.Text(r3, "3×", 6.8f, TextAlignmentOptions.Center, true);
-        r3.gameObject.AddComponent<TooltipTrigger>().text = "3× speed";
+        pr.gameObject.AddComponent<TooltipTrigger>().text = "Pause / play\nNormal speed";
+        var r2 = UIKit.At(ctl, "2x", 21.5f, 1.5f, 17, 10);
+        var b2 = UIKit.MakeButton(r2, "", Color.clear, () => SetFast(2f)); fast2Bg = (Image)b2.targetGraphic;
+        for (int k = 0; k < 2; k++) fast2Icons.Add(UIKit.IconAt(r2, playIcon, 3.4f + k * 5.2f, 1.6f, 6f, 6.8f, T.dim));
+        r2.gameObject.AddComponent<TooltipTrigger>().text = "2× speed";
         var r6 = UIKit.At(ctl, "6x", 39.5f, 1.5f, 17, 10);
         var b6 = UIKit.MakeButton(r6, "", Color.clear, () => SetFast(6f)); fast6Bg = (Image)b6.targetGraphic;
-        fast6Label = UIKit.Text(r6, "6×", 6.8f, TextAlignmentOptions.Center, true);
+        for (int k = 0; k < 3; k++) fast6Icons.Add(UIKit.IconAt(r6, playIcon, 1.0f + k * 5.0f, 1.6f, 6f, 6.8f, T.dim));
         r6.gameObject.AddComponent<TooltipTrigger>().text = "6× speed";
 
         // ---- clock + date, reusing the existing objects (TimeBarUI keeps updating them)
@@ -390,7 +440,7 @@ public class HudController : MonoBehaviour
 
     void RefreshStats()
     {
-        if (moneyText != null) moneyText.text = Agency.Money.ToString("N0", CultureInfo.InvariantCulture);
+        if (moneyText != null) moneyText.text = UIKit.MoneyM(Agency.Money);
         if (repText != null) repText.text = "Rep LVL " + Agency.RepLevel;
         if (repFill != null) ((RectTransform)repFill.transform).sizeDelta = new Vector2(42f * Agency.RepProgress, 2f);
         if (resText != null) resText.text = "Staff " + Agency.Staff;

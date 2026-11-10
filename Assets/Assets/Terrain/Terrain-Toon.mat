@@ -44,12 +44,15 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
-    m_Floats: []
+    m_Floats:
+    - _Desat: 0.55
+    - _TexBoost: 1.9
     m_Colors:
-    - _Color0: {r: 0.43, g: 0.52, b: 0.38, a: 1}
-    - _Color1: {r: 0.68, g: 0.62, b: 0.5, a: 1}
-    - _Color2: {r: 0.48, g: 0.48, b: 0.49, a: 1}
-    - _Color3: {r: 0.62, g: 0.58, b: 0.52, a: 1}
+    - _Color0: {r: 0.85, g: 1, b: 0.62, a: 1}
+    - _Color1: {r: 1, g: 1, b: 1, a: 1}
+    - _Color2: {r: 1, g: 1, b: 1, a: 1}
+    - _Color3: {r: 1, g: 1, b: 1, a: 1}
+    - _Tile: {r: 5, g: 5, b: 8, a: 5}
     - _ToonLevels: {r: 0.35, g: 0.72, b: 0, a: 0}
     - _ToonParams: {r: 0.05, g: 0.5, b: 0.02, a: 0.45}
   m_BuildTextureStacks: []

@@ -1,6 +1,16 @@
 #ifndef SPACEAGENCY_TOON_COMMON
 #define SPACEAGENCY_TOON_COMMON
 
+// Distance haze shared by all toon shaders (DayNightCycle sets the globals: colour follows the sky's horizon, x = start, y = end in metres)
+float4 _SpaceFogColor;
+float4 _SpaceFogParams;
+half3 SpaceFog(half3 col, float3 positionWS)
+{
+    float viewZ = -TransformWorldToView(positionWS).z;
+    float f = saturate((viewZ - _SpaceFogParams.x) / max(1.0, _SpaceFogParams.y - _SpaceFogParams.x));
+    return lerp(col, _SpaceFogColor.rgb, f * _SpaceFogParams.z);
+}
+
 // Hard-banded (cel) lighting from the main directional light, with shadows and an ambient floor.
 // toonParams: x = low threshold, y = high threshold, z = edge softness, w = ambient strength
 // screenUV: normalized screen position (needed by Forward+ light clusters)
@@ -33,7 +43,7 @@ half3 ToonShade(half3 albedo, float3 normalWS, float3 positionWS, float2 screenU
         lit += (l.color / max(lum, 0.0001h)) * band;                                     // tint only; strength is banded
     LIGHT_LOOP_END
 #endif
-    return albedo * lit;
+    return SpaceFog(albedo * lit, positionWS);
 }
 
 #endif

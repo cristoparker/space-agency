@@ -1,13 +1,12 @@
 using System.Globalization;
-using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>Facility window: every building, whether it is built, and construction (money + game time) for the ones that are not.</summary>
+/// <summary>Facility window: every building with its level, and construction / upgrades (money + game time).</summary>
 public class FacilityPanelUI : MonoBehaviour
 {
-    public const float W = 198f, H = 270f;
+    public const float W = 198f, H = 290f;
     bool built;
     RectTransform list;
     float refreshTimer;
@@ -48,7 +47,7 @@ public class FacilityPanelUI : MonoBehaviour
         {
             if (fill == null) continue;
             ((RectTransform)fill.transform).anchorMax = new Vector2(Mathf.Clamp01(BaseSim.Progress(job)), 1f);
-            label.text = "Building  ·  " + BaseSim.DaysLeft(job) + " days left";
+            label.text = (job.level <= 1 ? "Building" : "Upgrading") + "  ·  " + BaseSim.DaysLeft(job) + " days left";
         }
     }
 
@@ -60,30 +59,25 @@ public class FacilityPanelUI : MonoBehaviour
         live.Clear();
         if (sim == null) return;
         var T = UIKit.T;
-        float w = W - 16;
+        float w = W - 16, h = 64;
         foreach (var b in BaseData.Buildings)
         {
-            bool isBuilt = sim.IsBuilt(b.id);
+            if (!b.listed) continue;
+            int level = sim.LevelOf(b.id);
             var job = sim.Job(b.id);
-            float h = isBuilt ? 40 : 56;
             var card = UIKit.At(list, b.id, 0, 0, w, h);
             card.gameObject.AddComponent<LayoutElement>().preferredHeight = h;
             UIKit.Tint(card, new Color(0f, 0f, 0f, 0.18f));
             UIKit.TextAt(card, "Name", 7, 4, w * 0.6f, 11, b.name, 7.8f, TextAlignmentOptions.MidlineLeft, true);
-            string state = isBuilt ? "Operational" : job != null ? "Under construction" : "Not built";
-            UIKit.TextAt(card, "State", w * 0.4f, 4, w * 0.6f - 7, 11, state, 6.3f, TextAlignmentOptions.MidlineRight, true,
-                isBuilt ? new Color(0.62f, 1f, 0.76f, 1f) : job != null ? new Color(1f, 0.75f, 0.4f, 1f) : T.dim);
-            var d = UIKit.TextAt(card, "Desc", 7, 15, w - 14, 16, b.description, 6.2f, TextAlignmentOptions.TopLeft, false, T.dim);
+            string state = level == 0 ? (b.needsPlot ? "Not built" : "Not built") : "Level " + level + "  ·  " + BuildingDef.LevelNames[Mathf.Min(level, 3)];
+            UIKit.TextAt(card, "State", w * 0.4f, 4, w * 0.6f - 7, 11, state, 6.2f, TextAlignmentOptions.MidlineRight, true,
+                level > 0 ? new Color(0.62f, 1f, 0.76f, 1f) : T.dim);
+            var d = UIKit.TextAt(card, "Desc", 7, 15, w - 14, 18, b.description, 6.1f, TextAlignmentOptions.TopLeft, false, T.dim);
             d.textWrappingMode = TextWrappingModes.Normal; d.lineSpacing = -6f;
-            if (isBuilt)
+
+            if (job != null)
             {
-                var hosts = BaseData.Programs.Where(p => p.building == b.id).Select(p => p.group == "sci" ? "Scientist training" : p.group == "pilot" ? "Pilot training" : p.name).Distinct();
-                var s = string.Join(", ", hosts);
-                if (s.Length > 0) UIKit.TextAt(card, "Hosts", 7, 28, w - 14, 9, "Hosts: " + s, 5.8f, TextAlignmentOptions.MidlineLeft, false, T.dim);
-            }
-            else if (job != null)
-            {
-                var track = UIKit.At(card, "Progress", 7, 36, w - 14, 14);
+                var track = UIKit.At(card, "Progress", 7, 44, w - 14, 14);
                 UIKit.Tint(track, T.track);
                 var fillRt = UIKit.At(track, "Fill", 0, 0, 10, 14);
                 fillRt.anchorMin = new Vector2(0, 0); fillRt.anchorMax = new Vector2(BaseSim.Progress(job), 1); fillRt.pivot = new Vector2(0, 0.5f);
@@ -95,9 +89,15 @@ public class FacilityPanelUI : MonoBehaviour
             else
             {
                 string why = sim.WhyNotBuild(b);
-                string text = "Build  ·  $" + b.costM.ToString("0.#", CultureInfo.InvariantCulture) + " M  ·  " + Mathf.CeilToInt(b.days) + " days";
-                if (why == null) UIKit.Btn(card, text, 7, 36, w - 14, 14, T.teal, () => sim.StartBuild(b), 6.8f);
-                else { var bt = UIKit.Btn(card, why, 7, 36, w - 14, 14, T.chip, null, 6.5f, true, T.dim); bt.interactable = false; }
+                int next = level + 1;
+                if (next > b.MaxLevel) { var done = UIKit.Btn(card, "Fully upgraded", 7, 44, w - 14, 14, T.chip, null, 6.5f, true, T.dim); done.interactable = false; }
+                else
+                {
+                    string verb = level == 0 ? "Build on a free plot" : "Upgrade to level " + next;
+                    string text = verb + "  ·  $" + BaseSim.CostOf(b, next).ToString("0.#", CultureInfo.InvariantCulture) + " M  ·  " + Mathf.CeilToInt(BaseSim.DaysOf(b, next)) + " days";
+                    if (why == null) UIKit.Btn(card, text, 7, 44, w - 14, 14, T.teal, () => sim.StartBuild(b), 6.3f);
+                    else { var bt = UIKit.Btn(card, why == "Not enough money" ? text + "  (no money)" : why, 7, 44, w - 14, 14, T.chip, null, 6.2f, true, T.dim); bt.interactable = false; }
+                }
             }
         }
     }

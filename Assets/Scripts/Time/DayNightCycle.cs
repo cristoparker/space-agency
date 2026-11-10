@@ -20,19 +20,28 @@ public class DayNightCycle : MonoBehaviour
     public Color daySky = new Color32(0x7A, 0x98, 0xBF, 255);
     public Color dayEquator = new Color32(0x8A, 0x92, 0x9A, 255);
     public Color dayGround = new Color32(0x4A, 0x4A, 0x4A, 255);
-    public Color nightSky = new Color32(0x28, 0x34, 0x5C, 255);
-    public Color nightEquator = new Color32(0x20, 0x2A, 0x48, 255);
-    public Color nightGround = new Color32(0x14, 0x18, 0x24, 255);
+    public Color nightSky = new Color32(0x3A, 0x4A, 0x7E, 255);
+    public Color nightEquator = new Color32(0x30, 0x3E, 0x6A, 255);
+    public Color nightGround = new Color32(0x1E, 0x26, 0x3C, 255);
+    [Header("Moonlight")]
+    public Color moonColor = new Color32(0x7C, 0x96, 0xFF, 255);
+    [Range(0f, 1f)] public float moonIntensity = 0.35f;
+    Light moon;
 
     [Header("Sky")]
     [Tooltip("Procedural sky (SpaceAgency/Sky/Procedural): gradient, sun, stars and drifting clouds.")]
     public Material skyMaterial;
     [Range(0f, 1f)] public float cloudCoverage = 0.62f;
+    [Header("Distance haze (hides the far mountains and the long highway ends)")]
+    public float fogStart = 800f, fogEnd = 1550f;
     [Tooltip("Colour the ambient light takes on at sunrise and sunset.")]
     public Color twilightAmbient = new Color32(0xFF, 0x9A, 0x6A, 255);
 
     [Tooltip("Used in the editor / when no GameClock exists. 0..1 of the day.")]
     [Range(0f, 1f)] public float previewDayProgress = 0.5f;
+
+    /// <summary>Layer menu switch: turns the distance haze off.</summary>
+    public static bool HazeEnabled = true;
 
     void OnEnable()
     {
@@ -60,6 +69,20 @@ public class DayNightCycle : MonoBehaviour
         sun.shadows = day > 0.01f ? shadowType : LightShadows.None;
         sun.shadowStrength = shadowStrength;
 
+        // moon: a soft blue light from the opposite side of the sky, only when the sun is down
+        if (moon == null)
+        {
+            var mg = GameObject.Find("Moon Light");
+            if (mg == null) { mg = new GameObject("Moon Light"); mg.hideFlags = HideFlags.DontSave; }
+            moon = mg.GetComponent<Light>();
+            if (moon == null) moon = mg.AddComponent<Light>();
+            moon.type = LightType.Directional; moon.shadows = LightShadows.None;
+        }
+        float night = Mathf.Clamp01(-elevation * 4f);
+        moon.color = moonColor; moon.intensity = moonIntensity * night;
+        moon.transform.rotation = Quaternion.Euler(Mathf.Clamp(-angle + 180f, 20f, 70f), sunYaw + 160f, 0f);
+        moon.enabled = night > 0.01f;
+
         RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
         RenderSettings.ambientSkyColor = Color.Lerp(nightSky, daySky, day);
         // warm the ambient light around sunrise and sunset
@@ -74,5 +97,29 @@ public class DayNightCycle : MonoBehaviour
         Shader.SetGlobalFloat("_SkyTime", Application.isPlaying ? Time.time : (float)UnityEngine.Time.realtimeSinceStartupAsDouble);
         if (skyMaterial != null) skyMaterial.SetFloat("_CloudCoverage", cloudCoverage);
 
+        // haze: exactly the sky shader's horizon colour for this sun height (same keyframes and blending, in linear space)
+        float sh = toSun.y;
+        Color fcl = SkyHorizon(sh);
+        Color fc = QualitySettings.activeColorSpace == ColorSpace.Linear ? fcl.gamma : fcl;
+        RenderSettings.fog = HazeEnabled; RenderSettings.fogMode = FogMode.Linear;
+        RenderSettings.fogStartDistance = fogStart; RenderSettings.fogEndDistance = fogEnd; RenderSettings.fogColor = fc;
+        Shader.SetGlobalColor("_SpaceFogColor", QualitySettings.activeColorSpace == ColorSpace.Linear ? fcl : fc);
+        Shader.SetGlobalVector("_SpaceFogParams", new Vector4(fogStart, fogEnd, HazeEnabled ? 1f : 0f, 0f));
+
+    }
+
+    // mirrors SpaceAgencySky.shader: hor = Key4(sunH, night, twilight, golden hour, day), colours authored in sRGB and blended in linear
+    static Color SkyHorizon(float h)
+    {
+        Color Lin(float r, float g, float b) => new Color(Mathf.Pow(r, 2.2f), Mathf.Pow(g, 2.2f), Mathf.Pow(b, 2.2f));
+        Color n = Lin(0.04f, 0.06f, 0.14f), t = Lin(1f, 0.45f, 0.2f), gold = Lin(1f, 0.74f, 0.52f), d = Lin(0.66f, 0.82f, 0.97f);
+        float w1 = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(-0.18f, 0.02f, h));
+        float w2 = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0f, 0.24f, h));
+        float w3 = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.2f, 0.65f, h));
+        Color c = Color.Lerp(n, t, w1);
+        c = Color.Lerp(c, gold, w2);
+        c = Color.Lerp(c, d, w3);
+        c.a = 1f;
+        return c;
     }
 }

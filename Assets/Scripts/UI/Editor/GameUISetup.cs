@@ -127,8 +127,8 @@ public static class GameUISetup
         var clock = Object.FindAnyObjectByType<GameClock>(FindObjectsInactive.Include);
         if (clock != null)
         {
-            clock.gameMinutesPerSecond = 1f;
-            clock.speedLevels = new[] { 0f, 1f, 3f, 6f };
+            clock.gameMinutesPerSecond = 24f;
+            clock.speedLevels = new[] { 0f, 1f, 2f, 6f };
             clock.startSpeedIndex = 1;
             clock.startFromRealDhakaTime = false;
             clock.startYear = 2026; clock.startMonth = 1; clock.startDay = 1; clock.startHour = 6;

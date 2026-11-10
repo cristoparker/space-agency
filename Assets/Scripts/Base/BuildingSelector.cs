@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using TMPro;
 using UnityEngine;
@@ -7,9 +8,10 @@ using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 /// <summary>
-/// Hover and select the buildings of the base. The building under the mouse lights up and shows its name floating above it
-/// (the name follows the building on screen). Clicking selects it: it keeps an outline and its name, and an info card
-/// shows what it does, what is running there and shortcuts to the matching windows.
+/// Hover and select the facilities of the space centre (an empty plot counts too). The one under the mouse lights up and shows its
+/// name floating above it. Clicking selects it: it keeps an outline and its name, and an info card shows its level, what is
+/// running there, shortcuts to the matching windows and the Build / Upgrade button.
+/// Each facility object has children "Plot", "L1", "L2", "L3"; whichever is visible is what gets picked.
 /// </summary>
 public class BuildingSelector : MonoBehaviour
 {
@@ -17,7 +19,13 @@ public class BuildingSelector : MonoBehaviour
     public RectTransform canvasRect;
     public Camera cam;
 
-    sealed class Entry { public Transform t; public Renderer r; public Color baseColor; public MaterialPropertyBlock mpb = new MaterialPropertyBlock(); public GameObject outlineGo; }
+    sealed class Entry
+    {
+        public Transform t; public Color baseColor = Color.white;
+        public int plot = -1;                       // 0..4 for the empty/buildable plots, -1 for fixed buildings
+        public MaterialPropertyBlock mpb = new MaterialPropertyBlock();
+        public GameObject outlineGo; public Renderer outlined;
+    }
 
     readonly List<Entry> entries = new List<Entry>();
     Entry hover, selected;
@@ -31,9 +39,11 @@ public class BuildingSelector : MonoBehaviour
         { "LaunchPad", new (string, System.Action)[] { ("Rocket designer", () => Panels.Open("rocket")) } },
         { "MissionControl", new (string, System.Action)[] { ("Contracts", () => Panels.Open("contracts")) } },
         { "AdminOffice", new (string, System.Action)[] { ("Training", () => Panels.Open("programs:0")) } },
-        { "Hangar", new (string, System.Action)[] { ("Pilot training", () => Panels.Open("programs:0")), ("Structure test", () => Panels.Open("programs:1")) } },
-        { "FuelDepot", new (string, System.Action)[] { ("Engine test", () => Panels.Open("programs:1")) } },
+        { "Hangar", new (string, System.Action)[] { ("Pilot training", () => Panels.Open("programs:0")) } },
+        { "FuelDepot", new (string, System.Action)[0] },
         { "RadarTower", new (string, System.Action)[] { ("Comms test", () => Panels.Open("programs:1")) } },
+        { "ResearchLab", new (string, System.Action)[] { ("Structure test", () => Panels.Open("programs:1")) } },
+        { "TestStand", new (string, System.Action)[] { ("Engine test", () => Panels.Open("programs:1")) } },
     };
 
     public void Init()
@@ -43,15 +53,51 @@ public class BuildingSelector : MonoBehaviour
         if (root != null)
             foreach (Transform c in root.transform)
             {
-                var r = c.GetComponent<Renderer>() ?? c.GetComponentInChildren<Renderer>();
-                if (r == null) continue;
-                Color col = r.sharedMaterial != null && r.sharedMaterial.HasProperty("_BaseColor") ? r.sharedMaterial.GetColor("_BaseColor") : Color.white;
-                entries.Add(new Entry { t = c, r = r, baseColor = col });
+                var r = c.GetComponentInChildren<Renderer>(true);
+                Color col = r != null && r.sharedMaterial != null && r.sharedMaterial.HasProperty("_BaseColor") ? r.sharedMaterial.GetColor("_BaseColor") : Color.white;
+                entries.Add(new Entry { t = c, baseColor = col });
             }
+        var plots = GameObject.Find("Base Plots");
+        if (plots != null)
+            for (int i = 0; i < plots.transform.childCount; i++)
+                entries.Add(new Entry { t = plots.transform.GetChild(i), plot = i, baseColor = Color.white });
         hoverLabel = MakeLabel("Hover Label", out hoverText, false);
         selectLabel = MakeLabel("Selected Label", out selectText, true);
         BuildCard();
         hoverLabel.gameObject.SetActive(false); selectLabel.gameObject.SetActive(false); card.gameObject.SetActive(false);
+        if (BaseSim.Instance != null) BaseSim.Instance.Changed += OnBaseChanged;
+    }
+
+    void OnDestroy()
+    {
+        if (BaseSim.Instance != null) BaseSim.Instance.Changed -= OnBaseChanged;
+    }
+
+    // the visible model (plot or the current level)
+    static Renderer Rend(Entry e)
+    {
+        if (e == null || e.t == null) return null;
+        for (int i = e.t.childCount - 1; i >= 0; i--)           // the facility (added last) wins over the plot marker
+        {
+            var ch = e.t.GetChild(i);
+            if (ch.gameObject.activeSelf) { var r = ch.GetComponentInChildren<MeshRenderer>(); if (r != null) return r; }
+        }
+        return null;
+    }
+
+    static Bounds BoundsOf(Entry e)
+    {
+        Bounds b = default; bool first = true;
+        foreach (Transform ch in e.t)
+        {
+            if (!ch.gameObject.activeSelf) continue;
+            foreach (var r in ch.GetComponentsInChildren<MeshRenderer>())
+            {
+                if (r.gameObject.name == "Selection Outline") continue;
+                if (first) { b = r.bounds; first = false; } else b.Encapsulate(r.bounds);
+            }
+        }
+        return b;
     }
 
     // ---------------------------------------------------------------- ui
@@ -64,7 +110,6 @@ public class BuildingSelector : MonoBehaviour
         var img = UIKit.Tint(r, selectedStyle ? UIKit.T.teal : new Color(0.07f, 0.08f, 0.12f, 0.8f));
         img.raycastTarget = false;
         text = UIKit.Text(r, "", 7f, TextAlignmentOptions.Center, true);
-        // a little pointer under the pill
         var tip = new GameObject("Tip", typeof(RectTransform)).GetComponent<RectTransform>();
         tip.SetParent(r, false);
         tip.anchorMin = tip.anchorMax = new Vector2(0.5f, 0f); tip.pivot = new Vector2(0.5f, 0.5f);
@@ -79,46 +124,103 @@ public class BuildingSelector : MonoBehaviour
         card = new GameObject("Building Card", typeof(RectTransform)).GetComponent<RectTransform>();
         card.SetParent(canvasRect, false);
         card.anchorMin = card.anchorMax = new Vector2(0.5f, 0f); card.pivot = new Vector2(0.5f, 0f);
-        card.anchoredPosition = new Vector2(0f, 10f); card.sizeDelta = new Vector2(190f, 66f);
+        card.anchoredPosition = new Vector2(0f, 10f); card.sizeDelta = new Vector2(210f, 84f);
         UIKit.Glass(card);
         cardTitle = UIKit.TextAt(card, "Title", 10, 7, 120, 13, "", 9.5f, TextAlignmentOptions.MidlineLeft, true);
-        cardState = UIKit.TextAt(card, "State", 90, 7, 90, 13, "", 6.5f, TextAlignmentOptions.MidlineRight, true);
-        cardBody = UIKit.TextAt(card, "Body", 10, 22, 170, 20, "", 6.5f, TextAlignmentOptions.TopLeft, false, UIKit.T.dim);
+        cardState = UIKit.TextAt(card, "State", 100, 7, 100, 13, "", 6.5f, TextAlignmentOptions.MidlineRight, true);
+        cardBody = UIKit.TextAt(card, "Body", 10, 22, 190, 28, "", 6.5f, TextAlignmentOptions.TopLeft, false, UIKit.T.dim);
         cardBody.textWrappingMode = TextWrappingModes.Normal; cardBody.lineSpacing = -6f;
-        cardButtons = UIKit.At(card, "Buttons", 10, 44, 170, 16);
+        cardButtons = UIKit.At(card, "Buttons", 10, 62, 190, 16);
+        cardButtons.anchorMin = cardButtons.anchorMax = new Vector2(0f, 1f); cardButtons.pivot = new Vector2(0f, 1f);
     }
+
+    void OnBaseChanged()
+    {
+        if (selected == null) return;
+        SetOutline(selected, false);
+        SetOutline(selected, true);
+        SetTint(selected, 1.25f);
+        FillCard();
+    }
+
+    static string IdOf(Entry e) => e.plot >= 0 ? (BaseSim.Instance != null ? BaseSim.Instance.FacilityAt(e.plot) : null) : e.t.name;
+    static string PlotName(Entry e) => "P" + (e.plot + 1);
 
     void FillCard()
     {
         if (selected == null) return;
-        var id = selected.t.name;
-        var def = BaseData.Building(id);
         var sim = BaseSim.Instance;
-        cardTitle.text = def != null ? def.name : id;
-        cardState.text = "Operational";
-        cardState.color = new Color(0.62f, 1f, 0.76f, 1f);
+        var id = IdOf(selected);
+        UIKit.Clear(cardButtons);
+
+        // ---- an empty plot: choose what to build here
+        if (selected.plot >= 0 && id == null)
+        {
+            cardTitle.text = "Plot " + PlotName(selected);
+            cardState.text = "Empty plot";
+            cardState.color = UIKit.T.dim;
+            cardBody.text = "Choose a facility to build here. Each facility can be built once, and it needs power from the Power Grid.";
+            card.sizeDelta = new Vector2(236f, 122f);
+            cardButtons.anchoredPosition = new Vector2(10f, -52f);
+            cardButtons.sizeDelta = new Vector2(216f, 64f);
+            int n = 0;
+            foreach (var d in BaseData.Buildings)
+            {
+                if (!d.needsPlot) continue;
+                var def2 = d;
+                bool built = sim != null && sim.LevelOf(def2.id) > 0 || sim != null && sim.Job(def2.id) != null;
+                string why = sim != null ? sim.WhyNotBuild(def2, selected.plot) : "-";
+                bool ok = !built && why == null;
+                string label = built ? def2.name + "  (built)" : def2.name + "  $" + BaseSim.CostOf(def2, 1).ToString("0.#", CultureInfo.InvariantCulture) + " M";
+                float x = (n % 2) * 109f, y = (n / 2) * 20f;
+                var b = UIKit.Btn(cardButtons, label, x, y, 107, 18, ok ? UIKit.T.green : UIKit.T.chip, () => { int plot = selected.plot; sim.StartBuild(def2, plot); }, 6.2f, true, ok ? (Color?)null : UIKit.T.dim);
+                b.interactable = ok;
+                if (!ok && !built) b.gameObject.AddComponent<TooltipTrigger>().text = why;
+                n++;
+            }
+            return;
+        }
+
+        // ---- a facility (fixed or built on a plot)
+        card.sizeDelta = new Vector2(228f, 84f);
+        cardButtons.anchoredPosition = new Vector2(10f, -62f);
+        cardButtons.sizeDelta = new Vector2(208f, 16f);
+        var def = BaseData.Building(id);
+        int level = sim != null ? sim.LevelOf(id) : 1;
+        cardTitle.text = (def != null ? def.name : id) + (selected.plot >= 0 ? "  ·  " + PlotName(selected) : "");
+        cardState.text = level == 0 ? "Under construction" : "Level " + level + "  ·  " + BuildingDef.LevelNames[Mathf.Min(level, 3)];
+        cardState.color = level == 0 ? new Color(1f, 0.75f, 0.4f, 1f) : new Color(0.62f, 1f, 0.76f, 1f);
         var sb = new System.Text.StringBuilder();
         sb.Append(def != null ? def.description : "");
         if (sim != null)
+        {
+            var job = sim.Job(id);
+            if (job != null) sb.Append("\n<color=#FFB35C>" + (job.level <= 1 ? "Under construction" : "Upgrading to level " + job.level) + ", " + BaseSim.DaysLeft(job) + " days left</color>");
             foreach (var j in sim.RunningPrograms(id))
-            {
-                var p = BaseData.Program(j.id);
-                sb.Append("\n<color=#FFB35C>Running: " + p.name + ", " + BaseSim.DaysLeft(j) + " days left</color>");
-            }
+                sb.Append("\n<color=#FFB35C>Running: " + BaseData.Program(j.id).name + ", " + BaseSim.DaysLeft(j) + " days left</color>");
+        }
         cardBody.text = sb.ToString();
 
-        UIKit.Clear(cardButtons);
-        if (Actions.TryGetValue(id, out var acts))
+        float bx = 0f;
+        if (def != null && sim != null && sim.Job(id) == null && level + 1 <= def.MaxLevel && def.MaxLevel > 1)
         {
-            float x = 0f, w = Mathf.Min(82f, 170f / acts.Length - 3f);
+            int next = level + 1;
+            string label = "Upgrade  $" + BaseSim.CostOf(def, next).ToString("0.#", CultureInfo.InvariantCulture) + " M  ·  " + Mathf.CeilToInt(BaseSim.DaysOf(def, next)) + " d";
+            string why = sim.WhyNotBuild(def);
+            bool ok = why == null;
+            var bb = UIKit.Btn(cardButtons, label, bx, 0, 96, 16, ok ? UIKit.T.green : UIKit.T.chip, () => sim.StartBuild(def), 6.5f, true, ok ? (Color?)null : UIKit.T.dim);
+            bb.interactable = ok;
+            if (!ok) bb.gameObject.AddComponent<TooltipTrigger>().text = why;
+            bx += 100f;
+        }
+        if (level > 0 && id != null && Actions.TryGetValue(id, out var acts))
             foreach (var (label, action) in acts)
             {
                 var act = action;
-                UIKit.Btn(cardButtons, label, x, 0, w, 16, UIKit.T.teal, () => act(), 7f);
-                x += w + 4f;
+                UIKit.Btn(cardButtons, label, bx, 0, 62, 16, UIKit.T.teal, () => act(), 6.5f);
+                bx += 66f;
             }
-        }
-        var close = UIKit.Btn(cardButtons, "Close", 170f - 40f, 0, 40, 16, UIKit.T.chip, Deselect, 7f);
+        UIKit.Btn(cardButtons, "Close", 208f - 36f, 0, 36, 16, UIKit.T.chip, Deselect, 6.5f);
     }
 
     // ---------------------------------------------------------------- picking
@@ -133,37 +235,42 @@ public class BuildingSelector : MonoBehaviour
         foreach (var e in entries)
         {
             if (e.t == null || !e.t.gameObject.activeInHierarchy) continue;
-            if (e.r.bounds.IntersectRay(ray, out float d) && d < bestT) { bestT = d; best = e; }
+            var b = BoundsOf(e);
+            if (b.size == Vector3.zero) continue;
+            if (b.IntersectRay(ray, out float d) && d < bestT) { bestT = d; best = e; }
         }
         return best;
     }
 
     void SetTint(Entry e, float mul)
     {
-        if (e == null || e.r == null) return;
-        if (mul <= 1.001f) { e.r.SetPropertyBlock(null); return; }
+        var r = Rend(e);
+        if (r == null) return;
+        if (mul <= 1.001f) { r.SetPropertyBlock(null); return; }
         e.mpb.SetColor("_BaseColor", new Color(e.baseColor.r * mul, e.baseColor.g * mul, e.baseColor.b * mul, e.baseColor.a));
-        e.r.SetPropertyBlock(e.mpb);
+        r.SetPropertyBlock(e.mpb);
     }
 
     void SetOutline(Entry e, bool on)
     {
         if (e == null) return;
         if (!on) { if (e.outlineGo != null) Destroy(e.outlineGo); e.outlineGo = null; return; }
-        if (e.outlineGo != null || outline == null) return;
-        var mf = e.r.GetComponent<MeshFilter>();
+        var r = Rend(e);
+        if (e.outlineGo != null || outline == null || r == null) return;
+        var mf = r.GetComponent<MeshFilter>();
         if (mf == null || mf.sharedMesh == null) return;
         var go = new GameObject("Selection Outline");
-        go.transform.SetParent(e.r.transform, false);
+        go.transform.SetParent(r.transform, false);
         go.AddComponent<MeshFilter>().sharedMesh = mf.sharedMesh;
         var mr = go.AddComponent<MeshRenderer>();
         mr.sharedMaterial = outline; mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         var b = mf.sharedMesh.bounds; Vector3 ext = b.extents, c = b.center;
-        float thick = 0.16f;
-        Vector3 scale = new Vector3(1f + thick / Mathf.Max(0.02f, ext.x * e.r.transform.lossyScale.x), 1f + thick / Mathf.Max(0.02f, ext.y * e.r.transform.lossyScale.y), 1f + thick / Mathf.Max(0.02f, ext.z * e.r.transform.lossyScale.z));
+        Vector3 ls = r.transform.lossyScale;
+        float thick = Mathf.Clamp(b.size.magnitude * 0.004f, 0.18f, 0.7f);        // thicker for bigger buildings
+        Vector3 scale = new Vector3(1f + thick / Mathf.Max(0.02f, ext.x * ls.x), 1f + thick / Mathf.Max(0.02f, ext.y * ls.y), 1f + thick / Mathf.Max(0.02f, ext.z * ls.z));
         go.transform.localScale = scale;
         go.transform.localPosition = c - Vector3.Scale(c, scale);
-        e.outlineGo = go;
+        e.outlineGo = go; e.outlined = r;
     }
 
     void Select(Entry e)
@@ -206,15 +313,20 @@ public class BuildingSelector : MonoBehaviour
         PlaceLabel(selectLabel, selectText, selected);
     }
 
+    /// <summary>Layer menu switch for the floating building names.</summary>
+    public static bool LabelsVisible = true;
+
     void PlaceLabel(RectTransform label, TMP_Text text, Entry e)
     {
+        if (!LabelsVisible) e = null;
         if (e == null || cam == null || e.t == null) { if (label.gameObject.activeSelf) label.gameObject.SetActive(false); return; }
-        var b = e.r.bounds;
-        Vector3 world = new Vector3(b.center.x, b.max.y + 0.6f, b.center.z);          // floats above the roof
+        var b = BoundsOf(e);
+        Vector3 world = new Vector3(b.center.x, b.max.y + Mathf.Max(1.5f, b.size.y * 0.06f), b.center.z);          // floats above the roof
         Vector3 sp = cam.WorldToScreenPoint(world);
         if (sp.z <= 0f) { label.gameObject.SetActive(false); return; }
-        var def = BaseData.Building(e.t.name);
-        string n = def != null ? def.name : e.t.name;
+        var id = IdOf(e);
+        var def = id != null ? BaseData.Building(id) : null;
+        string n = e.plot >= 0 ? (id == null ? "Plot " + PlotName(e) + "  (empty)" : (def != null ? def.name : id) + "  ·  " + PlotName(e)) : (def != null ? def.name : e.t.name);
         if (text.text != n) { text.text = n; label.sizeDelta = new Vector2(text.GetPreferredValues(n).x + 14f, 13f); }
         if (RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, sp, canvasRect.GetComponentInParent<Canvas>().worldCamera, out var lp))
         {
