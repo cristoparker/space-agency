@@ -2,6 +2,7 @@
 #define SPACEAGENCY_TOON_COMMON
 
 // Distance haze shared by all toon shaders (DayNightCycle sets the globals: colour follows the sky's horizon, x = start, y = end in metres)
+float _SpaceNight;                                   // 0 = day, 1 = night (DayNightCycle)
 float4 _SpaceFogColor;
 float4 _SpaceFogParams;
 half3 SpaceFog(half3 col, float3 positionWS)
@@ -29,21 +30,33 @@ half3 ToonShade(half3 albedo, float3 normalWS, float3 positionWS, float2 screenU
     half3 ambient = SampleSH(normalWS) * toonParams.w;
     half3 lit = mainLight.color * shade + ambient;
 
-    // Point / spot lights (lamps at night), banded like the sun.
+    // Point / spot lights (lamps, headlights): smooth, so they read as real light rather than a round flashlight disc.
 #if defined(_ADDITIONAL_LIGHTS)
     InputData inputData = (InputData)0;
     inputData.positionWS = positionWS;
     inputData.normalizedScreenSpaceUV = screenUV;
     uint pixelLightCount = GetAdditionalLightsCount();
     LIGHT_LOOP_BEGIN(pixelLightCount)
-        Light l = GetAdditionalLight(lightIndex, positionWS);
-        half lum = dot(l.color, half3(0.3h, 0.59h, 0.11h));
-        float x = saturate(dot(normalWS, l.direction)) * l.distanceAttenuation * lum;   // brightness at this surface
-        float band = smoothstep(0.05, 0.1, x) * 0.4 + smoothstep(0.3, 0.35, x) * 0.35 + smoothstep(0.8, 0.85, x) * 0.35;
-        lit += (l.color / max(lum, 0.0001h)) * band;                                     // tint only; strength is banded
+        Light l = GetAdditionalLight(lightIndex, positionWS, half4(1, 1, 1, 1));       // includes the light cookie (soft pools, dipped beams)
+        float ndl = saturate(dot(normalWS, l.direction));
+        half3 e = l.color * (l.distanceAttenuation * ndl);                              // smooth, physically falling off
+        lit += 1.0h - exp(-1.5h * e);                                                   // soft shoulder instead of hard bands: no visible rim
     LIGHT_LOOP_END
 #endif
     return SpaceFog(albedo * lit, positionWS);
 }
 
 #endif
+
+// Lit windows at night: the window cell of the shared palette (row 0, column 4) glows, a few windows stay dark, each in a slightly different warm / cool white.
+half3 WindowGlow(float2 uv, float3 positionWS, float4 baseMapST)
+{
+    if (_SpaceNight < 0.01 || abs(baseMapST.z) + abs(baseMapST.w) > 0.0001) return 0;      // materials that shift the palette (cars) are skipped
+    float isWin = step(uv.y, 0.125) * step(0.5, uv.x) * step(uv.x, 0.625);
+    if (isWin < 0.5) return 0;
+    float2 cell = floor(positionWS.xz * 0.37 + positionWS.y * 0.55);
+    float h = frac(sin(dot(cell, float2(12.9898, 78.233))) * 43758.5453);
+    float lit = step(0.2, h);
+    half3 col = lerp(half3(1.0, 0.72, 0.36), half3(0.85, 0.93, 1.0), step(0.78, frac(h * 7.31)));
+    return col * (lit * _SpaceNight * (1.25 + 0.5 * frac(h * 3.7)));
+}

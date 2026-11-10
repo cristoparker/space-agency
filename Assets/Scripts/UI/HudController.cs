@@ -32,7 +32,7 @@ public class HudController : MonoBehaviour
         ("Testing", new[] { "Engine Test", "Structure Test", "Comms Test" }),
         ("Layer", new[] { "Labels", "Haze", "UI" }),
     };
-    static float NavWidth(int g) => 22f;
+    static float NavWidth(int g) => 15f;
     static readonly Dictionary<string, string> ItemIcons = new Dictionary<string, string>
     {
         { "Scientist Training", "icon_scientist" }, { "Pilot Training", "icon_pilot" }, { "Facility", "icon_facility" }, { "Payload", "icon_payload" },
@@ -80,7 +80,9 @@ public class HudController : MonoBehaviour
         BuildingTags.Create(canvasRt);                      // floating name tags, progress bars and completion bubbles (the Labels layer)
         BuildTopBar();
         CalendarUI.Create(canvasRt);                        // drops down from the date in the top bar
-        ObjectiveMenuUI.Create(canvasRt);                  // the Objectives button at the left and its panel
+        var objectiveMenu = ObjectiveMenuUI.Create(canvasRt);                  // the Objectives button at the left and its panel
+        if (FlightManager.Instance == null) new GameObject("Flight Manager").AddComponent<FlightManager>();
+        FlightPanelUI.Create(canvasRt, objectiveMenu);                          // 'Mission in flight' under it after a launch
         Agency.Changed += RefreshStats;
         RefreshStats();
     }
@@ -130,25 +132,38 @@ public class HudController : MonoBehaviour
     {
         foreach (var k in new List<string>(layerOn.Keys)) layerOn[k] = true;                      // a fresh scene starts with every layer on
         BuildingSelector.LabelsVisible = true; BuildingTags.Visible = true; DayNightCycle.HazeEnabled = true;
-        const float gap = 3f, pad = 5f, bh = 22f;
-        float total = 0f; for (int q = 0; q < Nav.Length; q++) total += NavWidth(q);
-        float w = pad * 2 + total + (Nav.Length - 1) * gap, h = bh + pad * 2;
+        const float gap = 2f, pad = 3f, bh = 15f;
+        float total = 0f; for (int q = 0; q < Nav.Length - 1; q++) total += NavWidth(q);             // the last entry (Layer) lives in the bottom-right group
+        float w = pad * 2 + total + (Nav.Length - 2) * gap, h = bh + pad * 2;
         var bar = new GameObject("Bottom Nav", typeof(RectTransform)).GetComponent<RectTransform>();
         bar.SetParent(transform, false);
         bar.anchorMin = bar.anchorMax = Vector2.zero; bar.pivot = Vector2.zero;
         bar.anchoredPosition = new Vector2(8f, 8f); bar.sizeDelta = new Vector2(w, h);
         UIKit.Glass(bar);
 
+        // bottom right: the Layer button and the cinematic camera button, side by side
+        var rbar = new GameObject("Bottom Right", typeof(RectTransform)).GetComponent<RectTransform>();
+        rbar.SetParent(transform, false);
+        rbar.anchorMin = rbar.anchorMax = new Vector2(1f, 0f); rbar.pivot = new Vector2(1f, 0f);
+        rbar.anchoredPosition = new Vector2(-8f, 8f); rbar.sizeDelta = new Vector2(pad * 2 + 15f * 2 + gap, h);
+        UIKit.Glass(rbar);
+        var cine = UIKit.At(rbar, "Cinematic", pad + 15f + gap, pad, 15f, bh);
+        UIKit.MakeButton(cine, "", UIKit.T.chip, () => { CloseMenus(); CinematicCamera.Begin(this, canvasRt); });
+        UIKit.IconAt(cine, Resources.Load<Sprite>("UIIcons/icon_camera"), 3.5f, 3.5f, bh - 7f, bh - 7f, UIKit.T.ink);
+        cine.gameObject.AddComponent<TooltipTrigger>().text = "Cinematic camera\nThe interface hides and the camera tours the base. Click or Esc to leave.";
+
         for (int g = 0; g < Nav.Length; g++)
         {
             int gi = g;
-            float x = pad; for (int q = 0; q < g; q++) x += NavWidth(q) + gap;
+            bool isLayer = Nav[g].label == "Layer";
+            Transform parentBar = isLayer ? (Transform)rbar : bar;
+            float x = pad; if (!isLayer) for (int q = 0; q < g; q++) x += NavWidth(q) + gap;
             float bw = NavWidth(g);
-            var r = UIKit.At(bar, Nav[g].label, x, pad, bw, bh);
+            var r = UIKit.At(parentBar, Nav[g].label, x, pad, bw, bh);
             var b = UIKit.MakeButton(r, "", UIKit.T.chip, () => OnNav(gi));
             var sprite = navIcons != null && g < navIcons.Length ? navIcons[g] : null;
             if (Nav[g].label == "Layer") sprite = Resources.Load<Sprite>("UIIcons/nav_layers");
-            if (sprite != null) UIKit.IconAt(r, sprite, 4.5f, 4.5f, bh - 9f, bh - 9f, UIKit.T.ink);
+            if (sprite != null) UIKit.IconAt(r, sprite, 3.5f, 3.5f, bh - 7f, bh - 7f, UIKit.T.ink);
             else UIKit.Text(r, Nav[g].label.Substring(0, 1), 9f, TextAlignmentOptions.Center, true);
             r.gameObject.AddComponent<TooltipTrigger>().text = Nav[g].label == "Layer" ? "Layer\nShow or hide parts of the map." : Nav[g].label;
             navImages.Add((Image)b.targetGraphic);
@@ -156,16 +171,16 @@ public class HudController : MonoBehaviour
             var items = Nav[g].items;
             if (items.Length == 0) { subMenus.Add(null); continue; }
             var sub = new GameObject(Nav[g].label + " Menu", typeof(RectTransform)).GetComponent<RectTransform>();
-            sub.SetParent(bar, false);
+            sub.SetParent(parentBar, false);
             sub.anchorMin = sub.anchorMax = Vector2.zero; sub.pivot = Vector2.zero;
-            sub.anchoredPosition = new Vector2(x, h + 3f);
+            sub.anchoredPosition = new Vector2(isLayer ? rbar.sizeDelta.x - 70f : x, h + 3f);
             float ch = 14f, cg = 2f, cw = 70f;
             sub.sizeDelta = new Vector2(cw, items.Length * (ch + cg));
             for (int i = 0; i < items.Length; i++)
             {
                 string item = items[i];
                 var chip = UIKit.At(sub, item, 0, i * (ch + cg), cw, ch);
-                UIKit.Glass(chip, false);
+                UIKit.Panel(chip, false);
                 UIHover.Attach(chip.gameObject, 1.05f, 0.22f);                                    // the whole chip springs and glows under the pointer
                 var hit = UIKit.MakeButton(UIKit.At(chip, "Hit", 0, 0, cw, ch), item, Color.clear, () => OnSubMenu(item), 6.8f, false, null, false);
                 var label = hit.GetComponentInChildren<TMP_Text>();
@@ -228,7 +243,7 @@ public class HudController : MonoBehaviour
     float uiHintUntil;
     TMP_Text uiHint;
 
-    void HideInterface()
+    public void HideInterface()
     {
         if (uiHidden) return;
         uiHidden = true;
@@ -248,7 +263,7 @@ public class HudController : MonoBehaviour
         uiHintUntil = Time.unscaledTime + 4f;
     }
 
-    void ShowInterface()
+    public void ShowInterface()
     {
         if (!uiHidden) return;
         uiHidden = false;
@@ -280,7 +295,7 @@ public class HudController : MonoBehaviour
         r.SetParent(transform, false);
         r.anchorMin = r.anchorMax = new Vector2(0.5f, 0f); r.pivot = new Vector2(0.5f, 0f);
         r.anchoredPosition = new Vector2(0f, 40f); r.sizeDelta = new Vector2(220f, 16f);
-        UIKit.Glass(r);
+        UIKit.Panel(r);
         toastText = UIKit.Text(r, "", 7.5f, TextAlignmentOptions.Center);
         toastBox = r;
         r.gameObject.SetActive(false);
@@ -323,8 +338,8 @@ public class HudController : MonoBehaviour
         }
     }
 
-    // =============================================================== game speed: pause / 3x / 6x
-    // One real minute is one game day at normal speed (GameClock.gameMinutesPerSecond = 24); 2x and 6x multiply that.
+    // =============================================================== game speed: pause / normal / 5x / one day per second
+    // One real minute is one game day at normal speed (GameClock.gameMinutesPerSecond = 24); 5x and 60x (one day per second) multiply that.
     int IndexOfSpeed(float v)
     {
         var c = GameClock.Instance; if (c == null) return -1;
@@ -356,7 +371,7 @@ public class HudController : MonoBehaviour
         var want = paused ? playIcon : pauseIcon;
         if (want != null && playIconImg.sprite != want) playIconImg.sprite = want;
         playBg.color = paused ? UIKit.T.teal : Color.clear;
-        bool f2 = Mathf.Approximately(c.Speed, 2f), f6 = Mathf.Approximately(c.Speed, 6f);
+        bool f2 = Mathf.Approximately(c.Speed, 5f), f6 = Mathf.Approximately(c.Speed, 60f);
         fast2Bg.color = f2 ? new Color(1f, 1f, 1f, 0.26f) : Color.clear;
         fast6Bg.color = f6 ? new Color(1f, 1f, 1f, 0.26f) : Color.clear;
         foreach (var i in fast2Icons) i.color = f2 ? UIKit.T.ink : UIKit.T.dim;
@@ -410,7 +425,7 @@ public class HudController : MonoBehaviour
         badgeRt = badge;
         UIHover.Attach(badge.gameObject, 1.04f, 0.14f);
 
-        // ---- game speed: pause/play (normal speed), 2x and 6x - shown as play triangles, the tooltip names the speed
+        // ---- game speed: pause/play (normal speed), 4x and 10x - shown as play triangles, the tooltip names the speed
         var ctl = UIKit.At(left, "Game Speed", 0, 0, 58, 13);
         UIKit.Tint(ctl, T.track);
         Size(ctl, 58f, 13f);
@@ -419,13 +434,13 @@ public class HudController : MonoBehaviour
         playIconImg = UIKit.IconAt(pr, pauseIcon, 5.5f, 1.5f, 8, 7, T.ink);
         pr.gameObject.AddComponent<TooltipTrigger>().text = "Pause / play\nNormal speed";
         var r2 = UIKit.At(ctl, "2x", 21.5f, 1.5f, 17, 10);
-        var b2 = UIKit.MakeButton(r2, "", Color.clear, () => SetFast(2f)); fast2Bg = (Image)b2.targetGraphic;
+        var b2 = UIKit.MakeButton(r2, "", Color.clear, () => SetFast(5f)); fast2Bg = (Image)b2.targetGraphic;
         for (int k = 0; k < 2; k++) fast2Icons.Add(UIKit.IconAt(r2, playIcon, 3.4f + k * 5.2f, 1.6f, 6f, 6.8f, T.dim));
-        r2.gameObject.AddComponent<TooltipTrigger>().text = "2× speed";
+        r2.gameObject.AddComponent<TooltipTrigger>().text = "5× speed";
         var r6 = UIKit.At(ctl, "6x", 39.5f, 1.5f, 17, 10);
-        var b6 = UIKit.MakeButton(r6, "", Color.clear, () => SetFast(6f)); fast6Bg = (Image)b6.targetGraphic;
-        for (int k = 0; k < 3; k++) fast6Icons.Add(UIKit.IconAt(r6, playIcon, 1.0f + k * 5.0f, 1.6f, 6f, 6.8f, T.dim));
-        r6.gameObject.AddComponent<TooltipTrigger>().text = "6× speed";
+        var b6 = UIKit.MakeButton(r6, "", Color.clear, () => SetFast(60f)); fast6Bg = (Image)b6.targetGraphic;
+        fast6Icons.Add(UIKit.IconAt(r6, Resources.Load<Sprite>("UIIcons/icon_daynight"), 3.5f, 0.5f, 10f, 9f, T.dim));
+        r6.gameObject.AddComponent<TooltipTrigger>().text = "One day per second\nA full day and night passes every second.";
 
         // ---- clock + date (the date opens the calendar)
         var timeRt = UIKit.At(left, "Time", 0, 0, 36, 13);
@@ -464,7 +479,8 @@ public class HudController : MonoBehaviour
         money.gameObject.AddComponent<TooltipTrigger>().text = "Money\nYour agency's budget.";
 
         // ---- centre: progress of the tracked contract
-        var mission = MissionBarUI.Create(bar, new Vector2(82f, 0f));
+        var mission = DeadlineBarUI.Create(left);                          // contract deadline joined with the progress bar, next to the date
+        Size(mission, DeadlineBarUI.W, DeadlineBarUI.H);
         LaunchDayUI.Create(bar, left, mission);              // launch countdown next to the date, glowing Launch button on launch day
         RefreshStats();
     }

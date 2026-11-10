@@ -25,7 +25,7 @@ public class ContractsPanelUI : MonoBehaviour
         var r = (RectTransform)transform;
         r.anchorMin = r.anchorMax = new Vector2(1f, 1f); r.pivot = new Vector2(1f, 1f);
         r.anchoredPosition = new Vector2(-8f, -32f); r.sizeDelta = new Vector2(W, H);
-        UIKit.Glass(r);
+        UIKit.Panel(r);
 
         title = UIKit.TitleBar(r, "Contracts", UIKit.T.teal, W, () => gameObject.SetActive(false));
         tabs = new Segmented(r, 10, 28, W - 20, 15, new[] { "Offers", "Global", "Active" }, 0, i => { tab = i; Refresh(); });
@@ -118,7 +118,8 @@ public class ContractsPanelUI : MonoBehaviour
         else
         {
             foreach (var m in mm.Running) ActiveCard(m, mm);
-            if (mm.Running.Count == 0) Empty("No contracted mission.\nAccept a contract from OFFERS.");
+            foreach (var pm in mm.Pending) PendingCard(pm, mm);
+            if (mm.Running.Count == 0 && mm.Pending.Count == 0) Empty("No contracted mission.\nAccept a contract from OFFERS.");
         }
     }
 
@@ -171,13 +172,25 @@ public class ContractsPanelUI : MonoBehaviour
         UIKit.Text(rew, "$" + UIKit.Money(m.budget) + " reward", 7f, TextAlignmentOptions.Center, true);
     }
 
+    void PendingCard(MissionDefinition m, MissionManager mm)
+    {
+        float w = W - 16;
+        var card = CardShell(100, new Color(1f, 0.72f, 0.3f, 0.10f));
+        Details(card, m);
+        UIKit.TextAt(card, "Pending", 7, 3, 60, 11, "", 6f, TextAlignmentOptions.MidlineLeft, true).raycastTarget = false;
+        var tag = UIKit.At(card, "Tag", w - 62, 3, 56, 11); UIKit.Tint(tag, UIKit.Wash(new Color(1f, 0.72f, 0.3f, 1f), 0.8f));
+        UIKit.Text(tag, "PENDING", 5.8f, TextAlignmentOptions.Center, true, new Color(0.2f, 0.1f, 0f, 1f));
+        UIKit.Btn(card, "Remove from pending", 8, 82, w - 16, 14, UIKit.T.chip, () => { mm.RemovePending(m); Refresh(); }, 6.5f, true, new Color(1f, 0.45f, 0.42f, 1f));
+    }
+
     void OfferCard(MissionDefinition m, MissionManager mm)
     {
         float w = W - 16;
         var card = CardShell(100, new Color(1f, 1f, 1f, 0.10f));
         Details(card, m);
         UIKit.Btn(card, "Decline", 8, 82, w * 0.5f - 11, 14, UIKit.T.chip, () => mm.DiscardMission(m), 6.8f, true, new Color(1f, 0.45f, 0.42f, 1f));
-        UIKit.Btn(card, "Accept", w * 0.5f + 3, 82, w * 0.5f - 11, 14, UIKit.T.green, () => { mm.StartMission(m); tab = TabActive; Refresh(); Hud.Toast("Contract accepted: " + m.displayName); }, 6.5f);
+        bool busy = mm.Running.Count > 0;
+        UIKit.Btn(card, busy ? "Add as pending" : "Accept", w * 0.5f + 3, 82, w * 0.5f - 11, 14, busy ? UIKit.Wash(new Color(1f, 0.72f, 0.3f, 1f), 0.7f) : UIKit.T.green, () => { mm.StartMission(m); tab = TabActive; Refresh(); Hud.Toast(busy ? "Pending: " + m.displayName + " starts when the current contract is launched." : "Contract accepted: " + m.displayName); }, 6.5f);
     }
 
     // =============================================================== global contract finder (bidding front end)

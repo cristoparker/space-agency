@@ -76,7 +76,7 @@ public class DayNightCycle : MonoBehaviour
         float day = Mathf.Clamp01(elevation * 3f);
         sun.intensity = maxIntensity * Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((elevation + 0.08f) * 5f));   // gentle light even at sunrise and sunset
         sun.color = Color.Lerp(horizonColor, dayColor, Mathf.SmoothStep(0f, 1f, day));
-        sun.shadows = day > 0.01f ? shadowType : LightShadows.None;
+        sun.shadows = day > 0.01f ? LightShadows.Soft : LightShadows.None;
         sun.shadowStrength = shadowStrength;
 
         // moon: a soft blue light from the opposite side of the sky, only when the sun is down
@@ -103,6 +103,7 @@ public class DayNightCycle : MonoBehaviour
 
         // feed the sky shader: where the sun is and how far the wind has blown the clouds
         Vector3 toSun = -sun.transform.forward;
+        Shader.SetGlobalFloat("_SpaceNight", 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((elevation + 0.02f) / 0.2f)));   // windows glow when it is dark
         Shader.SetGlobalVector("_SkySunDir", new Vector4(toSun.x, toSun.y, toSun.z, 0f));
         Shader.SetGlobalFloat("_SkyTime", Application.isPlaying ? Time.time : (float)UnityEngine.Time.realtimeSinceStartupAsDouble);
         if (skyMaterial != null) skyMaterial.SetFloat("_CloudCoverage", cloudCoverage);

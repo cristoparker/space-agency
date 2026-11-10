@@ -125,7 +125,7 @@ public class BuildingSelector : MonoBehaviour
         card.SetParent(canvasRect, false);
         card.anchorMin = card.anchorMax = new Vector2(0.5f, 0f); card.pivot = new Vector2(0.5f, 0f);
         card.anchoredPosition = new Vector2(0f, 10f); card.sizeDelta = new Vector2(210f, 84f);
-        UIKit.Glass(card);
+        UIKit.Panel(card);
         cardTitle = UIKit.TextAt(card, "Title", 10, 7, 120, 13, "", 9.5f, TextAlignmentOptions.MidlineLeft, true);
         cardState = UIKit.TextAt(card, "State", 100, 7, 100, 13, "", 6.5f, TextAlignmentOptions.MidlineRight, true);
         cardBody = UIKit.TextAt(card, "Body", 10, 22, 190, 28, "", 6.5f, TextAlignmentOptions.TopLeft, false, UIKit.T.dim);

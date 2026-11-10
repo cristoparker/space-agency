@@ -29,7 +29,7 @@ public static class LevelSetup
     static readonly Vector2 GateWest = new Vector2(-390, 32), GateMain = new Vector2(-94.5f, 32);
     const float FenceZ = 32f;
 
-    static Material baseMat, lampOn, lampOff, hwMat, svMat;
+    static Material baseMat, lampOn, lampOff, hwMat, svMat, gravelMat, pathMat, plainMat, zebraMat;
     static Dictionary<string, Vector3> dims;
     static Terrain terrain;
 
@@ -311,7 +311,7 @@ public static class LevelSetup
     }
 
     // ================================================================ roads (procedural meshes with painted textures)
-    sealed class RoadDef { public string name; public Vector2[] pts; public float radius; public bool highway; }
+    sealed class RoadDef { public string name; public Vector2[] pts; public float radius; public bool highway, gravel; }
 
     static RoadDef[] Roads =
     {
@@ -319,7 +319,8 @@ public static class LevelSetup
         new RoadDef { name = "Loop", radius = 16, pts = new[] { new Vector2(-94.5f, 11.4f), new Vector2(-94.5f, 238), new Vector2(-279, 238), new Vector2(-279, 85), new Vector2(-94.5f, 85) } },
         new RoadDef { name = "TopWest", radius = 6, pts = new[] { new Vector2(-279, 238), new Vector2(-380, 234), new Vector2(-470, 226) } },
         new RoadDef { name = "East", radius = 16, pts = new[] { new Vector2(-94.5f, 173), new Vector2(270, 173), new Vector2(270, 272) } },
-        new RoadDef { name = "Mid", radius = 14, pts = new[] { new Vector2(29, 284), new Vector2(29, 79), new Vector2(196, 79), new Vector2(233, 86) } },   // ends at the housing footpath
+        new RoadDef { name = "Mid", radius = 14, pts = new[] { new Vector2(29, 284), new Vector2(29, 79), new Vector2(196, 79) } },
+        new RoadDef { name = "HousingTrack", gravel = true, radius = 10, pts = new[] { new Vector2(196, 79), new Vector2(233, 86) } },   // gravel track to the staff housing
         new RoadDef { name = "GateWest", radius = 30, pts = new[] { new Vector2(-396, 11.4f), new Vector2(-396, 20), new Vector2(-390, 32), new Vector2(-372, 54), new Vector2(-330, 71), new Vector2(-279, 85) } },
         new RoadDef { name = "Spur Office", pts = new[] { new Vector2(-94.5f, 118), new Vector2(-44, 118) } },
         new RoadDef { name = "Spur Pad", pts = new[] { new Vector2(-187, 85), new Vector2(-187, 98) } },
@@ -336,6 +337,10 @@ public static class LevelSetup
     {
         hwMat = RoadMaterial("Road_Highway", GfxDir + "road-highway.png");
         svMat = RoadMaterial("Road_Service", GfxDir + "road-service.png");
+        gravelMat = RoadMaterial("Road_Gravel", GfxDir + "road-gravel.png");
+        pathMat = RoadMaterial("Path_Pave", GfxDir + "path-pave.png");
+        plainMat = RoadMaterial("Road_Plain", GfxDir + "road-plain.png");
+        zebraMat = RoadMaterial("Road_Zebra", GfxDir + "road-zebra.png");
     }
 
     static Material RoadMaterial(string name, string texPath)
@@ -447,7 +452,7 @@ public static class LevelSetup
         {
             var path = Smooth(r.pts, r.radius, 6f);
             roadPaths[r.name] = path;
-            var mesh = RoadMesh(r.name.Replace(' ', '_'), path, r.highway ? 22.8f : 11.4f, P + (r.highway ? 0.10f : 0.22f), 32f);
+            var mesh = RoadMesh(r.name.Replace(' ', '_'), path, r.highway ? 22.8f : r.gravel ? 8f : 11.4f, P + (r.highway ? 0.10f : 0.22f), r.gravel ? 16f : 32f);
             var assetPath = RoadDir + r.name.Replace(' ', '_') + ".asset";
             var old = AssetDatabase.LoadAssetAtPath<Mesh>(assetPath);
             if (old != null) { EditorUtility.CopySerialized(mesh, old); mesh = old; }
@@ -456,10 +461,191 @@ public static class LevelSetup
             go.transform.SetParent(root, false);
             go.GetComponent<MeshFilter>().sharedMesh = mesh;
             var mr = go.GetComponent<MeshRenderer>();
-            mr.sharedMaterial = r.highway ? hwMat : svMat;
+            mr.sharedMaterial = r.highway ? hwMat : r.gravel ? gravelMat : svMat;
             go.isStatic = true;
         }
+        BuildFootpathsAndLamps(root, site);
+        BuildJunctions(root);
+        BuildHousingWalks(root);
         AssetDatabase.SaveAssets();
+    }
+
+    // footpath beside the concrete site roads, and a lamp post every ~45 m on the outer edge of the path
+    static readonly string[] PathRoads = { "Loop", "TopWest", "East", "Mid", "GateWest" };
+
+    static bool InBuildingZone(Vector2 q, float shrink)
+    {
+        foreach (var k in Keepout) if (Mathf.Abs(q.x - k.x) < k.z - shrink && Mathf.Abs(q.y - k.y) < k.w - shrink) return true;
+        return false;
+    }
+
+    static float DistToOtherRoads(string self, Vector2 q)
+    {
+        float best = 1e9f;
+        foreach (var kv in roadPaths)
+        {
+            if (kv.Key == self) continue;
+            var p = kv.Value;
+            float hw = kv.Key == "Highway" ? 11.4f : kv.Key == "HousingTrack" ? 4f : 5.7f;
+            for (int i = 0; i < p.Count; i++) best = Mathf.Min(best, Vector2.Distance(q, p[i]) - hw);
+        }
+        return best;
+    }
+
+    static void BuildFootpathsAndLamps(Transform roadsRoot, Transform site)
+    {
+        var lampRoot = new GameObject("Road Lamps").transform; lampRoot.SetParent(site, false);
+        int lampCount = 0;
+        void Lamp(Vector2 pos, Vector2 towardRoad)
+        {
+            float yaw = Mathf.Atan2(towardRoad.x, towardRoad.y) * Mathf.Rad2Deg;
+            var go = Place("RoadLamp", lampRoot, new Vector3(pos.x, GroundY(pos.x, pos.y) + 0.02f, pos.y), yaw, "RoadLamp");
+            if (go == null) return;
+            lampCount++;
+            GlowAtNight(go, new[] { new Vector3(0f, 7.7f, 2.3f) }, 18f, 26f);
+        }
+        foreach (var name in PathRoads)
+        {
+            if (!roadPaths.TryGetValue(name, out var path) || path.Count < 3) continue;
+            var normals = new Vector2[path.Count];
+            for (int i = 0; i < path.Count; i++)
+            {
+                Vector2 t = (path[Mathf.Min(path.Count - 1, i + 1)] - path[Mathf.Max(0, i - 1)]).normalized;
+                normals[i] = new Vector2(-t.y, t.x);
+            }
+            // pick the side that has less building ground on it
+            int bad0 = 0, bad1 = 0;
+            for (int i = 0; i < path.Count; i++) { if (InBuildingZone(path[i] + normals[i] * 7.4f, 6f)) bad0++; if (InBuildingZone(path[i] - normals[i] * 7.4f, 6f)) bad1++; }
+            float side = bad0 <= bad1 ? 1f : -1f;
+
+            var run = new List<Vector2>(); int runIdx = 0;
+            void Flush()
+            {
+                run = new List<Vector2>();
+            }
+            float sinceLamp = 30f;
+            for (int i = 0; i < path.Count; i++)
+            {
+                Vector2 q = path[i] + normals[i] * side * 7.4f;
+                bool ok = !InBuildingZone(q, 6f) && DistToOtherRoads(name, q) > 3.2f && Mathf.Abs(q.y) > 17f;
+                if (i > 0) sinceLamp += Vector2.Distance(path[i - 1], path[i]);
+                if (!ok) { Flush(); continue; }
+                run.Add(q);
+                if (sinceLamp >= 45f)
+                {
+                    Vector2 lp = path[i] + normals[i] * side * 7.0f;
+                    if (DistToOtherRoads(name, lp) > 4f && !InBuildingZone(lp, 6f)) { Lamp(lp, -normals[i] * side); sinceLamp = 0f; }
+                }
+            }
+            Flush();
+        }
+        // gravel track to the housing: two lamps
+        if (roadPaths.TryGetValue("HousingTrack", out var gp) && gp.Count > 4)
+            foreach (float f in new[] { 0.35f, 0.8f })
+            {
+                int i = Mathf.Clamp((int)(gp.Count * f), 1, gp.Count - 2);
+                Vector2 t = (gp[i + 1] - gp[i - 1]).normalized, n = new Vector2(-t.y, t.x);
+                Lamp(gp[i] + n * (f < 0.5f ? 5.8f : -5.8f), n * (f < 0.5f ? -1f : 1f));
+            }
+    }
+
+    // gravel walkways inside the staff housing (model at (317,110): walks at z=86 and z=128, and three cross walks)
+    static void BuildHousingWalks(Transform root)
+    {
+        Vector2 c = new Vector2(317f, 110f);
+        var runs = new List<Vector2[]>
+        {
+            new[] { c + new Vector2(-89f, -24f), c + new Vector2(89f, -24f) },
+            new[] { c + new Vector2(-89f, 18f), c + new Vector2(89f, 18f) },
+            new[] { c + new Vector2(-72f, -24f), c + new Vector2(-72f, 18f) },
+            new[] { c + new Vector2(0f, -24f), c + new Vector2(0f, 18f) },
+            new[] { c + new Vector2(72f, -24f), c + new Vector2(72f, 18f) },
+        };
+        int n = 0;
+        foreach (var r in runs)
+        {
+            var pts = new List<Vector2>();
+            float len = Vector2.Distance(r[0], r[1]);
+            for (int i = 0; i <= (int)(len / 4f); i++) pts.Add(Vector2.Lerp(r[0], r[1], i * 4f / len));
+            pts.Add(r[1]);
+            var go = new GameObject("Housing Walk " + n++, typeof(MeshFilter), typeof(MeshRenderer));
+            go.transform.SetParent(root, false);
+            go.GetComponent<MeshFilter>().sharedMesh = RoadMesh("HousingWalk" + n, pts, 3.2f, P + 0.24f, 8f);
+            go.GetComponent<MeshRenderer>().sharedMaterial = gravelMat; go.isStatic = true;
+        }
+    }
+
+    // road crossings: one blank concrete patch where roads meet (hides the overlapping geometry and markings) and a zebra crossing on every arm
+    static bool OnRoad(Vector2 q, float tol, string except = null)
+    {
+        foreach (var kv in roadPaths)
+        {
+            if (kv.Key == "Highway" || kv.Key == except || kv.Key == "HousingTrack") continue;
+            var p = kv.Value;
+            for (int i = 0; i < p.Count; i++) if ((p[i] - q).sqrMagnitude < tol * tol) return true;
+        }
+        return false;
+    }
+
+    static void BuildJunctions(Transform root)
+    {
+        var found = new List<(Vector2 c, Vector2 t)>();
+        void Add(Vector2 c, Vector2 t) { foreach (var f in found) if (Vector2.Distance(f.c, c) < 9f) return; found.Add((c, t.normalized)); }
+        var names = roadPaths.Keys.Where(k => k != "Highway" && k != "HousingTrack").ToList();
+        // road ends that land on another road
+        foreach (var a in names)
+            foreach (var e in new[] { roadPaths[a][0], roadPaths[a][roadPaths[a].Count - 1] })
+                foreach (var b in names)
+                {
+                    if (a == b) continue;
+                    var pb = roadPaths[b]; int bi = -1; float bd = 6f;
+                    for (int i = 0; i < pb.Count; i++) { float d = Vector2.Distance(pb[i], e); if (d < bd) { bd = d; bi = i; } }
+                    if (bi < 0) continue;
+                    Add(e, pb[Mathf.Min(pb.Count - 1, bi + 1)] - pb[Mathf.Max(0, bi - 1)]);
+                }
+        // roads that cross
+        for (int ai = 0; ai < names.Count; ai++)
+            for (int bi2 = ai + 1; bi2 < names.Count; bi2++)
+            {
+                var pa = roadPaths[names[ai]]; var pb = roadPaths[names[bi2]];
+                for (int i = 0; i < pa.Count - 1; i++)
+                    for (int j = 0; j < pb.Count - 1; j++)
+                    {
+                        Vector2 r = pa[i + 1] - pa[i], q = pb[j + 1] - pb[j];
+                        float den = r.x * q.y - r.y * q.x;
+                        if (Mathf.Abs(den) < 1e-4f) continue;
+                        Vector2 d = pb[j] - pa[i];
+                        float u = (d.x * q.y - d.y * q.x) / den, v = (d.x * r.y - d.y * r.x) / den;
+                        if (u >= 0f && u <= 1f && v >= 0f && v <= 1f) Add(pa[i] + r * u, r);
+                    }
+            }
+
+        const float half = 5.7f;
+        int n = 0;
+        foreach (var (c, t) in found)
+        {
+            Vector2 nrm = new Vector2(-t.y, t.x);
+            Mesh Quad(string nm, Vector2 centre, Vector2 dir, float length, float width, float y, float tile)
+                => RoadMesh(nm, new List<Vector2> { centre - dir * length / 2f, centre + dir * length / 2f }, width, y, tile);
+            void Make(string nm, Mesh m, Material mat)
+            {
+                var go = new GameObject(nm, typeof(MeshFilter), typeof(MeshRenderer));
+                go.transform.SetParent(root, false);
+                go.GetComponent<MeshFilter>().sharedMesh = m; go.GetComponent<MeshRenderer>().sharedMaterial = mat; go.isStatic = true;
+            }
+            Make("Junction " + n, Quad("Junction" + n, c, t, half * 2f, half * 2f, P + 0.26f, 32f), plainMat);
+            foreach (var dir in new[] { t, -t, nrm, -nrm })
+            {
+                if (!OnRoad(c + dir * 14f, 4.5f)) continue;
+                Vector2 zc = c + dir * (half + 1.9f);
+                bool clash = false;
+                foreach (var f in found) if (f.c != c && Vector2.Distance(f.c, zc) < half + 2.5f) clash = true;
+                if (clash) continue;
+                Make("Zebra " + n, Quad("Zebra" + n, zc, dir, 3.2f, half * 2f, P + 0.28f, 3.2f), zebraMat);
+            }
+            n++;
+        }
+        Debug.Log("LevelSetup: " + found.Count + " road junctions");
     }
 
     // ================================================================ buildings
@@ -688,6 +874,19 @@ public static class LevelSetup
         }
     }
 
+    static void AddPadSpot(Transform parent, string name, Vector3 pos, Vector3 target, Color color, float angle, float intensity, float range)
+    {
+        var g = new GameObject(name);
+        g.transform.SetParent(parent, false);
+        g.transform.position = pos;
+        g.transform.rotation = Quaternion.LookRotation(target - pos);
+        var l = g.AddComponent<Light>();
+        l.type = LightType.Spot; l.spotAngle = angle; l.range = range; l.color = color;
+        l.intensity = 0f; l.shadows = LightShadows.None; l.enabled = false;
+        var nl = g.AddComponent<NightLamp>();
+        nl.lights = new[] { l }; nl.onIntensity = intensity; nl.lampRenderer = null;
+    }
+
     static void BuildPadLights(Transform site)
     {
         var lights = new GameObject("Pad Lights").transform; lights.SetParent(site, false);
@@ -706,6 +905,26 @@ public static class LevelSetup
             var nl = g.AddComponent<NightLamp>();
             nl.lights = new[] { l }; nl.onIntensity = 2200f; nl.lampRenderer = null;
         }
+
+        // strong white key lights on the rocket from four sides, high up
+        var rocketMid = new Vector3(PadCenter.x, P + 34f, PadCenter.z);
+        int k = 0;
+        foreach (var (dx, dz) in new[] { (-62f, 0f), (62f, 0f), (0f, -62f), (0f, 62f) })
+        {
+            var pos = new Vector3(PadCenter.x + dx, P + 8f, PadCenter.z + dz);
+            AddPadSpot(lights, "Rocket Key " + (++k), pos, rocketMid, new Color(0.93f, 0.96f, 1f), 38f, 3500f, 230f);
+        }
+        // coloured accents, low and aimed up the rocket / tower like real pad lighting
+        var accents = new (float dx, float dz, Color c, string n)[]
+        {
+            (-22f, -22f, new Color(1f, 0.55f, 0.15f), "amber"), (22f, -22f, new Color(0.15f, 0.65f, 1f), "cyan"),
+            (-22f, 22f, new Color(0.8f, 0.25f, 0.95f), "magenta"), (22f, 22f, new Color(1f, 0.35f, 0.25f), "red"),
+        };
+        foreach (var a in accents)
+            AddPadSpot(lights, "Accent " + a.n, new Vector3(PadCenter.x + a.dx, P + 0.6f, PadCenter.z + a.dz), new Vector3(PadCenter.x, P + 42f, PadCenter.z), a.c, 40f, 26000f, 150f);
+        // soft coloured washes on other buildings: blue on mission control side, amber on the power plant, teal on the hangar front
+        foreach (var (pos, c, n) in new[] { (new Vector3(-32f, P + 1f, 118f), new Color(0.25f, 0.55f, 1f), "mission"), (new Vector3(-375f, P + 1f, 160f), new Color(1f, 0.6f, 0.2f), "power"), (new Vector3(92f, P + 1f, 236f), new Color(0.2f, 0.9f, 0.8f), "hangar") })
+            AddPadSpot(lights, "Accent " + n, pos, pos + new Vector3(0f, 14f, 0f), c, 60f, 6000f, 80f);
     }
 
     // ================================================================ nature: sparse greenery on the site, LOD forest and mountains far away
@@ -945,11 +1164,12 @@ public static class LevelSetup
 
         var list = new List<TrafficManager.Road>();
         foreach (var (name, pts, radius) in lines)
-            list.Add(new TrafficManager.Road { points = Smooth(pts.ToArray(), radius, 2f).ToArray() });
+            list.Add(new TrafficManager.Road { points = Smooth(pts.ToArray(), radius, 2f).ToArray(), highway = name == "Highway" });
         tm.roads = list.ToArray();
-        tm.laneOffset = 3.6f; tm.speedRange = new Vector2(14f, 22f);
+        tm.laneOffset = 2.9f; tm.highwayLanes = new[] { 3.6f, 8.6f }; tm.highwayCount = 36; tm.facilityCount = 5;
+        tm.highwaySpeed = new Vector2(22f, 38f); tm.facilitySpeed = new Vector2(6f, 10f);
         tm.headLightMaterial = LightMaterial("Vehicle_Head", new Color(1f, 0.96f, 0.82f)); tm.tailLightMaterial = LightMaterial("Vehicle_Tail", new Color(1f, 0.08f, 0.05f));
-        tm.minVehicles = 22; tm.maxVehicles = 28; tm.followDistance = 9f; tm.obstacleMargin = 1.5f; tm.turnSpeed = 8f;
+        tm.obstacleMargin = 1.5f;
         tm.ignoreObstacleNames = new[] { "LaunchPad", "CarParkA", "CarParkB", "StaffHousing" };
         EditorUtility.SetDirty(tm);
     }

@@ -128,7 +128,7 @@ public static class GameUISetup
         if (clock != null)
         {
             clock.gameMinutesPerSecond = 24f;
-            clock.speedLevels = new[] { 0f, 1f, 2f, 6f };
+            clock.speedLevels = new[] { 0f, 1f, 5f, 60f };
             clock.startSpeedIndex = 1;
             clock.startFromRealDhakaTime = false;
             clock.startYear = 2026; clock.startMonth = 1; clock.startDay = 1; clock.startHour = 6;

@@ -306,11 +306,7 @@ def dorm(b, x, y):
 def staff_housing():
     b = B()
     W, D = 190.0, 112.0
-    b.box((0, 0, 0.1), (W, D, 0.2), GREEN)                                           # lawn
-    for y in (-18.0, 24.0):                                                           # footpaths
-        b.box((0, y, 0.24), (W - 12, 3.2, 0.1), SAND)
-    for x in (-72.0, 0.0, 72.0):
-        b.box((x, 3.0, 0.24), (3.2, 46.0, 0.1), SAND)
+    # (the gravel walkways are laid by LevelSetup, so the model has none)
     for x in (-72.0, -36.0, 0.0, 36.0, 72.0):
         dorm(b, x, 34.0)
     for x in (-72.0, -36.0, 0.0, 36.0, 72.0):

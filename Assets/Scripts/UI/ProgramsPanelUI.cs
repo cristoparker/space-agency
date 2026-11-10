@@ -24,7 +24,7 @@ public class ProgramsPanelUI : MonoBehaviour
         var r = (RectTransform)transform;
         r.anchorMin = r.anchorMax = new Vector2(1f, 1f); r.pivot = new Vector2(1f, 1f);
         r.anchoredPosition = new Vector2(-8f, -32f); r.sizeDelta = new Vector2(W, H);
-        UIKit.Glass(r);
+        UIKit.Panel(r);
         title = UIKit.TitleBar(r, "Training", UIKit.T.teal, W, () => gameObject.SetActive(false));
         tabs = new Segmented(r, 10, 28, W - 20, 15, new[] { "Training", "Testing" }, 0, i => { tab = i; Refresh(); });
         list = UIKit.ScrollList(r, "List", 6, 48, W - 12, H - 54, null, 5f);

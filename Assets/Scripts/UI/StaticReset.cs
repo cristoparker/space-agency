@@ -11,6 +11,9 @@ static class StaticReset
     {
         PlotPicker.ResetStatics();
         LaunchSequence.ResetStatics();
+        CinematicCamera.ResetStatics();
+        LaunchResultUI.ResetStatics();
+        FlightManager.ResetStatics();
         UIConfirm.ResetStatics();
         FacilityPanelUI.ResetStatics();
         FacilityPreview.ResetStatics();

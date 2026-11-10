@@ -11,6 +11,7 @@ using UnityEngine;
 public class SimpleBuild
 {
     public string headId, payloadId;                 // 1. payload: the head (capacity) and the cargo in it
+    public string customPayload;                     //    name of a cargo built in the Payload Builder (replaces payloadId)
     public string tankId; public int tankCount = 1;  // 2. fuel tanks (body)
     public string engineId;                          // 3. engine
     public string upperEngineId;                     //    optional upper-stage engine
@@ -18,6 +19,36 @@ public class SimpleBuild
     public string boosterId; public int boosterCount = 2;   // 4. outer layer
     public string finId; public int finCount = 4;
     public List<string> extras = new List<string>(); // 5. parachute, comms, power, RCS, legs: no visual
+}
+
+/// <summary>A cargo the player built in the Payload Builder: a base payload plus the power and comms fitted around it.</summary>
+[Serializable]
+public class CustomPayload
+{
+    public string name, payloadId;
+    public List<string> equipment = new List<string>();
+    public float massKg, costM;
+}
+
+[Serializable] class CustomPayloadList { public List<CustomPayload> items = new List<CustomPayload>(); }
+
+public static class CustomPayloads
+{
+    const string Key = "SpaceAgency.CustomPayloads";
+    public static List<CustomPayload> All()
+    {
+        try { return JsonUtility.FromJson<CustomPayloadList>(PlayerPrefs.GetString(Key, "{}"))?.items ?? new List<CustomPayload>(); }
+        catch { return new List<CustomPayload>(); }
+    }
+    static void Write(List<CustomPayload> l) => PlayerPrefs.SetString(Key, JsonUtility.ToJson(new CustomPayloadList { items = l }));
+    public static CustomPayload Get(string name) => All().FirstOrDefault(x => x.name == name);
+    public static void Upsert(CustomPayload c)
+    {
+        var l = All(); int i = l.FindIndex(x => x.name == c.name);
+        if (i >= 0) l[i] = c; else l.Add(c);
+        Write(l);
+    }
+    public static void Delete(string name) { var l = All(); l.RemoveAll(x => x.name == name); Write(l); }
 }
 
 public static class SimpleBuilder
@@ -60,10 +91,12 @@ public static class SimpleBuilder
         if (head != null) { Adapt(head.BottomClass); stack.Add(head.id); }
 
         d.stack = stack;
-        d.payloadId = s.payloadId;
+        var cp = string.IsNullOrEmpty(s.customPayload) ? null : CustomPayloads.Get(s.customPayload);
+        d.payloadId = cp != null && lib.Get(cp.payloadId) != null ? cp.payloadId : s.payloadId;
         d.boosterId = s.boosterId; d.boosterCount = Mathf.Clamp(s.boosterCount, 1, MaxOuter);
         d.finId = s.finId; d.finCount = Mathf.Clamp(s.finCount, 2, MaxOuter);
         d.equipment = s.extras.Where(e => lib.Get(e) != null).Take(MaxExtras).ToList();
+        if (cp != null) d.equipment.AddRange(cp.equipment.Where(e => lib.Get(e) != null));          // the power / comms built into the custom cargo
     }
 
     /// <summary>Best-effort simple build for an older design that only has a part stack (a three-stage rocket loses its third stage).</summary>

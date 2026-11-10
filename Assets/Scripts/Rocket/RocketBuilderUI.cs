@@ -57,7 +57,9 @@ public class RocketBuilderUI : MonoBehaviour
         ("Payloads", "Payload"), ("Communication", "Comms"), ("Power", "Power"),
     };
 
-    const string SaveKey = "SpaceAgency.RocketDesign", NameKey = "SpaceAgency.RocketName";
+    const string RocketKey = "SpaceAgency.RocketDesign", RocketNameKey = "SpaceAgency.RocketName", PayloadKey = "SpaceAgency.PayloadDesign", PayloadNameKey = "SpaceAgency.PayloadName";
+    string SaveKey => mode == DesignerMode.Rocket ? RocketKey : PayloadKey;
+    string NameKey => mode == DesignerMode.Rocket ? RocketNameKey : PayloadNameKey;
     const string Good = "#8FE3B0", Warn = "#FFB878", Bad = "#FF8C8C", Soft = "#9FB4C8", Cyan = "#7FDBFF";
     const float LW = 190f, RW = 196f, CardH = 302f, CardY = 32f, Gap = 4f;
 
@@ -80,6 +82,8 @@ public class RocketBuilderUI : MonoBehaviour
     GameObject selCard, deployDialog;
     GameObject[] infoViews;
     RectTransform chipRow, gridContent, subRow, statsGrid, paintCard;
+    Button saveBtn;
+    TMP_Text paintTitle;
     TMP_Text countLabel, orbitText;
     GameObject countBox;
     Image[] orbitPips, paintRings;
@@ -87,7 +91,9 @@ public class RocketBuilderUI : MonoBehaviour
     Image[] statIcon = new Image[8];
     Image orbitIcon;
     Transform hierList, bpList, buyList;
-    TMP_Text titleText, statsText, checksText, missionLabel, summaryText, cardText, deployInfo, deployDate, monthLabel;
+    Transform checksList;
+    TMP_Text checksHead;
+    TMP_Text titleText, statsText, missionLabel, summaryText, cardText, deployInfo, deployDate, monthLabel;
     Image titleBar, rotImg, panImg, bpBtnImg, buyBtnImg;
     TMP_InputField nameInput;
     Button undoBtn, redoBtn, deleteBtn, deployBtn;
@@ -224,7 +230,8 @@ public class RocketBuilderUI : MonoBehaviour
         missionLabel = UIKit.TextAt(vChecks, "Contract", 16, 0, 148, 12, "", 6.5f, TextAlignmentOptions.Center);
         UIKit.Btn(vChecks, ">", 166, 0, 14, 12, T.chip, () => ChangeMission(1), 7f);
         var chk = UIKit.At(vChecks, "Checks", 0, 14, 180, ah - 14);
-        checksText = ScrollText(chk, 180, ah - 14);
+        checksHead = UIKit.TextAt(chk, "Head", 3, 0, 174, 10, "", 6.2f, TextAlignmentOptions.MidlineLeft, true);
+        checksList = UIKit.ScrollList(chk, "Rows", 0, 11, 180, ah - 25, UIKit.T.well, 1.5f);
         var vBp = UIKit.At(card, "BlueprintView", 5, ay, 180, ah);
         bpList = UIKit.ScrollList(vBp, "Blueprints", 0, 0, 180, ah, T.well, 2f);
         var vBuy = UIKit.At(card, "BuyView", 5, ay, 180, ah);
@@ -233,7 +240,7 @@ public class RocketBuilderUI : MonoBehaviour
 
         // ---- name / save / deploy ----
         nameInput = UIKit.Input(card, 5, 261, 88, 14, "Rocket name", 18, 7f);
-        UIKit.Btn(card, "Save", 96, 261, 40, 14, T.chip, SaveRocket, 6.5f);
+        saveBtn = UIKit.Btn(card, "Save", 96, 261, 40, 14, T.chip, SaveRocket, 6.5f);
         deployBtn = UIKit.Btn(card, "Deploy", 139, 261, 46, 14, T.chip, OpenDeploy, 6.5f);
 
         // ---- blueprints (as in the reference) ----
@@ -288,7 +295,10 @@ public class RocketBuilderUI : MonoBehaviour
         statsGrid.gameObject.SetActive(rocket);
         subRow.gameObject.SetActive(rocket);
         if (paintCard != null) paintCard.gameObject.SetActive(true);
-        nameInput.placeholder.GetComponent<TMP_Text>().text = rocket ? "Rocket name" : "Rocket name";
+        deployBtn.gameObject.SetActive(rocket);
+        var saveLabel = saveBtn.GetComponentInChildren<TMP_Text>(); if (saveLabel != null) saveLabel.text = rocket ? "Save" : "Save cargo";
+        nameInput.GetComponentInChildren<TMP_InputField>(true).text = PlayerPrefs.GetString(NameKey, "");
+        nameInput.placeholder.GetComponent<TMP_Text>().text = rocket ? "Rocket name" : "Cargo name";
         // category chips
         UIKit.Clear(chipRow);
         chipImages.Clear();
@@ -437,8 +447,31 @@ public class RocketBuilderUI : MonoBehaviour
         if (prev == null && mm != null && mm.Tracked != null) missionIndex = Mathf.Max(0, missions.IndexOf(mm.Tracked.Definition));
     }
 
+    void SaveCargo()
+    {
+        var pay = library.Get(design.payloadId);
+        if (pay == null) { Toast("Pick a payload first.", true); return; }
+        string nm = (nameInput.text ?? "").Trim();
+        if (nm.Length == 0) nm = "Cargo " + (CustomPayloads.All().Count + 1);
+        nameInput.text = nm; PlayerPrefs.SetString(NameKey, nm);
+        var eq = design.equipment.Select(library.Get).Where(e => e != null).ToList();
+        CustomPayloads.Upsert(new CustomPayload
+        {
+            name = nm, payloadId = pay.id, equipment = new List<string>(design.equipment),
+            massKg = pay.massKg + eq.Sum(e => e.dryMassKg), costM = pay.costM + eq.Sum(e => e.costM),
+        });
+        Toast("Cargo \"" + nm + "\" is ready: pick it in the Rocket Designer, Payload, Cargo.");
+    }
+
+    void OpenPayloadBuilder()
+    {
+        PlayerPrefs.SetString(RocketKey, design.ToJson());
+        Panels.Open("payload");
+    }
+
     void SaveRocket()
     {
+        if (mode == DesignerMode.Payload) { SaveCargo(); return; }
         if (design.stack.Count == 0 && design.payloadId == null) { Toast("Nothing to save yet.", true); return; }
         string nm = (nameInput.text ?? "").Trim();
         if (nm.Length == 0) nm = "Rocket " + (RocketSaves.All().Count + 1);
@@ -459,11 +492,10 @@ public class RocketBuilderUI : MonoBehaviour
 
     void OpenDeploy()
     {
-        if (design.stack.Count == 0) { Toast("Build a rocket first.", true); return; }
-        if (!report.valid)
+        var core = RocketRules.MissingCore(design, library);
+        if (design.stack.Count == 0 || core.Count > 0)
         {
-            var first = report.checks.FirstOrDefault(c => c.sev == Sev.Error);
-            Toast("Not ready: " + (first != null ? first.text : "fix the rocket"), true);
+            Toast("A rocket needs " + (core.Count > 0 ? string.Join(", ", core) : "an engine, a fuel tank and a head") + " before it can go to the pad.", true);
             infoView = 2; RefreshAll();
             return;
         }
@@ -480,7 +512,8 @@ public class RocketBuilderUI : MonoBehaviour
         deployInfo.text = "Rocket: <b>" + nm + "</b>   Build cost <b>$" + UIKit.Money(DeployCost) + "</b>"
                           + (afford ? "" : "  <color=" + Bad + ">(not enough money)</color>")
                           + "\nContract: " + (m == null ? "<color=" + Soft + ">none (free launch)</color>" : "<color=" + Cyan + ">" + m.id + "</color> " + m.displayName)
-                          + (DeploymentManager.Instance.Current != null ? "\n<color=" + Warn + ">Replaces the rocket now on the pad.</color>" : "");
+                          + (DeploymentManager.Instance.Current != null ? "\n<color=" + Warn + ">Replaces the rocket now on the pad.</color>" : "")
+                          + (report.checks.Any(c => c.sev == Sev.Error) ? "\n<color=" + Warn + ">" + report.checks.Count(c => c.sev == Sev.Error) + " requirement(s) not met. You can still deploy, but the launch may fail.</color>" : "");
         deployDialog.SetActive(true);
         RefreshCalendar();
     }
@@ -572,7 +605,8 @@ public class RocketBuilderUI : MonoBehaviour
             var go = Instantiate(prefab, root.transform);
             go.transform.localPosition = pos; go.transform.localRotation = rot;
             var pr = go.AddComponent<PartRef>(); pr.kind = kind; pr.index = index;
-            if (mat != null) foreach (var rd in go.GetComponentsInChildren<MeshRenderer>()) rd.sharedMaterial = mat;
+            var pm = library.Livery(design.PaintOf(RocketPaint.Key(p, kind))) ?? mat;
+            if (pm != null) foreach (var rd in go.GetComponentsInChildren<MeshRenderer>()) rd.sharedMaterial = pm;
             return go;
         }
         float r = 0.6f;
@@ -656,6 +690,8 @@ public class RocketBuilderUI : MonoBehaviour
     {
         if (mode == DesignerMode.Rocket) { RefreshGridRocket(); return; }
         UIKit.Clear(gridContent);
+        var gl2 = gridContent.GetComponent<GridLayoutGroup>(); if (gl2 != null) gl2.enabled = true;
+        var fit2 = gridContent.GetComponent<ContentSizeFitter>(); if (fit2 != null) fit2.enabled = true;
         var cats = Cats;
         if (catIdx >= cats.Length) catIdx = 0;
         string cat = cats[catIdx].cat;
@@ -869,19 +905,56 @@ public class RocketBuilderUI : MonoBehaviour
         statsText.text = s.ToString();
         if (mode == DesignerMode.Rocket) UpdateStatsGrid();
 
-        var c = new StringBuilder();
-        c.AppendLine(r.valid ? "<color=" + Good + "><b>READY TO DEPLOY</b></color>" : "<color=" + Bad + "><b>NOT READY</b></color>");
-        if (m == null) c.AppendLine("<color=" + Soft + ">No active contract. Accept one in CONTRACTS to check your rocket against it.</color>");
-        foreach (var ch in r.checks)
-        {
-            string col = ch.sev == Sev.Ok ? Good : ch.sev == Sev.Warn ? Warn : Bad;
-            string tag = ch.sev == Sev.Ok ? "OK" : ch.sev == Sev.Warn ? "!" : "X";
-            c.AppendLine("<color=" + col + ">[" + tag + "]</color> " + ch.text);
-        }
-        if (r.checks.Count == 0) c.AppendLine("<color=" + Soft + ">Add parts to see checks.</color>");
-        checksText.text = c.ToString();
+        RefreshChecks(r, m);
 
         summaryText.text = "$" + r.costM.ToString("0.0") + "M  " + (r.launchKg / 1000f).ToString("0.0") + " t  " + (r.valid ? "<color=" + Good + ">ready</color>" : "<color=" + Warn + ">not ready</color>");
+    }
+
+    // the checks as a list: a round icon per line (tick = met, ! = close, x = not met), rocket checks first, then the contract's
+    void RefreshChecks(RocketReport r, MissionDefinition m)
+    {
+        UIKit.Clear(checksList);
+        int ok = r.checks.Count(c => c.sev == Sev.Ok), total = r.checks.Count;
+        var core = RocketRules.MissingCore(design, library);
+        checksHead.text = total == 0 ? "<color=" + Soft + ">Add parts to see checks</color>"
+            : (core.Count > 0 ? "<color=" + Bad + ">Needs " + string.Join(", ", core) + "</color>" : r.valid ? "<color=" + Good + ">All requirements met</color>" : "<color=" + Warn + ">" + ok + " of " + total + " met</color>");
+        if (m == null) AddCheckNote("No contract selected. Pick one with < > above to check your rocket against it.");
+        bool shownContract = false, shownRocket = false;
+        foreach (var ch in r.checks.OrderBy(c => c.contract))
+        {
+            if (!ch.contract && !shownRocket) { AddCheckHeader("Rocket"); shownRocket = true; }
+            if (ch.contract && !shownContract) { AddCheckHeader("Contract requirements"); shownContract = true; }
+            AddCheckRow(ch);
+        }
+    }
+
+    void AddCheckHeader(string text)
+    {
+        var r = UIKit.At(checksList, "H", 0, 0, 174, 9);
+        var le = r.gameObject.AddComponent<LayoutElement>(); le.preferredHeight = 9; le.minHeight = 9;
+        UIKit.TextAt(r, "T", 3, 0, 170, 9, text.ToUpperInvariant(), 5.2f, TextAlignmentOptions.MidlineLeft, true, UIKit.T.dim).raycastTarget = false;
+    }
+
+    void AddCheckNote(string text)
+    {
+        var r = UIKit.At(checksList, "Note", 0, 0, 174, 14);
+        var le = r.gameObject.AddComponent<LayoutElement>(); le.preferredHeight = 14; le.minHeight = 14;
+        var t = UIKit.TextAt(r, "T", 3, 0, 170, 14, text, 5.6f, TextAlignmentOptions.MidlineLeft, false, UIKit.T.dim); t.textWrappingMode = TextWrappingModes.Normal; t.raycastTarget = false;
+    }
+
+    void AddCheckRow(Check ch)
+    {
+        bool two = ch.text.Length > 46;
+        float h = two ? 17f : 11f;
+        var row = UIKit.At(checksList, "Row", 0, 0, 174, h);
+        var le = row.gameObject.AddComponent<LayoutElement>(); le.preferredHeight = h; le.minHeight = h;
+        Color col = ch.sev == Sev.Ok ? UIKit.T.green : ch.sev == Sev.Warn ? new Color(1f, 0.72f, 0.3f, 1f) : UIKit.T.red;
+        var chip = UIKit.At(row, "Icon", 3, (h - 8f) * 0.5f, 8, 8);
+        UIKit.Tint(chip, UIKit.Wash(col, 0.9f)).raycastTarget = false;
+        if (ch.sev == Sev.Ok) UIKit.IconAt(chip, Resources.Load<Sprite>("UIIcons/icon_check"), 1f, 1f, 6, 6, new Color(0.04f, 0.14f, 0.08f, 1f));
+        else UIKit.TextAt(chip, "G", 0, 0, 8, 8, ch.sev == Sev.Warn ? "!" : "x", 6f, TextAlignmentOptions.Center, true, new Color(0.15f, 0.05f, 0.03f, 1f)).raycastTarget = false;
+        var t = UIKit.TextAt(row, "Text", 15, 0, 157, h, ch.text, 5.8f, TextAlignmentOptions.MidlineLeft, false, ch.sev == Sev.Ok ? UIKit.T.ink : col);
+        t.textWrappingMode = TextWrappingModes.Normal; t.lineSpacing = -6f; t.raycastTarget = false;
     }
 
     // =============================================================== simple builder (rocket mode)
@@ -913,12 +986,12 @@ public class RocketBuilderUI : MonoBehaviour
         switch (p.category)
         {
             case "Head": SetSimple(s => s.headId = p.id, p.DisplayName + " fitted"); break;
-            case "Payload": SetSimple(s => s.payloadId = p.id, p.DisplayName + " loaded"); break;
-            case "Tank": if (subTab == 0) SetSimple(s => s.tankId = p.id, p.DisplayName + " fitted"); else SetSimple(s => s.upperTankId = p.id, p.DisplayName + " fitted to the upper stage"); break;
-            case "Engine": if (subTab == 0) SetSimple(s => s.engineId = p.id, p.DisplayName + " fitted"); else SetSimple(s => s.upperEngineId = p.id, p.DisplayName + " fitted to the upper stage"); break;
-            case "Booster": SetSimple(s => s.boosterId = p.id, p.DisplayName + "s fitted"); break;
-            case "Structure": if (p.id.StartsWith("Fin_")) SetSimple(s => s.finId = p.id, p.DisplayName + "s fitted"); break;
-            default:                                                    // recovery, power, comms, thrusters: equip / remove, no visual change
+            case "Payload": SetSimple(s => { s.payloadId = p.id; s.customPayload = null; }, p.DisplayName + " loaded"); break;
+            case "Tank": SetSimple(s => { s.tankId = p.id; s.upperTankId = null; s.upperEngineId = null; }, p.DisplayName + " fitted"); break;
+            case "Engine": SetSimple(s => { s.engineId = p.id; s.upperEngineId = null; s.upperTankId = null; }, p.DisplayName + " fitted"); break;
+            case "Booster": SetSimple(s => { s.boosterId = p.id; s.finId = null; }, p.DisplayName + "s fitted"); break;           // boosters alone
+            case "Structure": if (p.id.StartsWith("Fin_")) SetSimple(s => { s.finId = p.id; s.boosterId = null; }, p.DisplayName + "s fitted"); break;   // fins alone
+            default:                                                    // recovery, power, comms: equip / remove, no visual change
                 bool has = Simple.extras.Contains(p.id);
                 if (!has && Simple.extras.Count >= SimpleBuilder.MaxExtras) { Toast("Only " + SimpleBuilder.MaxExtras + " extras fit.", true); return; }
                 SetSimple(s => { if (has) s.extras.Remove(p.id); else s.extras.Add(p.id); }, p.DisplayName + (has ? " removed" : " equipped"));
@@ -936,7 +1009,7 @@ public class RocketBuilderUI : MonoBehaviour
         {
             case SelKind.Booster: SetSimple(s => s.boosterId = null, "Boosters removed"); return;
             case SelKind.Fin: SetSimple(s => s.finId = null, "Fins removed"); return;
-            case SelKind.Payload: SetSimple(s => s.payloadId = null, "Cargo removed"); return;
+            case SelKind.Payload: SetSimple(s => { s.payloadId = null; s.customPayload = null; }, "Cargo removed"); return;
             case SelKind.Equip: { string id = p.id; SetSimple(s => s.extras.Remove(id), "Extra removed"); return; }
         }
         if (RocketRules.IsHead(p)) SetSimple(s => s.headId = null, "Head removed");
@@ -951,9 +1024,9 @@ public class RocketBuilderUI : MonoBehaviour
         switch (p.category)
         {
             case "Head": return s.headId == p.id;
-            case "Payload": return s.payloadId == p.id;
-            case "Tank": return (subTab == 0 ? s.tankId : s.upperTankId) == p.id;
-            case "Engine": return (subTab == 0 ? s.engineId : s.upperEngineId) == p.id;
+            case "Payload": return s.payloadId == p.id && string.IsNullOrEmpty(s.customPayload);
+            case "Tank": return s.tankId == p.id;
+            case "Engine": return s.engineId == p.id;
             case "Booster": return s.boosterId == p.id;
             case "Structure": return s.finId == p.id;
             default: return s.extras.Contains(p.id);
@@ -1009,165 +1082,175 @@ public class RocketBuilderUI : MonoBehaviour
         return sb.ToString();
     }
 
-    // ---- the parts grid of the simple builder ----
-    void RefreshGridRocket()
+    // ---- the parts grid of the simple builder: no tabs, one scrolling page per category with titled sections ----
+    float penY; int penCol;
+    const float CellW = 56f, CellH = 86f, CellGap = 3f;
+
+    RectTransform NextCell(string name)
     {
-        UIKit.Clear(gridContent); UIKit.Clear(subRow);
-        var cats = Cats;
-        if (catIdx >= cats.Length) catIdx = 0;
-        string cat = cats[catIdx].cat;
-        var names = SubTabs[catIdx];
-        if (subTab >= names.Length) subTab = 0;
+        var r = UIKit.At(gridContent, name, 3 + penCol * (CellW + CellGap), penY, CellW, CellH);
+        if (++penCol >= 3) EndRow();
+        return r;
+    }
+    void EndRow() { if (penCol > 0) { penCol = 0; penY += CellH + CellGap; } }
 
-        float segW = names.Length >= 4 ? RW - 12 : names.Length == 3 ? 126f : 112f;
-        BuildSubTabs(names, segW);
-        BuildStepper();
-
-        var list = new List<(PartInfo part, string label, PartInfo second)>();
-        bool noneCell = false; string noneName = "None"; bool noneOn = false;
-        var s = Simple;
-        System.Func<string, IEnumerable<PartInfo>> byCat = c => library.Parts.Where(x => x.category == c).OrderBy(x => PartInfo.SizeRank(x.size)).ThenBy(x => x.costM);
-        switch (cat)
+    void SectionTitle(string text, string hint = null)
+    {
+        EndRow();
+        var t = UIKit.TextAt(gridContent, "Section", 4, penY, 176, 11, text, 6.6f, TextAlignmentOptions.MidlineLeft, true, UIKit.T.ink);
+        t.raycastTarget = false;
+        if (hint != null)
         {
-            case "Payload":
-                if (subTab == 0) foreach (var x in byCat("Head")) list.Add((x, null, null));
-                else { foreach (var x in byCat("Payload")) list.Add((x, null, null)); noneCell = true; noneName = "No cargo"; noneOn = s.payloadId == null; }
-                break;
-            case "Tank": foreach (var x in byCat("Tank")) list.Add((x, null, null)); break;
-            case "Engine":
-                foreach (var x in byCat("Engine")) list.Add((x, null, null));
-                if (subTab == 1) { noneCell = true; noneName = "No upper stage"; noneOn = s.upperEngineId == null; }
-                break;
-            case "Outer":
-                if (subTab == 0) { foreach (var x in byCat("Booster")) list.Add((x, null, null)); noneCell = true; noneName = "No boosters"; noneOn = s.boosterId == null; }
-                else if (subTab == 1) { foreach (var x in library.Parts.Where(f => f.id.StartsWith("Fin_")).OrderBy(f => PartInfo.SizeRank(f.size))) list.Add((x, null, null)); noneCell = true; noneName = "No fins"; noneOn = s.finId == null; }
-                else foreach (var c in Combos) { var b = library.Get(c.booster); var f = library.Get(c.fin); if (b != null && f != null) list.Add((b, c.name, f)); }
-                break;
-            default:
-                string[] extraCats = { "Recovery", "Power", "Comms", "Thruster" };
-                foreach (var x in byCat(extraCats[subTab])) list.Add((x, null, null));
-                break;
+            var h = UIKit.TextAt(gridContent, "Hint", 4, penY + 10, 176, 9, hint, 5.2f, TextAlignmentOptions.MidlineLeft, false, UIKit.T.dim);
+            h.raycastTarget = false; penY += 10f;
         }
-
-        if (noneCell) NoneCell(noneName, noneOn, cat, subTab);
-        foreach (var entry in list)
-        {
-            var part = entry.part;
-            bool combo = entry.second != null;
-            bool equipped = combo ? s.boosterId == part.id && s.finId == entry.second.id : SimpleHas(part);
-            bool toggle = cat == "Extras";
-            var cell = UIKit.At(gridContent, part.id, 0, 0, 56, 86);
-            UIKit.Tint(cell, equipped ? UIKit.Wash(UIKit.T.green, 0.22f) : new Color(1f, 1f, 1f, 0.12f));
-            PartIcon(cell, part.id, 5, 3, 46, 34);
-            int rt = PartRatings.Rating(part);
-            var shield = UIKit.IconAt(cell, Resources.Load<Sprite>("UIIcons/stat_rating"), 33, 3, 7, 7, ColorFromHex(RatingColor(rt)));
-            UIKit.TextAt(cell, "Rt", 40, 2.5f, 15, 8, rt.ToString(), 5.4f, TextAlignmentOptions.MidlineLeft, true, ColorFromHex(RatingColor(rt))).raycastTarget = false;
-            UIKit.TextAt(cell, "Name", 2, 37, 52, 8, combo ? entry.label : part.DisplayName, 5.2f, TextAlignmentOptions.Center, false, UIKit.T.dim).overflowMode = TextOverflowModes.Ellipsis;
-            UIKit.TextAt(cell, "Stat", 2, 45, 52, 9, combo ? "boost + steady" : KeyStat(part), 5.8f, TextAlignmentOptions.Center, false, UIKit.T.ink).overflowMode = TextOverflowModes.Ellipsis;
-            float price = part.costM + (combo ? entry.second.costM * 4f : 0f);
-            UIKit.TextAt(cell, "Price", 2, 54, 52, 10, "$" + price.ToString("0.#") + " M", 6.8f, TextAlignmentOptions.Center, true, UIKit.T.priceText);
-            string label = toggle ? (equipped ? "Remove" : "Equip") : equipped ? "Equipped" : "Equip";
-            var b2 = UIKit.Btn(cell, label, 4, 68, 48, 13, equipped && !toggle ? UIKit.T.chip : UIKit.Wash(equipped ? UIKit.T.red : UIKit.T.green, 0.6f), () =>
-            {
-                if (combo) SetSimple(sb => { sb.boosterId = part.id; sb.finId = entry.second.id; }, entry.label + " fitted");
-                else AddPart(part);
-            }, 6.4f, true, equipped && !toggle ? UIKit.T.dim : UIKit.T.ink);
-            b2.interactable = toggle || !equipped;
-            Tip(cell.gameObject, combo ? "<b>" + entry.label + "</b>\n<color=" + Soft + ">Boosters and fins fitted together.</color>\n" + Compact(part).Split('\n').Skip(1).FirstOrDefault() : Compact(part));
-        }
+        penY += 13f;
     }
 
-    static readonly Dictionary<string, string> SubIcons = new Dictionary<string, string>
+    bool Needed(PartInfo p)
     {
-        { "Head", "sub_head" }, { "Cargo", "sub_cargo" }, { "Main stage", "sub_main" }, { "Upper stage", "sub_upper" },
-        { "Boosters", "sub_boosters" }, { "Fins", "sub_fins" }, { "Combos", "sub_combo" },
-        { "Recovery", "sub_recovery" }, { "Power", "sub_power" }, { "Comms", "sub_comms" }, { "Thrusters", "sub_thrusters" },
-    };
-
-    // sub-tabs with a glyph of their own: icon + name, the chosen one lit
-    void BuildSubTabs(string[] names, float width)
-    {
-        var T = UIKit.T;
-        var track = UIKit.At(subRow, "Tabs", 0, 0, width, 13);
-        UIKit.Tint(track, T.track);
-        float seg = (width - 4f) / names.Length;
-        for (int i = 0; i < names.Length; i++)
-        {
-            int idx = i;
-            var r = UIKit.At(track, names[i], 2 + i * seg, 2, seg, 9);
-            var b = UIKit.MakeButton(r, "", i == subTab ? new Color(1f, 1f, 1f, 0.26f) : Color.clear, () => { subTab = idx; RefreshGrid(); RefreshStepper(); });
-            string label = names[i];
-            bool narrow = seg < 40f;
-            float iw = 7f;
-            if (SubIcons.TryGetValue(label, out var ic)) UIKit.IconAt(r, Resources.Load<Sprite>("UIIcons/" + ic), narrow ? 2f : 4f, 1f, iw, iw, i == subTab ? T.ink : T.dim);
-            var t = UIKit.TextAt(r, "L", (narrow ? 2f : 4f) + iw + 1.5f, 0, seg - iw - 6f, 9, label, 5.4f, TextAlignmentOptions.MidlineLeft, true, i == subTab ? T.ink : T.dim);
-            t.raycastTarget = false; t.overflowMode = TextOverflowModes.Ellipsis;
-        }
+        var m = Mission;
+        if (m == null) return false;
+        string t = (m.target ?? "").ToLowerInvariant();
+        bool far = t.Contains("moon") || t.Contains("mars") || t.Contains("lunar") || t.Contains("asteroid");
+        bool Req(string type) => m.specialRequirements != null && m.specialRequirements.Any(r => string.Equals(r.type, type, StringComparison.OrdinalIgnoreCase));
+        bool crew = m.payload != null && !string.IsNullOrEmpty(m.payload.type) && m.payload.type.IndexOf("crew", StringComparison.OrdinalIgnoreCase) >= 0;
+        if (p.category == "Comms") return Req("communication") || far;
+        if (p.category == "Power") return far || Req("power");
+        if (p.category == "Recovery") return Req("landing") || Req("recovery") || crew;
+        return false;
     }
 
-    void NoneCell(string name, bool on, string cat, int sub)
+    void PartCell(PartInfo part, string label, PartInfo second, bool equipped, bool toggle, System.Action click, string tip, string statText = null, bool needed = false)
     {
-        var cell = UIKit.At(gridContent, "None", 0, 0, 56, 86);
+        var cell = NextCell(part.id);
+        UIKit.Tint(cell, equipped ? UIKit.Wash(UIKit.T.green, 0.22f) : new Color(1f, 1f, 1f, 0.12f));
+        PartIcon(cell, part.id, 5, 3, 46, 34);
+        int rt = PartRatings.Rating(part);
+        UIKit.IconAt(cell, Resources.Load<Sprite>("UIIcons/stat_rating"), 33, 3, 7, 7, ColorFromHex(RatingColor(rt)));
+        UIKit.TextAt(cell, "Rt", 40, 2.5f, 15, 8, rt.ToString(), 5.4f, TextAlignmentOptions.MidlineLeft, true, ColorFromHex(RatingColor(rt))).raycastTarget = false;
+        UIKit.TextAt(cell, "Name", 2, 37, 52, 8, label ?? part.DisplayName, 5.2f, TextAlignmentOptions.Center, false, UIKit.T.dim).overflowMode = TextOverflowModes.Ellipsis;
+        UIKit.TextAt(cell, "Stat", 2, 45, 52, 9, needed && !equipped ? "Needed" : statText ?? KeyStat(part), 5.8f, TextAlignmentOptions.Center, needed && !equipped, needed && !equipped ? ColorFromHex(Warn) : UIKit.T.ink).overflowMode = TextOverflowModes.Ellipsis;
+        float price = part.costM + (second != null ? second.costM * 4f : 0f);
+        UIKit.TextAt(cell, "Price", 2, 54, 52, 10, "$" + price.ToString("0.#") + " M", 6.8f, TextAlignmentOptions.Center, true, UIKit.T.priceText);
+        string btn = toggle ? (equipped ? "Remove" : "Equip") : equipped ? "Equipped" : "Equip";
+        var b2 = UIKit.Btn(cell, btn, 4, 68, 48, 13, equipped && !toggle ? UIKit.T.chip : UIKit.Wash(equipped ? UIKit.T.red : UIKit.T.green, 0.6f), () => click(), 6.4f, true, equipped && !toggle ? UIKit.T.dim : UIKit.T.ink);
+        b2.interactable = toggle || !equipped;
+        Tip(cell.gameObject, tip);
+    }
+
+    void NoneCell(string name, bool on, System.Action act)
+    {
+        var cell = NextCell("None");
         UIKit.Tint(cell, on ? UIKit.Wash(UIKit.T.green, 0.22f) : new Color(1f, 1f, 1f, 0.06f));
         UIKit.TextAt(cell, "X", 2, 8, 52, 26, "-", 18f, TextAlignmentOptions.Center, true, UIKit.T.dim);
         UIKit.TextAt(cell, "Name", 2, 40, 52, 10, name, 5.6f, TextAlignmentOptions.Center, false, UIKit.T.dim);
-        var b = UIKit.Btn(cell, on ? "Chosen" : "Select", 4, 68, 48, 13, on ? UIKit.T.chip : UIKit.Wash(UIKit.T.green, 0.6f), () =>
-        {
-            if (cat == "Payload") SetSimple(s => s.payloadId = null, "No cargo");
-            else if (cat == "Engine") SetSimple(s => s.upperEngineId = null, "Single stage");
-            else if (cat == "Outer" && sub == 0) SetSimple(s => s.boosterId = null, "No boosters");
-            else if (cat == "Outer") SetSimple(s => s.finId = null, "No fins");
-        }, 6.4f, true, on ? UIKit.T.dim : UIKit.T.ink);
+        var b = UIKit.Btn(cell, on ? "Chosen" : "Select", 4, 68, 48, 13, on ? UIKit.T.chip : UIKit.Wash(UIKit.T.green, 0.6f), () => act(), 6.4f, true, on ? UIKit.T.dim : UIKit.T.ink);
         b.interactable = !on;
+    }
+
+    void RefreshGridRocket()
+    {
+        UIKit.Clear(gridContent); UIKit.Clear(subRow);
+        var gl = gridContent.GetComponent<GridLayoutGroup>(); if (gl != null) gl.enabled = false;      // laid out by hand: titled sections
+        var fit = gridContent.GetComponent<ContentSizeFitter>(); if (fit != null) fit.enabled = false;
+        penY = 3f; penCol = 0;
+        var cats = Cats;
+        if (catIdx >= cats.Length) catIdx = 0;
+        string cat = cats[catIdx].cat;
+        var s = Simple;
+        System.Func<string, IEnumerable<PartInfo>> byCat = c => library.Parts.Where(x => x.category == c).OrderBy(x => PartInfo.SizeRank(x.size)).ThenBy(x => x.costM);
+        BuildStepper(cat);
+
+        switch (cat)
+        {
+            case "Payload":
+                SectionTitle("Head", "The nose of the rocket. A fairing carries cargo.");
+                foreach (var x in byCat("Head")) { var part = x; PartCell(part, null, null, SimpleHas(part), false, () => AddPart(part), Compact(part)); }
+                SectionTitle("Cargo", "Cargo is built in the Payload Builder.");
+                EndRow();
+                {
+                    var cell = NextCell("BuildCargo");
+                    UIKit.Tint(cell, UIKit.Wash(UIKit.T.purple, 0.28f));
+                    UIKit.TextAt(cell, "Plus", 2, 8, 52, 26, "+", 22f, TextAlignmentOptions.Center, true, UIKit.T.ink).raycastTarget = false;
+                    UIKit.TextAt(cell, "Name", 2, 38, 52, 22, "Build new\ncargo", 5.8f, TextAlignmentOptions.Center, true, UIKit.T.ink).raycastTarget = false;
+                    UIKit.Btn(cell, "Go build", 4, 68, 48, 13, UIKit.Wash(UIKit.T.purple, 0.6f), OpenPayloadBuilder, 6.4f, true, UIKit.T.ink);
+                    Tip(cell.gameObject, "<b>Payload Builder</b>\n<color=" + Soft + ">Build your own cargo: a satellite, rover or lander with power and comms. It will show up here when saved.</color>");
+                }
+                NoneCell("No cargo", s.payloadId == null && string.IsNullOrEmpty(s.customPayload), () => SetSimple(sb => { sb.payloadId = null; sb.customPayload = null; }, "No cargo"));
+                foreach (var cp in CustomPayloads.All())
+                {
+                    var c = cp; var basePart = library.Get(c.payloadId); if (basePart == null) continue;
+                    bool on = s.customPayload == c.name;
+                    PartCell(basePart, c.name, null, on, false, () => SetSimple(sb => { sb.customPayload = c.name; sb.payloadId = c.payloadId; }, c.name + " loaded"),
+                        "<b>" + c.name + "</b>\n<color=" + Soft + ">Your cargo: " + basePart.DisplayName + (c.equipment.Count > 0 ? " + " + c.equipment.Count + " extras" : "") + "</color>\nWeighs " + c.massKg.ToString("N0") + " kg",
+                        c.massKg.ToString("N0") + " kg");
+                }
+                break;
+            case "Tank":
+                SectionTitle("Fuel tanks", "One stage. More tanks hold more fuel.");
+                foreach (var x in byCat("Tank")) { var part = x; PartCell(part, null, null, SimpleHas(part), false, () => AddPart(part), Compact(part)); }
+                break;
+            case "Engine":
+                SectionTitle("Engines", "One combined engine: lifts off and keeps working in space.");
+                foreach (var x in byCat("Engine").Where(e => !e.id.EndsWith("_Vac"))) { var part = x; PartCell(part, null, null, SimpleHas(part), false, () => AddPart(part), Compact(part)); }
+                break;
+            case "Outer":
+                SectionTitle("Boosters only");
+                NoneCell("No boosters", s.boosterId == null && s.finId == null, () => SetSimple(sb => { sb.boosterId = null; sb.finId = null; }, "Nothing on the outside"));
+                foreach (var x in byCat("Booster")) { var part = x; PartCell(part, null, null, s.boosterId == part.id && s.finId == null, false, () => AddPart(part), Compact(part)); }
+                SectionTitle("Boosters with fins");
+                foreach (var c in Combos) { var b = library.Get(c.booster); var f = library.Get(c.fin); if (b == null || f == null) continue; var cc = c; var part = b; var fin = f;
+                    PartCell(part, c.name, fin, s.boosterId == part.id && s.finId == fin.id, false, () => SetSimple(sb => { sb.boosterId = part.id; sb.finId = fin.id; }, cc.name + " fitted"),
+                        "<b>" + c.name + "</b>\n<color=" + Soft + ">Boosters and fins fitted together.</color>", "boost + steady"); }
+                SectionTitle("Fins only");
+                foreach (var x in library.Parts.Where(f => f.id.StartsWith("Fin_")).OrderBy(f => PartInfo.SizeRank(f.size))) { var part = x; PartCell(part, null, null, s.finId == part.id && s.boosterId == null, false, () => AddPart(part), Compact(part)); }
+                break;
+            default:
+                string[] extraCats = { "Recovery", "Power", "Comms" }, extraNames = { "Recovery", "Power", "Communication" };
+                for (int k = 0; k < extraCats.Length; k++)
+                {
+                    SectionTitle(extraNames[k], Mission != null ? "Marked Needed when the contract asks for it." : null);
+                    foreach (var x in byCat(extraCats[k]).OrderByDescending(Needed)) { var part = x; PartCell(part, null, null, SimpleHas(part), true, () => AddPart(part), Compact(part), null, Needed(part)); }
+                }
+                break;
+        }
+        EndRow();
+        gridContent.sizeDelta = new Vector2(0f, penY + 3f);
     }
 
     static Color ColorFromHex(string hex) { ColorUtility.TryParseHtmlString(hex, out var c); return c; }
 
-    // count stepper (tanks, boosters, fins), shown at the right end of the sub-tab row
-    void BuildStepper()
+    // count steppers (tanks, boosters, fins) in the strip above the grid
+    void BuildStepper(string cat)
     {
-        string cat = Cats[catIdx].cat;
-        bool show = cat == "Tank" || cat == "Outer";
-        if (!show) { countBox = null; countLabel = null; return; }
-        var box = UIKit.At(subRow, "Count", RW - 12 - 62, 0, 62, 13);
-        countBox = box.gameObject;
-        UIKit.Btn(box, "-", 0, 0, 14, 13, UIKit.T.chip, () => ChangeCount(-1), 7.5f);
-        countLabel = UIKit.TextAt(box, "N", 15, 0, 32, 13, "", 6.4f, TextAlignmentOptions.Center, true);
-        UIKit.Btn(box, "+", 48, 0, 14, 13, UIKit.T.chip, () => ChangeCount(1), 7.5f);
-        Tip(box.gameObject, "How many\n<color=" + Soft + ">more tanks hold more fuel, more boosters push harder</color>");
-        RefreshStepper();
-    }
-
-    int CurrentCount()
-    {
-        var s = Simple; string cat = Cats[catIdx].cat;
-        if (cat == "Tank") return subTab == 0 ? s.tankCount : s.upperTankCount;
-        return subTab == 1 ? s.finCount : s.boosterCount;
-    }
-
-    void ChangeCount(int dlt)
-    {
-        string cat = Cats[catIdx].cat;
-        SetSimple(s =>
+        if (cat == "Tank") Stepper(0f, "tanks", () => Simple.tankCount, d => SetSimple(sb => sb.tankCount = Mathf.Clamp(sb.tankCount + d, 1, SimpleBuilder.MaxTanks), "Tanks x " + Mathf.Clamp(Simple.tankCount + d, 1, SimpleBuilder.MaxTanks)), 120f);
+        else if (cat == "Outer")
         {
-            if (cat == "Tank") { if (subTab == 0) s.tankCount = Mathf.Clamp(s.tankCount + dlt, 1, SimpleBuilder.MaxTanks); else s.upperTankCount = Mathf.Clamp(s.upperTankCount + dlt, 1, SimpleBuilder.MaxTanks); }
-            else if (subTab == 1) s.finCount = Mathf.Clamp(s.finCount + dlt, 2, SimpleBuilder.MaxOuter);
-            else s.boosterCount = Mathf.Clamp(s.boosterCount + dlt, 1, SimpleBuilder.MaxOuter);
-        }, "Count " + (CurrentCount() + dlt));
+            Stepper(0f, "boosters", () => Simple.boosterCount, d => SetSimple(sb => sb.boosterCount = Mathf.Clamp(sb.boosterCount + d, 1, SimpleBuilder.MaxOuter), "Boosters x " + Mathf.Clamp(Simple.boosterCount + d, 1, SimpleBuilder.MaxOuter)), 90f);
+            Stepper(94f, "fins", () => Simple.finCount, d => SetSimple(sb => sb.finCount = Mathf.Clamp(sb.finCount + d, 2, SimpleBuilder.MaxOuter), "Fins x " + Mathf.Clamp(Simple.finCount + d, 2, SimpleBuilder.MaxOuter)), 90f);
+        }
+        else
+        {
+            string hint = cat == "Payload" ? "Head and cargo" : cat == "Engine" ? "One combined engine" : "Pick what the mission needs";
+            UIKit.TextAt(subRow, "Hint", 2, 0, RW - 16, 13, hint, 6f, TextAlignmentOptions.MidlineLeft, true, UIKit.T.dim).raycastTarget = false;
+        }
     }
 
-    void RefreshStepper()
+    void Stepper(float x, string noun, System.Func<int> get, System.Action<int> change, float w)
     {
-        if (countLabel == null) return;
-        string cat = Cats[catIdx].cat;
-        countLabel.text = "x " + CurrentCount() + (cat == "Tank" ? (subTab == 0 ? " tanks" : " tanks") : subTab == 1 ? " fins" : " boosters");
+        var box = UIKit.At(subRow, "Count " + noun, x, 0, w, 13);
+        UIKit.Btn(box, "-", 0, 0, 14, 13, UIKit.T.chip, () => change(-1), 7.5f);
+        UIKit.TextAt(box, "N", 15, 0, w - 30, 13, noun + " x " + get(), 6.2f, TextAlignmentOptions.Center, true);
+        UIKit.Btn(box, "+", w - 14, 0, 14, 13, UIKit.T.chip, () => change(1), 7.5f);
+        Tip(box.gameObject, "How many " + noun + "\n<color=" + Soft + ">more is stronger, but heavier and dearer</color>");
     }
 
     // ---- paint menu beside the rocket ----
     void BuildPaintCard(RectTransform root, float x)
     {
         paintCard = UIKit.Card(root, "Paint Card", x, CardY, 30f, 24f + 8 * 17f);
-        UIKit.TextAt(paintCard, "Title", 0, 3, 30, 9, "Paint", 5.8f, TextAlignmentOptions.Center, true, UIKit.T.dim);
+        paintTitle = UIKit.TextAt(paintCard, "Title", 0, 3, 30, 9, "Paint", 5.4f, TextAlignmentOptions.Center, true, UIKit.T.dim);
         paintRings = new Image[8];
         for (int i = 0; i < 8; i++)
         {
@@ -1176,15 +1259,31 @@ public class RocketBuilderUI : MonoBehaviour
             var ring = UIKit.At(paintCard, "Ring" + i, 3, y - 1.5f, 24, 18);
             paintRings[i] = UIKit.Tint(ring, Color.clear);
             var sw = UIKit.At(paintCard, LiveryNames[i], 5, y, 20, 15);
-            var b = UIKit.MakeButton(sw, "", LiveryColors[i], () => { design.livery = idx; Changed(); Toast("Paint: " + LiveryNames[idx]); });
-            Tip(sw.gameObject, "<b>" + LiveryNames[i] + "</b>\n<color=" + Soft + ">Paint the rocket</color>");
+            var b = UIKit.MakeButton(sw, "", LiveryColors[i], () =>
+            {
+                string key = PaintKeyOfSel();
+                if (key == null) { design.livery = idx; design.paints.Clear(); } else design.SetPaint(key, idx);
+                Changed(); Toast((key == null ? "Whole rocket" : RocketPaint.Label(key)) + ": " + LiveryNames[idx]);
+            });
+            Tip(sw.gameObject, "<b>" + LiveryNames[i] + "</b>\n<color=" + Soft + ">Select a part to paint only that part, or select nothing to paint the whole rocket</color>");
         }
+    }
+
+    // the paint slot of the selected part (null = nothing selected: paint everything)
+    string PaintKeyOfSel()
+    {
+        if (sel.IsNone) return null;
+        var p = SelPart();
+        return p == null ? null : RocketPaint.Key(p, sel.kind);
     }
 
     void RefreshPaint()
     {
         if (paintRings == null) return;
-        for (int i = 0; i < paintRings.Length; i++) paintRings[i].color = i == design.livery ? new Color(1f, 1f, 1f, 0.85f) : Color.clear;
+        string key = PaintKeyOfSel();
+        int cur = key == null ? design.livery : design.PaintOf(key);
+        if (paintTitle != null) paintTitle.text = key == null ? "All" : RocketPaint.Label(key);
+        for (int i = 0; i < paintRings.Length; i++) paintRings[i].color = i == cur ? new Color(1f, 1f, 1f, 0.85f) : Color.clear;
     }
 
     // ---- the stats grid: orbit reach banner and eight icon cells ----

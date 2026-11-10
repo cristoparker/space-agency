@@ -31,11 +31,11 @@ public class LaunchDayUI : MonoBehaviour
         var T = UIKit.T;
 
         // the countdown pill, after the date in the left cluster
-        hintRt = UIKit.At(left, "Launch Hint", 0, 0, 74, 13);
-        var le = hintRt.gameObject.AddComponent<LayoutElement>(); le.preferredWidth = 74; le.minWidth = 74; le.preferredHeight = 13; le.minHeight = 13;
+        hintRt = UIKit.At(left, "Launch Hint", 0, 0, 56, 13);
+        var le = hintRt.gameObject.AddComponent<LayoutElement>(); le.preferredWidth = 56; le.minWidth = 56; le.preferredHeight = 13; le.minHeight = 13;
         hintBg = UIKit.Tint(hintRt, UIKit.Wash(T.teal, 0.5f));
         UIKit.IconAt(hintRt, Resources.Load<Sprite>("UIIcons/icon_launch"), 3, 2.5f, 8, 8, T.ink);
-        hintText = UIKit.TextAt(hintRt, "T", 12, 0, 60, 13, "", 6f, TextAlignmentOptions.MidlineLeft, true);
+        hintText = UIKit.TextAt(hintRt, "T", 12, 0, 44, 13, "", 5.8f, TextAlignmentOptions.MidlineLeft, true);
         hintRt.gameObject.AddComponent<TooltipTrigger>().text = "Launch day\nYour rocket is on the pad.\nThe launch button appears on that day.";
         hintRt.gameObject.SetActive(false);
 
@@ -51,7 +51,7 @@ public class LaunchDayUI : MonoBehaviour
         glow.sprite = T.round; glow.type = Image.Type.Sliced; glow.pixelsPerUnitMultiplier = 1f; glow.color = new Color(1f, 0.85f, 0.2f, 0.3f); glow.raycastTarget = false;
         UIRound.Attach(glow);
         var btn = UIKit.At(buttonRt, "Button", 0, 0, 80, 15);
-        var b = UIKit.MakeButton(btn, "", new Color(1f, 0.82f, 0.22f, 1f), () => LaunchSequence.Begin());
+        var b = UIKit.MakeButton(btn, "", new Color(1f, 0.82f, 0.22f, 1f), () => { var d = DeploymentManager.Instance; if (d == null || d.Current == null || d.library == null) return; LaunchResultUI.PreLaunch(d.Current, d.library, () => LaunchSequence.Begin()); });
         buttonBg = (Image)b.targetGraphic;
         UIKit.IconAt(btn, Resources.Load<Sprite>("UIIcons/icon_launch"), 6, 2.5f, 10, 10, new Color(0.25f, 0.16f, 0f, 1f));
         UIKit.TextAt(btn, "Label", 19, 0, 58, 15, "LAUNCH", 7.4f, TextAlignmentOptions.MidlineLeft, true, new Color(0.25f, 0.16f, 0f, 1f)).raycastTarget = false;
@@ -99,7 +99,7 @@ public class LaunchDayUI : MonoBehaviour
             if (scheduled && !ready)
             {
                 int d = dep.DaysToLaunch;
-                hintText.text = dateReached ? "Finish goals" : d <= 1 ? "Launch tomorrow" : "Launch in " + d + " days";
+                hintText.text = dateReached ? "Finish goals" : d <= 1 ? "Launch 1 d" : "Launch " + d + " d";
                 bool soon = d <= 2 || dateReached;
                 hintBg.color = soon ? UIKit.Wash(new Color(1f, 0.7f, 0.25f, 1f), 0.6f) : UIKit.Wash(UIKit.T.teal, 0.5f);
             }

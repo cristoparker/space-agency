@@ -182,4 +182,21 @@ im, d = canvas()
 d.polygon([(256, 40), (440, 230), (330, 230), (330, 340), (182, 340), (182, 230), (72, 230)], fill=255)
 d.rounded_rectangle((120, 380, 392, 440), radius=24, fill=255)
 save(im, "icon_upgrade")
+# cinematic camera: a movie camera
+im, d = canvas()
+d.rounded_rectangle((30, 150, 350, 390), radius=48, fill=255)
+d.polygon([(360, 230), (480, 160), (480, 380), (360, 310)], fill=255)
+d.ellipse((90, 40, 210, 160), fill=255)
+d.ellipse((220, 60, 330, 170), fill=255)
+d.ellipse((130, 200, 250, 320), fill=0)
+d.ellipse((165, 235, 215, 285), fill=255)
+save(im, "icon_camera")
+# one day per second: a circle, sun on the left half, moon on the right half
+im, d = canvas()
+d.pieslice((70, 70, 442, 442), 90, 270, fill=255)                     # left half: day
+d.arc((70, 70, 442, 442), 270, 90, fill=255, width=34)                # right half: ring
+d.ellipse((290, 150, 400, 260), fill=255)                             # moon disc ...
+d.ellipse((330, 130, 430, 230), fill=0)                               # ... bitten into a crescent
+d.ellipse((330, 300, 360, 330), fill=255); d.ellipse((380, 340, 400, 360), fill=255)   # stars
+save(im, "icon_daynight")
 print("icons written to", OUT)

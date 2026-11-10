@@ -23,5 +23,6 @@ public class MissionDefinition : ScriptableObject
     [Tooltip("TimeBased = follows the game clock. Manual = other systems set progress (e.g. rocket flight).")]
     public ProgressMode progressMode = ProgressMode.TimeBased;
 
-    public double DurationDays => duration.ToDays();
+    /// <summary>The contract's length in days: always between one month and six months (never years).</summary>
+    public double DurationDays => System.Math.Min(180.0, System.Math.Max(30.0, duration.ToDays()));
 }

@@ -19,6 +19,7 @@ public class NightLamp : MonoBehaviour
     public float turnOnBelowSunElevation = 0.12f;
 
     bool isOn;
+    float scale = 1f;
     float level;                       // 0..1 light fade
 
     public static bool IsNight(float turnOnBelow)
@@ -28,7 +29,11 @@ public class NightLamp : MonoBehaviour
         return elevation < turnOnBelow;
     }
 
-    void Start() => Apply(false, true);
+    void Start()
+    {
+        foreach (var l in lights) if (l != null) scale = Mathf.Max(scale, LightKit.SoftenLamp(l));
+        Apply(false, true);
+    }
 
     void Update()
     {
@@ -40,7 +45,7 @@ public class NightLamp : MonoBehaviour
         foreach (var l in lights)
         {
             if (l == null) continue;
-            l.intensity = onIntensity * level;
+            l.intensity = onIntensity * scale * level;
             l.enabled = level > 0.001f;
         }
     }

@@ -9,13 +9,14 @@ using UnityEngine.UI;
 /// </summary>
 public class ObjectiveMenuUI : MonoBehaviour
 {
-    const float PW = 196f;
+    public const float PW = 196f, PanelH = 200f;
     RectTransform canvasRt, panel, content;
     CanvasGroup panelGroup;
     Image buttonBg;
     TMP_Text badge;
     Sprite flag, check;
     bool open;
+    public bool IsOpen => open;
     float timer;
     readonly HashSet<string> collapsed = new HashSet<string>();
     readonly List<(MissionObjective o, Image fill, TMP_Text status)> live = new List<(MissionObjective, Image, TMP_Text)>();
@@ -57,10 +58,10 @@ public class ObjectiveMenuUI : MonoBehaviour
         panel = new GameObject("Objectives Panel", typeof(RectTransform)).GetComponent<RectTransform>();
         panel.SetParent(rt, false);
         panel.anchorMin = panel.anchorMax = new Vector2(0f, 1f); panel.pivot = new Vector2(0f, 1f);
-        panel.anchoredPosition = new Vector2(8f, -58f); panel.sizeDelta = new Vector2(PW, 230f);
-        UIKit.Glass(panel);
+        panel.anchoredPosition = new Vector2(8f, -58f); panel.sizeDelta = new Vector2(PW, PanelH);
+        UIKit.Panel(panel);
         UIKit.TitleBar(panel, "Objectives", UIKit.T.orange, PW, () => SetOpen(false));
-        content = UIKit.ScrollList(panel, "List", 5, 28, PW - 10, 230 - 33, null, 4f);
+        content = UIKit.ScrollList(panel, "List", 5, 28, PW - 10, PanelH - 33, null, 4f);
         panelGroup = panel.gameObject.AddComponent<CanvasGroup>();
         panel.gameObject.AddComponent<UIPopIn>();
         panel.gameObject.SetActive(false);
@@ -94,7 +95,7 @@ public class ObjectiveMenuUI : MonoBehaviour
         if (timer < 0.4f) return;
         timer = 0f;
         var mm = MissionManager.Instance;
-        if (badge != null && mm != null) badge.text = mm.Running.Count.ToString();
+        if (badge != null && mm != null) badge.text = (mm.Running.Count + mm.Pending.Count).ToString();
         if (!open) return;
         string sig = Signature();
         if (sig != lastSig) { Refresh(); return; }
@@ -111,7 +112,7 @@ public class ObjectiveMenuUI : MonoBehaviour
         var sb = new System.Text.StringBuilder();
         foreach (var m in mm.Running)
         {
-            sb.Append(m.Definition.id).Append(mm.Tracked == m ? "*" : "").Append(collapsed.Contains(m.Definition.id) ? "-" : "+");
+            sb.Append(m.Definition.id);
             foreach (var o in MissionObjectives.For(m)) sb.Append('|').Append((int)o.state).Append(o.status);
         }
         return sb.ToString();
@@ -121,7 +122,7 @@ public class ObjectiveMenuUI : MonoBehaviour
     {
         if (content == null) return;
         var mm = MissionManager.Instance;
-        if (badge != null && mm != null) badge.text = mm.Running.Count.ToString();
+        if (badge != null && mm != null) badge.text = (mm.Running.Count + mm.Pending.Count).ToString();
         if (!open) return;
         lastSig = Signature();
         UIKit.Clear(content);
@@ -136,7 +137,7 @@ public class ObjectiveMenuUI : MonoBehaviour
             UIKit.MakeButton(go, "Open Contracts", UIKit.T.teal, () => Panels.Open("contracts"), 6.6f);
             return;
         }
-        foreach (var m in mm.Running) MissionBlock(m, mm.Tracked == m);
+        MissionBlock(mm.Running[0], true);
     }
 
     void MissionBlock(MissionInstance m, bool tracked)
@@ -145,26 +146,20 @@ public class ObjectiveMenuUI : MonoBehaviour
         var objs = MissionObjectives.For(m);
         int doneCount = 0; foreach (var o in objs) if (o.done) doneCount++;
         string id = m.Definition.id;
-        bool isCollapsed = collapsed.Contains(id);
         float w = PW - 16;
 
-        // header: mission name, how many steps are done, a thin bar
+        // header: the current mission's name and how many steps are done (no expanding: there is only ever one mission)
         var head = UIKit.At(content, "Mission", 0, 0, w, 24);
         head.gameObject.AddComponent<LayoutElement>().preferredHeight = 24;
-        var hb = UIKit.MakeButton(head, "", new Color(1f, 1f, 1f, 0.14f), () => { if (!collapsed.Remove(id)) collapsed.Add(id); Refresh(); });
-        var chevron = UIKit.TextAt(head, "Chevron", 3, 0, 10, 20, isCollapsed ? ">" : "v", 7f, TextAlignmentOptions.Center, true, T.dim);
-        chevron.raycastTarget = false;
-        var nm = UIKit.TextAt(head, "Name", 14, 1, w - 52, 13, m.Definition.displayName, 6.9f, TextAlignmentOptions.MidlineLeft, true);
+        UIKit.Tint(head, new Color(1f, 1f, 1f, 0.14f)).raycastTarget = false;
+        var nm = UIKit.TextAt(head, "Name", 6, 1, w - 46, 13, m.Definition.displayName, 6.9f, TextAlignmentOptions.MidlineLeft, true);
         nm.overflowMode = TextOverflowModes.Ellipsis; nm.raycastTarget = false;
         UIKit.TextAt(head, "Count", w - 38, 1, 34, 13, doneCount + " / " + objs.Count, 6.2f, TextAlignmentOptions.MidlineRight, true, T.dim).raycastTarget = false;
-        var bar = UIKit.At(head, "Bar", 14, 17, w - 20, 3); bar.GetComponent<RectTransform>();
+        var bar = UIKit.At(head, "Bar", 6, 17, w - 12, 3);
         UIKit.Tint(bar, T.track).raycastTarget = false;
         var bf = UIKit.At(bar, "Fill", 0, 0, 10, 3);
         bf.anchorMin = Vector2.zero; bf.anchorMax = new Vector2(Mathf.Clamp01((float)doneCount / Mathf.Max(1, objs.Count)), 1f); bf.offsetMin = bf.offsetMax = Vector2.zero;
         UIKit.Tint(bf, doneCount == objs.Count ? T.green : T.teal).raycastTarget = false;
-        if (tracked) UIKit.Tint(UIKit.At(head, "Tracked", 0, 3, 2, 18), T.orange).raycastTarget = false;
-
-        if (isCollapsed) return;
 
         foreach (var o in objs) ObjectiveRow(o, w);
     }

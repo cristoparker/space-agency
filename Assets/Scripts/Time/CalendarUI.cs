@@ -23,7 +23,7 @@ public class CalendarUI : MonoBehaviour
         rt.SetParent(canvas, false);
         rt.anchorMin = rt.anchorMax = new Vector2(0f, 1f); rt.pivot = new Vector2(0f, 1f);
         rt.anchoredPosition = new Vector2(96f, -30f); rt.sizeDelta = new Vector2(W, 124f);
-        UIKit.Glass(rt);
+        UIKit.Panel(rt);
         rt.gameObject.SetActive(false);                      // build first, OnEnable runs when the calendar is opened
         var ui = rt.gameObject.AddComponent<CalendarUI>();
         inst = ui;

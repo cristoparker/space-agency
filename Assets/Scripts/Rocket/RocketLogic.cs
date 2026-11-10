@@ -15,6 +15,8 @@ public class RocketDesign
     public string payloadId;
     public List<string> equipment = new List<string>();
     public int livery;
+    [Tooltip("Colour of single parts (key = head / tank / engine / body / booster / fin / payload). Parts without an entry use `livery`.")]
+    public List<PartPaint> paints = new List<PartPaint>();
     [Tooltip("The simple builder: parts picked per category. When useSimple is on, stack/booster/fin/payload/equipment are generated from it.")]
     public SimpleBuild simple = new SimpleBuild();
     public bool useSimple;
@@ -26,12 +28,52 @@ public class RocketDesign
         catch { return new RocketDesign(); }
     }
 
+    public int PaintOf(string key)
+    {
+        foreach (var p in paints) if (p.key == key) return p.color;
+        return livery;
+    }
+
+    public void SetPaint(string key, int color)
+    {
+        foreach (var p in paints) if (p.key == key) { p.color = color; return; }
+        paints.Add(new PartPaint { key = key, color = color });
+    }
+
     public void Clear()
     {
+        paints.Clear();
         stack.Clear(); equipment.Clear();
         boosterId = finId = payloadId = null;
         boosterCount = 2; finCount = 4;
         simple = new SimpleBuild(); useSimple = false;
+    }
+}
+
+[Serializable]
+public class PartPaint { public string key; public int color; }
+
+/// <summary>Which paint slot a part belongs to: every selected part can have its own colour.</summary>
+public static class RocketPaint
+{
+    public static string Key(PartInfo p, SelKind kind)
+    {
+        switch (kind)
+        {
+            case SelKind.Booster: return "booster";
+            case SelKind.Fin: return "fin";
+            case SelKind.Payload: return "payload";
+            case SelKind.Equip: return "extra";
+        }
+        if (p == null) return "body";
+        if (RocketRules.IsHead(p)) return "head";
+        if (RocketRules.IsEngine(p)) return "engine";
+        if (p.category == "Tank") return "tank";
+        return "body";
+    }
+    public static string Label(string key)
+    {
+        switch (key) { case "head": return "Head"; case "tank": return "Tank"; case "engine": return "Engine"; case "booster": return "Boost."; case "fin": return "Fins"; case "payload": return "Cargo"; default: return "Body"; }
     }
 }
 
@@ -50,6 +92,17 @@ public static class RocketRules
             case "Structure": return p.id.StartsWith("Fin_") ? PartSlot.Fin : PartSlot.Stack;
             default: return PartSlot.Stack;
         }
+    }
+
+    /// <summary>The parts a rocket cannot be built or launched without: an engine, a fuel tank and a head.</summary>
+    public static List<string> MissingCore(RocketDesign d, PartLibrary lib)
+    {
+        var parts = d.stack.Select(lib.Get).Where(x => x != null).ToList();
+        var miss = new List<string>();
+        if (!parts.Any(IsEngine) && !(d.boosterId != null)) miss.Add("an engine");
+        if (!parts.Any(x => x.category == "Tank") && d.boosterId == null) miss.Add("a fuel tank");
+        if (!parts.Any(IsHead)) miss.Add("a head");
+        return miss;
     }
 
     public static bool IsHead(PartInfo p) => p != null && p.category == "Head";
@@ -189,7 +242,7 @@ public static class RocketRules
 
 public enum Sev { Ok, Warn, Error }
 
-public class Check { public string text; public Sev sev; }
+public class Check { public string text; public Sev sev; public bool contract; }
 
 public class StageInfo
 {
@@ -226,7 +279,8 @@ public static class RocketStats
         }
     }
 
-    static void Add(RocketReport r, Sev s, string text) => r.checks.Add(new Check { sev = s, text = text });
+    static bool addingContract;
+    static void Add(RocketReport r, Sev s, string text) => r.checks.Add(new Check { sev = s, text = text, contract = addingContract });
 
     public static RocketReport Evaluate(RocketDesign d, PartLibrary lib, MissionDefinition mission)
     {
@@ -339,6 +393,7 @@ public static class RocketStats
         }
 
         // ---- contract checks ----
+        addingContract = true;
         if (mission != null)
         {
             r.dvRequired = DvForTarget(mission.target);
@@ -372,8 +427,8 @@ public static class RocketStats
                         Add(r, soft ? Sev.Ok : Sev.Error, soft ? "Landing gear fitted (" + req.value + ")." : req.value + " needs a parachute or landing legs.");
                         break;
                     case "orbit":
-                        bool orbit = stack.Any(p => p.id.StartsWith("Avi_")) && equip.Any(e => e.id == "Thr_RCS_Block");
-                        Add(r, orbit ? Sev.Ok : Sev.Error, orbit ? req.value + ": avionics + RCS fitted." : req.value + " needs avionics and an RCS block.");
+                        bool orbit = stack.Any(p => p.id.StartsWith("Avi_"));
+                        Add(r, orbit ? Sev.Ok : Sev.Error, orbit ? req.value + ": flight computer fitted." : req.value + " needs avionics.");
                         break;
                     default:
                         Add(r, Sev.Warn, req.ToDisplayString() + " (not checked yet).");
@@ -382,6 +437,7 @@ public static class RocketStats
             }
         }
 
+        addingContract = false;
         r.valid = !r.checks.Any(c => c.sev == Sev.Error);
         SimpleMetrics.Fill(r, d, lib, stack, booster, bn, fin, fn);
         return r;
@@ -456,7 +512,8 @@ public static class RocketAssembler
             var go = UnityEngine.Object.Instantiate(prefab, root.transform);
             go.transform.localPosition = pos; go.transform.localRotation = rot;
             var pr = go.AddComponent<PartRef>(); pr.kind = kind; pr.index = index;
-            if (mat != null) foreach (var rd in go.GetComponentsInChildren<MeshRenderer>()) rd.sharedMaterial = mat;
+            var pm = lib.Livery(d.PaintOf(RocketPaint.Key(p, kind))) ?? mat;
+            if (pm != null) foreach (var rd in go.GetComponentsInChildren<MeshRenderer>()) rd.sharedMaterial = pm;
             return go;
         }
 

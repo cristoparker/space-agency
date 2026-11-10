@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -18,12 +19,17 @@ public class LaunchSequence : MonoBehaviour
 
     public static void ResetStatics() { Running = false; inst = null; }
 
+    FlightRecord record;
+
     public static bool Begin()
     {
         if (Running) return false;
         var dep = DeploymentManager.Instance;
         if (dep == null || dep.PadRocket == null || !MissionObjectives.LaunchAllowed(dep)) return false;
         if (inst == null) inst = new GameObject("Launch Sequence").AddComponent<LaunchSequence>();
+        var mission = MissionManager.Instance != null && dep.Current != null && !string.IsNullOrEmpty(dep.Current.missionId)
+            ? MissionManager.Instance.Running.FirstOrDefault(x => x.Definition.id == dep.Current.missionId)?.Definition : null;
+        inst.record = dep.library != null && dep.Current != null ? FlightOutcome.Evaluate(dep.Current, dep.library, mission) : new FlightRecord();
         inst.StartCoroutine(inst.Run(dep));
         return true;
     }
@@ -36,6 +42,7 @@ public class LaunchSequence : MonoBehaviour
     TMP_Text countdown, hint;
     readonly List<GameObject> hidden = new List<GameObject>();
     readonly List<GameObject> fx = new List<GameObject>();
+    readonly List<ParticleSystem> systems = new List<ParticleSystem>();      // stepped by hand while the game clock is paused
     static Texture2D soft;
     bool skip;
 
@@ -68,6 +75,8 @@ public class LaunchSequence : MonoBehaviour
         Vector3 look = basePos + Vector3.up * 30f;
         bool ignited = false;
         float end = 21.5f;
+        bool fails = record != null && record.Result == LaunchResult.Failure, blasted = false;
+        float blastT = Random.Range(10.5f, 13f);
 
         while (t < end && !skip)
         {
@@ -77,7 +86,7 @@ public class LaunchSequence : MonoBehaviour
             if (t > 0.6f && ((kb != null && (kb.spaceKey.wasPressedThisFrame || kb.escapeKey.wasPressedThisFrame || kb.enterKey.wasPressedThisFrame)) || (mouse != null && mouse.leftButton.wasPressedThisFrame))) skip = true;
 
             // countdown text
-            string txt = t < 1f ? "3" : t < 2f ? "2" : t < 3f ? "1" : t < lift + 1.2f ? "LIFTOFF" : "";
+            string txt = t < 1f ? "T-3" : t < 2f ? "T-2" : t < 3f ? "T-1" : t < lift + 1.2f ? "LIFTOFF" : "";
             countdown.text = txt;
             float frac = t % 1f;
             countdown.color = new Color(1f, 1f, 1f, txt == "" ? 0f : Mathf.Lerp(1f, 0.25f, frac));
@@ -107,18 +116,43 @@ public class LaunchSequence : MonoBehaviour
             }
             else rocket.transform.position = basePos + new Vector3(Random.Range(-0.03f, 0.03f), 0f, Random.Range(-0.03f, 0.03f)) * (ignited ? 1f : 0f);
 
+            // a failed launch: the rocket blows up
+            if (fails && !blasted && t >= blastT)
+            {
+                blasted = true;
+                rocket.SetActive(false);
+                foreach (var ps0 in new[] { flame, trail }) { var e0 = ps0.emission; e0.rateOverTime = 0f; e0.rateOverDistance = 0f; }
+                light.intensity = 90000f;
+                var blast = MakeBlast(pos);
+                blast.Play();
+                end = Mathf.Min(end, t + 5.5f);
+                fadeAlpha = 0.9f;
+            }
+            if (blasted) light.intensity = Mathf.MoveTowards(light.intensity, 0f, 60000f * dt);
+
+            // the game clock is paused (timeScale 0), so the engine does not move the particles: step them here
+            if (ignited) foreach (var psys in systems) if (psys != null) psys.Simulate(dt, false, false, false);
+
             // cameras
-            int want = t < 9f ? 0 : t < 14.5f ? 1 : 2;
+            int want = t < 6.4f ? 0 : t < 9.4f ? 3 : t < 14.5f ? 1 : 2;      // 3 = rocket POV
+            bool cut = false;
             if (want != shot)
             {
-                shot = want;
+                shot = want; cut = true; cutT = t;
                 fadeAlpha = 1f;                                          // a quick dip to black on every cut
                 if (shot == 0) { cam.fieldOfView = 46f; }
                 if (shot == 1) { cam.fieldOfView = 58f; }
                 if (shot == 2) { cam.fieldOfView = 34f; }
+                if (shot == 3) { cam.fieldOfView = 78f; }
             }
             Vector3 cpos, target;
-            if (shot == 0)
+            if (shot == 3)
+            {
+                // riding on top of the rocket, looking down as the pad falls away
+                cpos = pos + rocket.transform.up * 9f + rocket.transform.forward * -2.5f;
+                target = Vector3.Lerp(basePos, pos - rocket.transform.up * 10f, 0.25f);
+            }
+            else if (shot == 0)
             {
                 cpos = basePos + new Vector3(92f, 9f, -78f) + (new Vector3(70f, 9f, -62f) - new Vector3(92f, 9f, -78f)) * Mathf.Clamp01(t / 9f);
                 target = Vector3.Lerp(basePos + Vector3.up * 34f, pos + Vector3.up * 16f, t > lift ? 0.8f : 0f);
@@ -135,10 +169,15 @@ public class LaunchSequence : MonoBehaviour
             }
             cpos.y = Mathf.Max(cpos.y, GroundY(cpos) + 4f);
             cam.transform.position = cpos;
-            look = Vector3.Lerp(look, target, 1f - Mathf.Exp(-(shot == 0 ? 4f : 7f) * dt));
+            if (cut) look = target;                                      // snap at the cut: nothing carries over from the previous shot
+            else look = Vector3.Lerp(look, target, 1f - Mathf.Exp(-(shot == 0 ? 4f : 7f) * dt));
             var want_rot = Quaternion.LookRotation((look - cpos).normalized, Vector3.up);
-            cam.transform.rotation = Quaternion.Slerp(cam.transform.rotation, want_rot, 1f - Mathf.Exp(-12f * dt));
-            if (ignited && shot < 2) cam.transform.position += Random.insideUnitSphere * 0.08f * Mathf.Clamp01((t - 3f) / 2f);   // rumble
+            cam.transform.rotation = cut ? want_rot : Quaternion.Slerp(cam.transform.rotation, want_rot, 1f - Mathf.Exp(-12f * dt));
+            if (ignited && shot != 2)                                    // smooth rumble, faded in after each cut
+            {
+                float amp = 0.07f * Mathf.Clamp01((t - 3f) / 2f) * Mathf.Clamp01((t - cutT) / 0.8f);
+                cam.transform.position += new Vector3(Mathf.PerlinNoise(t * 9f, 0.3f) - 0.5f, Mathf.PerlinNoise(t * 9f, 7.7f) - 0.5f, Mathf.PerlinNoise(t * 9f, 15.1f) - 0.5f) * 2f * amp;
+            }
 
             // fades: dip on cuts, black at the very end
             fadeAlpha = Mathf.MoveTowards(fadeAlpha, 0f, dt * 5f);
@@ -151,7 +190,7 @@ public class LaunchSequence : MonoBehaviour
         fade.color = Color.black;
         yield return null;
         foreach (var go in fx) if (go != null) Destroy(go);
-        fx.Clear();
+        fx.Clear(); systems.Clear();
         dep.Consume();
         cam.transform.position = camPos; cam.transform.rotation = camRot; cam.fieldOfView = camFov;
         if (rig != null) rig.enabled = true;
@@ -162,12 +201,12 @@ public class LaunchSequence : MonoBehaviour
         Running = false;
         skip = false;
 
-        if (!string.IsNullOrEmpty(missionId) && MissionManager.Instance != null && MissionManager.Instance.CompleteByLaunch(missionId))
-            Hud.Toast("Launch successful! Contract completed: " + missionName);
-        else Hud.Toast("Launch successful!");
+        if (FlightManager.Instance != null && record != null) FlightManager.Instance.Launched(record);
+        else Hud.Toast("Launch complete.");
+        record = null;
     }
 
-    float fadeAlpha;
+    float fadeAlpha, cutT;
 
     static float GroundY(Vector3 p)
     {
@@ -235,7 +274,9 @@ public class LaunchSequence : MonoBehaviour
         var ps = go.AddComponent<ParticleSystem>();
         ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         var main = ps.main;
-        main.playOnAwake = false; main.loop = true; main.useUnscaledTime = true; main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.playOnAwake = false; main.loop = true; main.useUnscaledTime = false; main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.cullingMode = ParticleSystemCullingMode.AlwaysSimulate;
+        systems.Add(ps);
         var r = go.GetComponent<ParticleSystemRenderer>();
         var mat = new Material(Shader.Find("Sprites/Default")) { mainTexture = Soft() };
         r.sharedMaterial = mat; r.renderMode = ParticleSystemRenderMode.Billboard; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
@@ -272,12 +313,27 @@ public class LaunchSequence : MonoBehaviour
         ps.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
         var main = ps.main;
         main.startLifetime = new ParticleSystem.MinMaxCurve(7f, 10f); main.startSpeed = new ParticleSystem.MinMaxCurve(1f, 4f);
-        main.startSize = new ParticleSystem.MinMaxCurve(7f, 13f); main.maxParticles = 1500;
+        main.startSize = new ParticleSystem.MinMaxCurve(9f, 16f); main.maxParticles = 3000;
         var sh = ps.shape; sh.shapeType = ParticleSystemShapeType.Circle; sh.radius = 1.5f;
-        var em = ps.emission; em.rateOverTime = 0f; em.rateOverDistance = 0.55f;
+        var em = ps.emission; em.rateOverTime = 0f; em.rateOverDistance = 1.5f;
         var col = ps.colorOverLifetime; col.enabled = true;
         col.color = Grad((0f, new Color(0.95f, 0.93f, 0.9f, 0.7f)), (0.5f, new Color(0.85f, 0.85f, 0.88f, 0.4f)), (1f, new Color(0.8f, 0.82f, 0.86f, 0f)));
         var sz = ps.sizeOverLifetime; sz.enabled = true; sz.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 0.5f, 1f, 2.6f));
+        return ps;
+    }
+
+    ParticleSystem MakeBlast(Vector3 at)
+    {
+        var ps = NewPs("Blast", null, at);
+        var main = ps.main;
+        main.loop = false; main.startLifetime = new ParticleSystem.MinMaxCurve(1.6f, 3.4f); main.startSpeed = new ParticleSystem.MinMaxCurve(15f, 60f);
+        main.startSize = new ParticleSystem.MinMaxCurve(14f, 38f); main.maxParticles = 900; main.gravityModifier = 0.15f;
+        var sh = ps.shape; sh.shapeType = ParticleSystemShapeType.Sphere; sh.radius = 4f;
+        var em = ps.emission; em.rateOverTime = 0f;
+        em.SetBursts(new[] { new ParticleSystem.Burst(0f, 500) });
+        var col = ps.colorOverLifetime; col.enabled = true;
+        col.color = Grad((0f, new Color(1f, 0.95f, 0.7f, 1f)), (0.2f, new Color(1f, 0.55f, 0.15f, 0.9f)), (0.6f, new Color(0.25f, 0.22f, 0.22f, 0.7f)), (1f, new Color(0.15f, 0.15f, 0.17f, 0f)));
+        var sz = ps.sizeOverLifetime; sz.enabled = true; sz.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 0.5f, 1f, 1.8f));
         return ps;
     }
 

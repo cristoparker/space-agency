@@ -366,7 +366,6 @@ public class BaseSim : MonoBehaviour
         {
             D.SetLevel(j.id, Mathf.Max(j.level, D.LevelOf(j.id)));
             ApplyVisibility();
-            Hud.Toast("The " + BaseData.BuildingName(j.id) + " is now level " + D.LevelOf(j.id));
             BuildFinished?.Invoke(j.id, D.LevelOf(j.id));
             return;
         }

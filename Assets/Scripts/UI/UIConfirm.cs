@@ -29,7 +29,7 @@ public static class UIConfirm
         const float w = 190f;
         var card = UIKit.At(block, "Card", 0, 0, w, 100);
         card.anchorMin = card.anchorMax = new Vector2(0.5f, 0.5f); card.pivot = new Vector2(0.5f, 0.5f); card.anchoredPosition = Vector2.zero;
-        UIKit.Glass(card);
+        UIKit.Panel(card);
         card.gameObject.AddComponent<UIPopIn>();
         card.gameObject.AddComponent<CanvasGroup>();
 

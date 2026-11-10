@@ -83,6 +83,18 @@ def guardrail():
     return b.finish("Guardrail")
 
 
+def road_lamp():
+    """Street lamp for the site roads: pole with one arm reaching over the road (towards -Y = Unity +Z). Lamp glass is slot 1."""
+    b = B()
+    b.box((0, 0, 0.25), (0.7, 0.7, 0.5), CONC)                                     # base
+    b.cyl((0, 0, 4.2), 0.13, 7.6, STEEL, seg=8, r2=0.1)                            # pole
+    b.box((0, -1.2, 7.85), (0.12, 2.5, 0.12), STEEL)                               # arm
+    b.box((0, -2.3, 7.7), (0.56, 1.1, 0.24), DARK)                                 # lamp housing
+    b.box((0, -2.3, 7.56), (0.46, 0.92, 0.05), LCONC, mat=1)                       # lamp glass
+    b.box((0, 0, 7.5), (0.22, 0.22, 0.5), STEEL)                                   # arm bracket
+    return b.finish("RoadLamp")
+
+
 def chevron_sign():
     """Large black-and-yellow chevron board on a post for the bend."""
     b = B()
@@ -103,7 +115,7 @@ for m in list(bpy.data.meshes):
 
 manifest = {}
 x = 0
-for name, fn in (("TunnelPortal", tunnel_portal), ("Guardrail", guardrail), ("ChevronSign", chevron_sign)):
+for name, fn in (("TunnelPortal", tunnel_portal), ("Guardrail", guardrail), ("ChevronSign", chevron_sign), ("RoadLamp", road_lamp)):
     ob = fn()
     d = ob.dimensions
     manifest[name] = {"w": round(d.x, 2), "d": round(d.y, 2), "h": round(d.z, 2), "tris": sum(len(p.vertices) - 2 for p in ob.data.polygons)}

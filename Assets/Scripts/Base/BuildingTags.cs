@@ -150,17 +150,16 @@ public class BuildingTags : MonoBehaviour
         var T = UIKit.T;
         var b = NewRect("Done " + id, 134f, 16f);
         b.pivot = new Vector2(0.5f, 0f);
-        UIKit.Tint(b, OvalBlack).raycastTarget = false;
+        var hit = UIKit.Tint(b, OvalBlack);                          // the oval itself is the click area: click to dismiss
         var ring = UIKit.At(b, "Icon", 3, 2f, 12, 12);
         UIKit.Tint(ring, T.green).raycastTarget = false;
         UIKit.IconAt(ring, check, 2.2f, 2.2f, 7.6f, 7.6f, new Color(0.04f, 0.16f, 0.08f, 1f));
         Outlined(UIKit.TextAt(b, "Text", 18, 0, 114, 16, msg, 6.6f, TextAlignmentOptions.MidlineLeft, true, new Color(0.7f, 1f, 0.8f, 1f)));
-        var hit = b.gameObject.AddComponent<Image>(); hit.color = new Color(1f, 1f, 1f, 0f);          // invisible hit area: click to dismiss
         var btn = b.gameObject.AddComponent<Button>(); btn.targetGraphic = hit; btn.transition = Selectable.Transition.None;
         var captured = t;
         btn.onClick.AddListener(() => { if (captured.bubble != null) { Destroy(captured.bubble.gameObject); captured.bubble = null; } });
         b.gameObject.AddComponent<CanvasGroup>(); b.gameObject.AddComponent<UIPopIn>();
-        t.bubble = b; t.bubbleUntil = Time.unscaledTime + 18f;
+        t.bubble = b; t.bubbleUntil = float.MaxValue;               // stays on the building until it is clicked
     }
 
     // ---------------------------------------------------------------- every frame: follow the buildings

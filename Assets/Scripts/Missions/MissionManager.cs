@@ -15,6 +15,10 @@ public class MissionManager : MonoBehaviour
     readonly List<MissionDefinition> available = new List<MissionDefinition>();
     readonly List<MissionInstance> running = new List<MissionInstance>();
     readonly List<MissionInstance> completed = new List<MissionInstance>();
+    readonly List<MissionDefinition> pending = new List<MissionDefinition>();
+
+    /// <summary>Contracts the player accepted while another one was running: they start one after another, in this order.</summary>
+    public IReadOnlyList<MissionDefinition> Pending => pending;
 
     public IReadOnlyList<MissionDefinition> Available => available;
     public IReadOnlyList<MissionInstance> Running => running;
@@ -69,6 +73,7 @@ public class MissionManager : MonoBehaviour
         Agency.AddReputation(-10);
         Hud.Toast("Contract failed: \"" + m.Definition.displayName + "\" missed its deadline (-10 reputation).");
         Changed?.Invoke();
+        PromoteNext();
     }
 
     /// <summary>The rocket for this contract was launched successfully: pays the reward and completes the contract.</summary>
@@ -80,6 +85,17 @@ public class MissionManager : MonoBehaviour
         return true;
     }
 
+    /// <summary>The rocket for this contract has been launched: the contract leaves the running list (its flight and reward are handled by FlightManager).</summary>
+    public void DetachForFlight(string missionId)
+    {
+        var m = running.Find(x => x.Definition.id == missionId);
+        if (m == null) return;
+        running.Remove(m);
+        if (Tracked == m) Tracked = running.Count > 0 ? running[0] : null;
+        Changed?.Invoke();
+        PromoteNext();
+    }
+
     /// <summary>Starts a contract that did not come from the local offers (a won global contract).</summary>
     public MissionInstance AcceptExternal(MissionDefinition definition)
     {
@@ -88,9 +104,33 @@ public class MissionManager : MonoBehaviour
         return StartMission(definition);
     }
 
+    /// <summary>Only one contract runs at a time: a second accepted contract waits as pending until the first one is launched or ends.</summary>
     public MissionInstance StartMission(MissionDefinition definition)
     {
         if (definition == null || !available.Remove(definition)) return null;
+        if (running.Count > 0) { if (!pending.Contains(definition)) pending.Add(definition); Changed?.Invoke(); return null; }
+        return Begin(definition);
+    }
+
+    /// <summary>Takes a pending contract off the list and puts it back on offer.</summary>
+    public bool RemovePending(MissionDefinition definition)
+    {
+        if (!pending.Remove(definition)) return false;
+        if (!available.Contains(definition)) available.Add(definition);
+        Changed?.Invoke();
+        return true;
+    }
+
+    void PromoteNext()
+    {
+        if (running.Count > 0 || pending.Count == 0) return;
+        var next = pending[0]; pending.RemoveAt(0);
+        Begin(next);
+        Hud.Toast("Next contract started: " + next.displayName);
+    }
+
+    MissionInstance Begin(MissionDefinition definition)
+    {
         var clock = GameClock.Instance;
         var inst = new MissionInstance(definition, clock != null ? clock.GameTime : 0.0, clock != null ? clock.Now : DateTime.Now);
         running.Add(inst);
@@ -146,5 +186,6 @@ public class MissionManager : MonoBehaviour
         Agency.AddReputation(25);
         MissionCompleted?.Invoke(m);
         Changed?.Invoke();
+        PromoteNext();
     }
 }

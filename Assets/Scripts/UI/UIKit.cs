@@ -48,6 +48,23 @@ public static class UIKit
         return i;
     }
 
+    /// <summary>
+    /// A readable panel: nearly solid dark graphite with a soft shadow. Used for everything that holds text or controls (windows, menus,
+    /// dialogs, cards). Only the top bar and the bottom docks stay see-through glass.
+    /// </summary>
+    public static Color PanelColor => new Color(0.075f, 0.09f, 0.13f, 0.965f);
+    public static Color CardColor => new Color(0.135f, 0.16f, 0.225f, 0.98f);
+
+    public static Image Panel(RectTransform r, bool shadow = true)
+    {
+        var i = r.gameObject.AddComponent<Image>();
+        i.sprite = T.round; i.type = Image.Type.Sliced; i.pixelsPerUnitMultiplier = 1f;
+        i.material = T.flat; i.color = PanelColor;
+        UIRound.Attach(i, 14f);
+        if (shadow) UIShadow.Attach(r);
+        return i;
+    }
+
     /// <summary>Flat translucent rounded fill for anything inside a glass panel.</summary>
     /// <summary>A pale translucent white fill (the old "card" look) on a card-sized element becomes the frosted, dark card colour.</summary>
     static bool IsPaleWhite(Color c) => (c.r > 0.95f && c.g > 0.95f && c.b > 0.95f && c.a >= 0.04f && c.a <= 0.2f)       // pale white card fill
@@ -60,8 +77,7 @@ public static class UIKit
         i.material = T.flat;
         if (IsPaleWhite(c) && r.sizeDelta.x >= 40f && r.sizeDelta.y >= 22f)
         {
-            c = T.card;                                              // cards: frosted glass (blurred backdrop), while the panel behind stays clear
-            if (T.frost != null) i.material = T.frost;
+            c = CardColor;                                           // cards: a solid, slightly lighter graphite so the text on them is easy to read
         }
         i.color = c;
         UIRound.Attach(i);                                           // gently curved on every size: capsule for controls, soft corners for cards
@@ -71,7 +87,7 @@ public static class UIKit
     public static RectTransform Card(Transform parent, string name, float x, float y, float w, float h, bool glass = true)
     {
         var r = At(parent, name, x, y, w, h);
-        if (glass) Glass(r); else Tint(r, T.well);
+        if (glass) Panel(r); else Tint(r, T.well);
         return r;
     }
 

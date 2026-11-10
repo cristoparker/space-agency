@@ -65,7 +65,7 @@ public class PlotPicker : MonoBehaviour
         banner.SetParent(canvasRect, false);
         banner.anchorMin = banner.anchorMax = new Vector2(0.5f, 1f); banner.pivot = new Vector2(0.5f, 1f);
         banner.anchoredPosition = new Vector2(0f, -32f); banner.sizeDelta = new Vector2(290f, 24f);
-        UIKit.Glass(banner);
+        UIKit.Panel(banner);
         banner.gameObject.AddComponent<CanvasGroup>(); banner.gameObject.AddComponent<UIPopIn>();
         var t = UIKit.TextAt(banner, "Text", 10, 1, 205, 22, "Choose a plot for the <b>" + def.name + "</b>\n<size=80%><color=#9FB4C8>Click a highlighted plot. Esc cancels.</color></size>", 6.8f, TextAlignmentOptions.MidlineLeft);
         t.richText = true; t.textWrappingMode = TextWrappingModes.Normal; t.lineSpacing = -6f;

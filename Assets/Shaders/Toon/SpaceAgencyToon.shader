@@ -28,6 +28,7 @@ Shader "SpaceAgency/Toon/Lit"
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
             #pragma multi_compile _ _ADDITIONAL_LIGHTS
             #pragma multi_compile _ _CLUSTER_LIGHT_LOOP
+            #pragma multi_compile_fragment _ _LIGHT_COOKIES
             #pragma multi_compile_instancing
             #pragma multi_compile _ DOTS_INSTANCING_ON
 
@@ -71,6 +72,7 @@ Shader "SpaceAgency/Toon/Lit"
                 half4 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, IN.uv) * _BaseColor;
                 float3 n = normalize(IN.normalWS) * IS_FRONT_VFACE(face, 1.0, -1.0);      // double sided: light the back faces correctly
                 half3 col = ToonShade(albedo.rgb, n, IN.positionWS, GetNormalizedScreenSpaceUV(IN.positionCS), _ToonParams, _ToonLevels);
+                col += WindowGlow(IN.uv, IN.positionWS, _BaseMap_ST);
                 return half4(col, 1);
             }
             ENDHLSL
