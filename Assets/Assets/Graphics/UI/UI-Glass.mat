@@ -29,9 +29,9 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _BackdropBrightness: 0.85
-    - _BackdropSaturation: 1.7
-    - _BlurRadius: 7
+    - _BackdropBrightness: 1.02
+    - _BackdropSaturation: 1.35
+    - _BlurRadius: 5
     - _ColorMask: 15
     - _EdgeGlow: 0
     - _Flat: 0
@@ -42,7 +42,7 @@ Material:
     - _StencilOp: 0
     - _StencilReadMask: 255
     - _StencilWriteMask: 255
-    - _TintStrength: 0.6
+    - _TintStrength: 0.26
     m_Colors:
     - _BorderColor: {r: 1, g: 1, b: 1, a: 0.55}
     - _ClipRect: {r: -32767, g: -32767, b: 32767, a: 32767}

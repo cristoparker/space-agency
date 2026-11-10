@@ -42,6 +42,34 @@ public class DeploymentManager : MonoBehaviour
         }
     }
 
+    /// <summary>The rocket model standing on the pad (null when nothing is deployed).</summary>
+    public GameObject PadRocket => padRocket;
+
+    /// <summary>Whole game days until the launch date (0 = today or overdue).</summary>
+    public int DaysToLaunch
+    {
+        get
+        {
+            var d = LaunchDate; var clock = GameClock.Instance;
+            if (!d.HasValue || clock == null) return 0;
+            return Mathf.Max(0, (int)(d.Value.Date - clock.Now.Date).TotalDays);
+        }
+    }
+
+    /// <summary>True from the launch day on (until the rocket is launched): the glowing Launch button is shown.</summary>
+    public bool LaunchReady => Current != null && padRocket != null && LaunchDate.HasValue && GameClock.Instance != null && GameClock.Instance.Now.Date >= LaunchDate.Value.Date;
+
+    /// <summary>The rocket has gone: the pad is empty and the contract is no longer deployed.</summary>
+    public void Consume()
+    {
+        Current = null;
+        PlayerPrefs.DeleteKey(Key);
+        if (padRocket != null) Destroy(padRocket);
+        padRocket = null;
+        if (placeholder != null) placeholder.SetActive(false);
+        Changed?.Invoke();
+    }
+
     public bool IsScheduledFor(DateTime day) => LaunchDate.HasValue && LaunchDate.Value.Date == day.Date;
     public bool IsMissionDeployed(string missionId) => Current != null && !string.IsNullOrEmpty(missionId) && Current.missionId == missionId;
 

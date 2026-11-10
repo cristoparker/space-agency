@@ -53,8 +53,39 @@ public class MissionManager : MonoBehaviour
                 double total = m.Definition.DurationDays * 86400.0;
                 m.SetProgress(total > 0 ? (float)((clock.GameTime - m.StartGameTime) / total) : 1f);
             }
-            if (m.Progress >= 1f) Complete(m);
+            if (m.Progress >= 1f)
+            {
+                if (m.Definition.progressMode == ProgressMode.TimeBased) Expire(m);     // the deadline passed before the rocket launched
+                else Complete(m);
+            }
         }
+    }
+
+    /// <summary>The deadline ran out: the contract is lost.</summary>
+    void Expire(MissionInstance m)
+    {
+        running.Remove(m);
+        if (Tracked == m) Tracked = running.Count > 0 ? running[0] : null;
+        Agency.AddReputation(-10);
+        Hud.Toast("Contract failed: \"" + m.Definition.displayName + "\" missed its deadline (-10 reputation).");
+        Changed?.Invoke();
+    }
+
+    /// <summary>The rocket for this contract was launched successfully: pays the reward and completes the contract.</summary>
+    public bool CompleteByLaunch(string missionId)
+    {
+        var m = running.Find(x => x.Definition.id == missionId);
+        if (m == null) return false;
+        Complete(m);
+        return true;
+    }
+
+    /// <summary>Starts a contract that did not come from the local offers (a won global contract).</summary>
+    public MissionInstance AcceptExternal(MissionDefinition definition)
+    {
+        if (definition == null) return null;
+        if (!available.Contains(definition)) available.Add(definition);
+        return StartMission(definition);
     }
 
     public MissionInstance StartMission(MissionDefinition definition)

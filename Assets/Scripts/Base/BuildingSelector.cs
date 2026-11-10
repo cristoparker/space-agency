@@ -151,11 +151,11 @@ public class BuildingSelector : MonoBehaviour
         if (selected == null) return;
         var sim = BaseSim.Instance;
         var id = IdOf(selected);
-        UIKit.Clear(cardButtons);
 
         // ---- an empty plot: choose what to build here
         if (selected.plot >= 0 && id == null)
         {
+            UIKit.Clear(cardButtons); lastSig = null;
             cardTitle.text = "Plot " + PlotName(selected);
             cardState.text = "Empty plot";
             cardState.color = UIKit.T.dim;
@@ -182,14 +182,12 @@ public class BuildingSelector : MonoBehaviour
         }
 
         // ---- a facility (fixed or built on a plot)
-        card.sizeDelta = new Vector2(228f, 84f);
-        cardButtons.anchoredPosition = new Vector2(10f, -62f);
-        cardButtons.sizeDelta = new Vector2(208f, 16f);
         var def = BaseData.Building(id);
         int level = sim != null ? sim.LevelOf(id) : 1;
         cardTitle.text = (def != null ? def.name : id) + (selected.plot >= 0 ? "  ·  " + PlotName(selected) : "");
         cardState.text = level == 0 ? "Under construction" : "Level " + level + "  ·  " + BuildingDef.LevelNames[Mathf.Min(level, 3)];
         cardState.color = level == 0 ? new Color(1f, 0.75f, 0.4f, 1f) : new Color(0.62f, 1f, 0.76f, 1f);
+
         var sb = new System.Text.StringBuilder();
         sb.Append(def != null ? def.description : "");
         if (sim != null)
@@ -201,27 +199,56 @@ public class BuildingSelector : MonoBehaviour
         }
         cardBody.text = sb.ToString();
 
+        // The buttons are rebuilt only when what they show changes. (Rebuilding them every half second made them tremble and
+        // swallowed clicks that landed between the rebuild and the release.)
+        bool canUpgrade = def != null && sim != null && sim.Job(id) == null && level + 1 <= def.MaxLevel && def.MaxLevel > 1;
+        string blockedBy = canUpgrade ? sim.WhyNotBuild(def) : null;
+        string sig = id + "|" + level + "|" + canUpgrade + "|" + blockedBy + "|" + (sim != null && sim.Job(id) != null);
+        if (sig == lastSig) return;
+        lastSig = sig;
+        UIKit.Clear(cardButtons);
+
+        card.sizeDelta = new Vector2(236f, 94f);
+        cardButtons.anchoredPosition = new Vector2(10f, -64f);
+        cardButtons.sizeDelta = new Vector2(216f, 24f);
+        const float total = 216f, gap = 4f, closeW = 24f, actW = 52f;
+        var acts = new List<(string label, System.Action action)>();
+        if (level > 0 && id != null && Actions.TryGetValue(id, out var list)) acts.AddRange(list);
+        float upgW = total - closeW - gap - acts.Count * (actW + gap);
         float bx = 0f;
-        if (def != null && sim != null && sim.Job(id) == null && level + 1 <= def.MaxLevel && def.MaxLevel > 1)
+
+        if (canUpgrade)
         {
             int next = level + 1;
-            string label = "Upgrade  $" + BaseSim.CostOf(def, next).ToString("0.#", CultureInfo.InvariantCulture) + " M  ·  " + Mathf.CeilToInt(BaseSim.DaysOf(def, next)) + " d";
-            string why = sim.WhyNotBuild(def);
-            bool ok = why == null;
-            var bb = UIKit.Btn(cardButtons, label, bx, 0, 96, 16, ok ? UIKit.T.green : UIKit.T.chip, () => sim.StartBuild(def), 6.5f, true, ok ? (Color?)null : UIKit.T.dim);
-            bb.interactable = ok;
-            if (!ok) bb.gameObject.AddComponent<TooltipTrigger>().text = why;
-            bx += 100f;
+            bool ok = blockedBy == null;
+            string cost = "$" + BaseSim.CostOf(def, next).ToString("0.#", CultureInfo.InvariantCulture) + " M  ·  " + Mathf.CeilToInt(BaseSim.DaysOf(def, next)) + " days";
+            var rt = UIKit.At(cardButtons, "Upgrade", bx, 0, upgW, 24);
+            var b = UIKit.MakeButton(rt, "", ok ? UIKit.T.green : UIKit.Wash(UIKit.T.orange, 0.30f), () => sim.StartBuild(def));
+            // an arrow, the action, and under it the price and time (or why it cannot start yet)
+            UIKit.IconAt(rt, Resources.Load<Sprite>("UIIcons/icon_upgrade"), 6, 5.5f, 12, 12, ok ? Color.white : new Color(1f, 0.78f, 0.45f, 1f)).raycastTarget = false;
+            UIKit.TextAt(rt, "Label", 21, 2, upgW - 24, 11, "Upgrade to level " + next, 7f, TextAlignmentOptions.MidlineLeft, true, ok ? Color.white : new Color(1f, 0.85f, 0.6f, 1f)).raycastTarget = false;
+            UIKit.TextAt(rt, "Sub", 21, 12.5f, upgW - 24, 9, ok ? cost : blockedBy, 5.6f, TextAlignmentOptions.MidlineLeft, false, ok ? new Color(1f, 1f, 1f, 0.8f) : new Color(1f, 0.72f, 0.4f, 1f)).raycastTarget = false;
+            b.interactable = ok;
+            var cb = b.colors; cb.disabledColor = Color.white; b.colors = cb;                         // blocked: still bright, so the reason is readable
+            if (!ok) rt.gameObject.AddComponent<TooltipTrigger>().text = "Upgrade to level " + next + "\n" + cost + "\n" + blockedBy;
+            bx += upgW + gap;
         }
-        if (level > 0 && id != null && Actions.TryGetValue(id, out var acts))
-            foreach (var (label, action) in acts)
-            {
-                var act = action;
-                UIKit.Btn(cardButtons, label, bx, 0, 62, 16, UIKit.T.teal, () => act(), 6.5f);
-                bx += 66f;
-            }
-        UIKit.Btn(cardButtons, "Close", 208f - 36f, 0, 36, 16, UIKit.T.chip, Deselect, 6.5f);
+        else bx += 0f;
+
+        foreach (var (label, action) in acts)
+        {
+            var act = action;
+            var rt = UIKit.At(cardButtons, label, bx, 0, canUpgrade ? actW : actW + 8f, 24);
+            UIKit.MakeButton(rt, label, UIKit.T.teal, () => act(), 6.6f);
+            bx += (canUpgrade ? actW : actW + 8f) + gap;
+        }
+        // close: a round button at the right end
+        var close = UIKit.At(cardButtons, "Close", total - closeW, 0, closeW, 24);
+        UIKit.MakeButton(close, "", UIKit.T.chip, Deselect);
+        UIKit.IconAt(close, UIKit.T.closeIcon, 7, 7, 10, 10, UIKit.T.ink).raycastTarget = false;
     }
+
+    string lastSig;
 
     // ---------------------------------------------------------------- picking
     static bool OverUi() => EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
@@ -275,6 +302,15 @@ public class BuildingSelector : MonoBehaviour
 
     void Select(Entry e)
     {
+        lastSig = null;                                    // a new selection builds its buttons from scratch
+        // an empty plot opens the Facility menu with that plot already chosen
+        if (e != null && e.plot >= 0 && IdOf(e) == null)
+        {
+            if (selected != null) { SetOutline(selected, false); SetTint(selected, 1f); selected = null; }
+            card.gameObject.SetActive(false);
+            FacilityPanelUI.OpenForPlot(e.plot);
+            return;
+        }
         if (selected == e) return;
         if (selected != null) { SetOutline(selected, false); SetTint(selected, 1f); }
         selected = e;
@@ -289,6 +325,7 @@ public class BuildingSelector : MonoBehaviour
     {
         var mouse = Mouse.current;
         var kb = Keyboard.current;
+        if (PlotPicker.Active || UIConfirm.IsOpen) { if (selected != null) Deselect(); return; }          // the plot picker owns the map clicks
         if (kb != null && kb.escapeKey.wasPressedThisFrame && selected != null) Deselect();
 
         var over = Pick();
@@ -318,20 +355,17 @@ public class BuildingSelector : MonoBehaviour
 
     void PlaceLabel(RectTransform label, TMP_Text text, Entry e)
     {
-        if (!LabelsVisible) e = null;
+        if (!LabelsVisible || BuildingTags.Instance != null) e = null;          // the floating name tags already show every building's name
         if (e == null || cam == null || e.t == null) { if (label.gameObject.activeSelf) label.gameObject.SetActive(false); return; }
         var b = BoundsOf(e);
         Vector3 world = new Vector3(b.center.x, b.max.y + Mathf.Max(1.5f, b.size.y * 0.06f), b.center.z);          // floats above the roof
-        Vector3 sp = cam.WorldToScreenPoint(world);
-        if (sp.z <= 0f) { label.gameObject.SetActive(false); return; }
+        Vector3 vp = cam.WorldToViewportPoint(world);
+        if (vp.z <= 0f) { label.gameObject.SetActive(false); return; }
         var id = IdOf(e);
         var def = id != null ? BaseData.Building(id) : null;
         string n = e.plot >= 0 ? (id == null ? "Plot " + PlotName(e) + "  (empty)" : (def != null ? def.name : id) + "  ·  " + PlotName(e)) : (def != null ? def.name : e.t.name);
         if (text.text != n) { text.text = n; label.sizeDelta = new Vector2(text.GetPreferredValues(n).x + 14f, 13f); }
-        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, sp, canvasRect.GetComponentInParent<Canvas>().worldCamera, out var lp))
-        {
-            label.anchoredPosition = lp + new Vector2(0f, 3f);
-            if (!label.gameObject.activeSelf) label.gameObject.SetActive(true);
-        }
+        label.anchoredPosition = new Vector2((vp.x - 0.5f) * canvasRect.rect.width, (vp.y - 0.5f) * canvasRect.rect.height) + new Vector2(0f, 3f);
+        if (!label.gameObject.activeSelf) label.gameObject.SetActive(true);
     }
 }

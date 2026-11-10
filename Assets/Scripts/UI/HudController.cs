@@ -30,18 +30,25 @@ public class HudController : MonoBehaviour
         ("Training", new[] { "Scientist Training", "Pilot Training" }),
         ("Building", new[] { "Facility", "Payload", "Rocket" }),
         ("Testing", new[] { "Engine Test", "Structure Test", "Comms Test" }),
-        ("Layer", new[] { "Labels", "Vehicles", "Greenery", "Haze" }),
+        ("Layer", new[] { "Labels", "Haze", "UI" }),
     };
-    static float NavWidth(int g) => Nav[g].label == "Layer" ? 33f : 22f;
-    readonly Dictionary<string, TMP_Text> layerChips = new Dictionary<string, TMP_Text>();
-    static readonly Dictionary<string, bool> layerOn = new Dictionary<string, bool> { { "Labels", true }, { "Vehicles", true }, { "Greenery", true }, { "Haze", true } };
+    static float NavWidth(int g) => 22f;
+    static readonly Dictionary<string, string> ItemIcons = new Dictionary<string, string>
+    {
+        { "Scientist Training", "icon_scientist" }, { "Pilot Training", "icon_pilot" }, { "Facility", "icon_facility" }, { "Payload", "icon_payload" },
+        { "Rocket", "icon_rocket" }, { "Engine Test", "icon_engine" }, { "Structure Test", "icon_structure" }, { "Comms Test", "icon_comms" },
+        { "Labels", "icon_labels" }, { "UI", "icon_ui" }, { "Vehicles", "icon_vehicles" }, { "Greenery", "icon_greenery" }, { "Haze", "icon_haze" },
+    };
+    readonly Dictionary<string, Image> layerDots = new Dictionary<string, Image>();
+    static readonly Dictionary<string, bool> layerOn = new Dictionary<string, bool> { { "Labels", true }, { "Haze", true }, { "UI", true } };
 
-    RectTransform canvasRt, top;
+    RectTransform canvasRt;
     readonly List<GameObject> subMenus = new List<GameObject>();
     readonly List<Image> navImages = new List<Image>();
     int openGroup = -1;
     GameObject facilityPanel;
-    TMP_Text toastText, moneyText, repText, resText, agencyName;
+    TMP_Text toastText, moneyText, repText, resText, agencyName, timeText, dateText;
+    float clockTimer;
     Image repFill, playIconImg, playBg, fast2Bg, fast6Bg;
     readonly List<Image> fast2Icons = new List<Image>(), fast6Icons = new List<Image>();
     float toastTimer;
@@ -65,26 +72,17 @@ public class HudController : MonoBehaviour
     {
         if (UITheme.Current == null) { Debug.LogError("HudController: Resources/UITheme is missing. Run Tools / Space Agency / Setup Game UI."); return; }
         canvasRt = (RectTransform)transform;
-        top = transform.Find("Top Panel") as RectTransform;
         Canvas.ForceUpdateCanvases();
 
-        var cal = transform.Find("Calendar Panel") as RectTransform;
-        if (cal != null)
-        {
-            if (cal.GetComponent<UIShadow>() == null) UIShadow.Attach(cal);
-            cal.anchoredPosition = new Vector2(96f, -30f);                         // drops down from the date in the top bar
-        }
         BuildPanels();
         BuildNav();
         BuildToast();
-        if (top != null) BuildTopBar();
+        BuildingTags.Create(canvasRt);                      // floating name tags, progress bars and completion bubbles (the Labels layer)
+        BuildTopBar();
+        CalendarUI.Create(canvasRt);                        // drops down from the date in the top bar
+        ObjectiveMenuUI.Create(canvasRt);                  // the Objectives button at the left and its panel
         Agency.Changed += RefreshStats;
         RefreshStats();
-
-        var left = transform.Find("Left Panel");
-        if (left != null) left.gameObject.SetActive(false);                       // replaced by the bottom navigation
-        var oldMm = transform.Find("Mission Manager Panel");
-        if (oldMm != null) oldMm.gameObject.SetActive(false);                      // replaced by the Contracts window
     }
 
     // =============================================================== windows
@@ -131,7 +129,7 @@ public class HudController : MonoBehaviour
     void BuildNav()
     {
         foreach (var k in new List<string>(layerOn.Keys)) layerOn[k] = true;                      // a fresh scene starts with every layer on
-        BuildingSelector.LabelsVisible = true; DayNightCycle.HazeEnabled = true;
+        BuildingSelector.LabelsVisible = true; BuildingTags.Visible = true; DayNightCycle.HazeEnabled = true;
         const float gap = 3f, pad = 5f, bh = 22f;
         float total = 0f; for (int q = 0; q < Nav.Length; q++) total += NavWidth(q);
         float w = pad * 2 + total + (Nav.Length - 1) * gap, h = bh + pad * 2;
@@ -149,8 +147,8 @@ public class HudController : MonoBehaviour
             var r = UIKit.At(bar, Nav[g].label, x, pad, bw, bh);
             var b = UIKit.MakeButton(r, "", UIKit.T.chip, () => OnNav(gi));
             var sprite = navIcons != null && g < navIcons.Length ? navIcons[g] : null;
-            if (Nav[g].label == "Layer") UIKit.Text(r, "Layer", 7f, TextAlignmentOptions.Center, true, UIKit.T.ink);       // the word is written on the button
-            else if (sprite != null) UIKit.IconAt(r, sprite, 4.5f, 4.5f, bh - 9f, bh - 9f, UIKit.T.ink);
+            if (Nav[g].label == "Layer") sprite = Resources.Load<Sprite>("UIIcons/nav_layers");
+            if (sprite != null) UIKit.IconAt(r, sprite, 4.5f, 4.5f, bh - 9f, bh - 9f, UIKit.T.ink);
             else UIKit.Text(r, Nav[g].label.Substring(0, 1), 9f, TextAlignmentOptions.Center, true);
             r.gameObject.AddComponent<TooltipTrigger>().text = Nav[g].label == "Layer" ? "Layer\nShow or hide parts of the map." : Nav[g].label;
             navImages.Add((Image)b.targetGraphic);
@@ -168,9 +166,23 @@ public class HudController : MonoBehaviour
                 string item = items[i];
                 var chip = UIKit.At(sub, item, 0, i * (ch + cg), cw, ch);
                 UIKit.Glass(chip, false);
-                var hit = UIKit.MakeButton(UIKit.At(chip, "Hit", 0, 0, cw, ch), Nav[g].label == "Layer" ? LayerText(item) : item, Color.clear, () => OnSubMenu(item), 6.8f, false);
-                if (Nav[g].label == "Layer") layerChips[item] = hit.GetComponentInChildren<TMP_Text>();
+                UIHover.Attach(chip.gameObject, 1.05f, 0.22f);                                    // the whole chip springs and glows under the pointer
+                var hit = UIKit.MakeButton(UIKit.At(chip, "Hit", 0, 0, cw, ch), item, Color.clear, () => OnSubMenu(item), 6.8f, false, null, false);
+                var label = hit.GetComponentInChildren<TMP_Text>();
+                label.alignment = TextAlignmentOptions.MidlineLeft; label.margin = new Vector4(17f, 0f, 0f, 0f);
+                if (ItemIcons.TryGetValue(item, out var iconName))
+                {
+                    var ic = Resources.Load<Sprite>("UIIcons/" + iconName);
+                    if (ic != null) UIKit.IconAt(chip, ic, 4.5f, 3f, 8f, 8f, UIKit.T.ink);
+                }
+                if (Nav[g].label == "Layer")
+                {
+                    var dot = UIKit.Tint(UIKit.At(chip, "State", cw - 11f, 4.5f, 5f, 5f), layerOn[item] ? UIKit.T.green : new Color(1f, 1f, 1f, 0.22f));
+                    dot.raycastTarget = false; layerDots[item] = dot;
+                }
             }
+            sub.gameObject.AddComponent<CanvasGroup>();
+            sub.gameObject.AddComponent<UIPopIn>();                                               // the menu eases in when it opens
             sub.gameObject.SetActive(false);
             subMenus.Add(sub.gameObject);
         }
@@ -194,43 +206,57 @@ public class HudController : MonoBehaviour
         foreach (var i in navImages) i.color = UIKit.T.chip;
     }
 
-    static string LayerText(string item) => (layerOn[item] ? "✓  " : "     ") + item;
+    static string LayerText(string item) => item;
 
     // the Layer menu stays open so several layers can be switched in a row
     void ToggleLayer(string item)
     {
         bool on = !layerOn[item];
         layerOn[item] = on;
-        if (layerChips.TryGetValue(item, out var t) && t != null) t.text = LayerText(item);
+        if (layerDots.TryGetValue(item, out var dot) && dot != null) dot.color = on ? UIKit.T.green : new Color(1f, 1f, 1f, 0.22f);
         switch (item)
         {
-            case "Labels": BuildingSelector.LabelsVisible = on; break;
+            case "Labels": BuildingSelector.LabelsVisible = on; BuildingTags.Visible = on; break;
+            case "UI": if (!on) HideInterface(); break;
             case "Haze": DayNightCycle.HazeEnabled = on; break;
-            case "Vehicles":
-                var tm = FindAnyObjectByType<TrafficManager>(FindObjectsInactive.Include);
-                if (tm != null) foreach (Transform v in tm.transform) v.gameObject.SetActive(on);
-                break;
-            case "Greenery":
-                foreach (var n in new[] { "Site/Nature", "Site/Road Ends/Valley Trees", "Site/Road Ends/Valley Rocks" })
-                {
-                    var o = FindInactive(n); if (o != null) o.SetActive(on);
-                }
-                break;
         }
     }
 
-    // GameObject.Find only sees active objects: walk the path so a hidden layer can be switched back on
-    static GameObject FindInactive(string path)
+    // ---- the UI layer: the whole interface goes away, only the world labels stay; Esc brings it back
+    readonly List<GameObject> hiddenUi = new List<GameObject>();
+    bool uiHidden;
+    float uiHintUntil;
+    TMP_Text uiHint;
+
+    void HideInterface()
     {
-        var parts = path.Split('/');
-        var cur = GameObject.Find(parts[0]);
-        if (cur == null) return null;
-        for (int i = 1; i < parts.Length && cur != null; i++)
+        if (uiHidden) return;
+        uiHidden = true;
+        CloseMenus();
+        hiddenUi.Clear();
+        foreach (Transform c in canvasRt)
         {
-            var next = cur.transform.Find(parts[i]);
-            cur = next != null ? next.gameObject : null;
+            if (BuildingTags.Root != null && c == BuildingTags.Root) continue;
+            if (c.gameObject.activeSelf) { hiddenUi.Add(c.gameObject); c.gameObject.SetActive(false); }
         }
-        return cur;
+        var hint = new GameObject("UI Hint", typeof(RectTransform)).GetComponent<RectTransform>();
+        hint.SetParent(canvasRt, false);
+        hint.anchorMin = hint.anchorMax = new Vector2(0.5f, 0f); hint.pivot = new Vector2(0.5f, 0f); hint.anchoredPosition = new Vector2(0f, 10f); hint.sizeDelta = new Vector2(190f, 16f);
+        UIKit.Glass(hint, false);
+        uiHint = UIKit.Text(hint, "Interface hidden  ·  press Esc to bring it back", 6.2f, TextAlignmentOptions.Center, true);
+        hint.gameObject.AddComponent<CanvasGroup>().alpha = 1f;
+        uiHintUntil = Time.unscaledTime + 4f;
+    }
+
+    void ShowInterface()
+    {
+        if (!uiHidden) return;
+        uiHidden = false;
+        foreach (var go in hiddenUi) if (go != null) go.SetActive(true);
+        hiddenUi.Clear();
+        if (uiHint != null) Destroy(uiHint.transform.parent.gameObject);
+        layerOn["UI"] = true;
+        if (layerDots.TryGetValue("UI", out var dot) && dot != null) dot.color = UIKit.T.green;
     }
 
     void OnSubMenu(string item)
@@ -239,7 +265,7 @@ public class HudController : MonoBehaviour
         CloseMenus();
         switch (item)
         {
-            case "Facility": Panels.Open("facility"); break;
+            case "Facility": FacilityPanelUI.PlotContext = -1; Panels.Open("facility"); break;
             case "Payload": Panels.Open("payload"); break;
             case "Rocket": Panels.Open("rocket"); break;
             case "Scientist Training": case "Pilot Training": Panels.Open("programs:0"); break;
@@ -275,7 +301,26 @@ public class HudController : MonoBehaviour
             toastTimer -= Time.unscaledDeltaTime;
             if (toastTimer <= 0f && toastBox != null) toastBox.gameObject.SetActive(false);
         }
+        if (uiHidden)
+        {
+            var kb = UnityEngine.InputSystem.Keyboard.current;
+            if (kb != null && kb.escapeKey.wasPressedThisFrame) ShowInterface();
+            else if (uiHint != null)
+            {
+                var g = uiHint.transform.parent.GetComponent<CanvasGroup>();
+                if (g != null) g.alpha = Time.unscaledTime < uiHintUntil ? 1f : Mathf.MoveTowards(g.alpha, 0f, Time.unscaledDeltaTime * 1.5f);
+            }
+            return;
+        }
         RefreshClockControls();
+        clockTimer += Time.unscaledDeltaTime;
+        if (clockTimer > 0.2f && timeText != null && GameClock.Instance != null)
+        {
+            clockTimer = 0f;
+            var now = GameClock.Instance.Now;
+            timeText.text = now.ToString("hh:mm tt", CultureInfo.InvariantCulture);
+            dateText.text = now.ToString("ddd, dd MMM yyyy", CultureInfo.InvariantCulture);
+        }
     }
 
     // =============================================================== game speed: pause / 3x / 6x
@@ -354,7 +399,7 @@ public class HudController : MonoBehaviour
         bar.anchorMin = new Vector2(0f, 1f); bar.anchorMax = new Vector2(1f, 1f); bar.pivot = new Vector2(0.5f, 1f);
         bar.sizeDelta = new Vector2(-16f, 19f); bar.anchoredPosition = new Vector2(0f, -5f);
         UIKit.Glass(bar);
-        bar.SetSiblingIndex(top.GetSiblingIndex());
+        bar.SetAsFirstSibling();
         var left = Cluster(bar, "Left", true);
         var right = Cluster(bar, "Right", false);
 
@@ -363,6 +408,7 @@ public class HudController : MonoBehaviour
         agencyLogo = UIKit.At(badge, "Logo", 0, -0.5f, 14, 14);
         agencyName = UIKit.TextAt(badge, "Name", 18, 0, 60, 13, Agency.Name, 7f, TextAlignmentOptions.MidlineLeft, true);
         badgeRt = badge;
+        UIHover.Attach(badge.gameObject, 1.04f, 0.14f);
 
         // ---- game speed: pause/play (normal speed), 2x and 6x - shown as play triangles, the tooltip names the speed
         var ctl = UIKit.At(left, "Game Speed", 0, 0, 58, 13);
@@ -381,20 +427,24 @@ public class HudController : MonoBehaviour
         for (int k = 0; k < 3; k++) fast6Icons.Add(UIKit.IconAt(r6, playIcon, 1.0f + k * 5.0f, 1.6f, 6f, 6.8f, T.dim));
         r6.gameObject.AddComponent<TooltipTrigger>().text = "6× speed";
 
-        // ---- clock + date, reusing the existing objects (TimeBarUI keeps updating them)
-        var timeText = top.Find("Time Bar/Time Text");
-        var dateBtn = top.Find("Time Bar/Date Button");
-        if (timeText != null) { timeText.SetParent(left, false); Size(timeText, 32f, 13f); Small(timeText, 7f); }
-        if (dateBtn != null) { dateBtn.SetParent(left, false); Size(dateBtn, 70f, 13f); Small(dateBtn, 6.8f); }
-        foreach (var n in new[] { "Time Bar/Speed Controls", "Time Bar/Day Progress Slider" })
-        {
-            var o = top.Find(n); if (o != null) o.gameObject.SetActive(false);              // replaced by the controls above
-        }
+        // ---- clock + date (the date opens the calendar)
+        var timeRt = UIKit.At(left, "Time", 0, 0, 36, 13);
+        Size(timeRt, 36f, 13f);
+        timeText = UIKit.Text(timeRt, "", 7f, TextAlignmentOptions.MidlineLeft);
+        timeText.raycastTarget = false;
+        var dateRt = UIKit.At(left, "Date", 0, 0, 84, 13);
+        Size(dateRt, 84f, 13f);
+        UIKit.MakeButton(dateRt, "", Color.clear, () => CalendarUI.Toggle());
+        UIKit.IconAt(dateRt, Resources.Load<Sprite>("UIIcons/icon_calendar"), 3, 2f, 9, 9, T.ink);
+        dateText = UIKit.TextAt(dateRt, "Label", 14, 0, 68, 13, "", 6.6f, TextAlignmentOptions.MidlineLeft);
+        dateText.raycastTarget = false;
+        dateRt.gameObject.AddComponent<TooltipTrigger>().text = "Calendar\nSee the launch date of your rocket.";
 
         // ---- right: resources, reputation, money
         var res = UIKit.At(right, "Resources Pill", 0, 0, 46, 13);
         UIKit.Tint(res, T.chip); Size(res, 46f, 13f);
         resText = UIKit.Text(res, "Staff 25", 6.5f, TextAlignmentOptions.Center, true);
+        UIHover.Attach(res.gameObject, 1.05f, 0.18f);
         res.gameObject.AddComponent<TooltipTrigger>().text = "Resources\nStaff and facilities your agency runs.";
 
         var rep = UIKit.At(right, "Reputation Pill", 0, 0, 52, 13);
@@ -402,37 +452,20 @@ public class HudController : MonoBehaviour
         repText = UIKit.TextAt(rep, "Label", 5, 0, 44, 11, "Rep LVL 1", 6.3f, TextAlignmentOptions.MidlineLeft, true);
         var track = UIKit.At(rep, "Bar", 5, 9.5f, 42, 2f); UIKit.Tint(track, new Color(1f, 1f, 1f, 0.18f));
         repFill = UIKit.Tint(UIKit.At(track, "Fill", 0, 0, 10, 2f), T.teal);
+        UIHover.Attach(rep.gameObject, 1.05f, 0.18f);
         rep.gameObject.AddComponent<TooltipTrigger>().text = "Reputation\nGrows when contracts finish. Higher levels unlock better contracts.";
 
-        var money = top.Find("Money");
-        if (money != null)
-        {
-            money.SetParent(right, false);
-            Size(money, -1f, 13f);
-            Small(money, 7.5f);
-            var icon = money.Find("Money Icon");
-            if (icon != null) Size(icon, 10f, 10f);
-            var mt = money.Find("Money Text");
-            moneyText = mt != null ? mt.GetComponent<TMP_Text>() : null;
-        }
+        var money = UIKit.At(right, "Money", 0, 0, 76, 13);
+        Size(money, 76f, 13f);
+        UIKit.IconAt(money, Resources.Load<Sprite>("UIIcons/icon_money"), 1, 1.5f, 10, 10, new Color(0.62f, 1f, 0.76f, 1f));
+        moneyText = UIKit.TextAt(money, "Amount", 13, 0, 62, 13, "", 7.4f, TextAlignmentOptions.MidlineLeft, true);
+        moneyText.raycastTarget = false;
+        UIHover.Attach(money.gameObject, 1.05f, 0.14f);
+        money.gameObject.AddComponent<TooltipTrigger>().text = "Money\nYour agency's budget.";
 
-        // ---- centre: mission timeline
-        var mission = top.Find("Mission Bar") as RectTransform;
-        if (mission != null)
-        {
-            mission.SetParent(bar, false);
-            mission.anchorMin = mission.anchorMax = new Vector2(0.5f, 0.5f); mission.pivot = new Vector2(0.5f, 0.5f);
-            mission.anchoredPosition = new Vector2(34f, 0f);
-            Small(mission, 6.5f);
-            var ms = mission.Find("Mission Progress Slider");
-            if (ms != null) Size(ms, 54f, 4f);
-        }
-
-        // the old top panel stays (TimeBarUI lives on it) but draws nothing
-        var oldImg = top.GetComponent<Image>();
-        if (oldImg != null) oldImg.enabled = false;
-        var oldShadow = top.GetComponent<UIShadow>();
-        if (oldShadow != null) oldShadow.enabled = false;
+        // ---- centre: progress of the tracked contract
+        var mission = MissionBarUI.Create(bar, new Vector2(82f, 0f));
+        LaunchDayUI.Create(bar, left, mission);              // launch countdown next to the date, glowing Launch button on launch day
         RefreshStats();
     }
 

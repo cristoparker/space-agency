@@ -302,11 +302,12 @@ public static class LevelSetup
             var m = r.sharedMaterial;
             m.shader = shader;
             m.SetColor("_Shallow", new Color(0.30f, 0.82f, 0.82f)); m.SetColor("_Deep", new Color(0.05f, 0.34f, 0.66f));
-            m.renderQueue = 2950;
+            m.renderQueue = -1;                                                    // the shader's own (opaque) queue
             EditorUtility.SetDirty(m);
         }
         r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         if (sea.GetComponent<WaterReflection>() == null) sea.AddComponent<WaterReflection>();
+        if (sea.GetComponent<WaterDepthMap>() == null) sea.AddComponent<WaterDepthMap>();
     }
 
     // ================================================================ roads (procedural meshes with painted textures)

@@ -1,5 +1,24 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-4535201128285661892
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 337d07396db7b4519936f37c89c504f1, type: 3}
+  m_Name: God Rays
+  m_EditorClassIdentifier: Assembly-CSharp::GodRaysFeature
+  m_Active: 1
+  shader: {fileID: 4800000, guid: eeacf04bbbfd846e885ab8f96abe9a74, type: 3}
+  intensity: 0.65
+  decay: 0.955
+  length: 0.85
+  threshold: 0.72
+  tint: {r: 1, g: 0.92, b: 0.75, a: 1}
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -26,7 +45,8 @@ MonoBehaviour:
     probeVolumeBlendStatesCS: {fileID: 7200000, guid: b9a23f869c4fd45f19c5ada54dd82176, type: 3}
   m_RendererFeatures:
   - {fileID: 7833122117494664109}
-  m_RendererFeatureMap: ad6b866f10d7b46cl
+  - {fileID: -4535201128285661892}
+  m_RendererFeatureMap: ad6b866f10d7b46c3c1595339aba0fc1l
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   m_AssetVersion: 3

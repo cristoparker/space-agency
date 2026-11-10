@@ -14,6 +14,10 @@ public class DayNightCycle : MonoBehaviour
     [Tooltip("Hard shadows keep the crisp pixel look. Soft blurs the edges.")]
     public LightShadows shadowType = LightShadows.Hard;
     [Range(0f, 1f)] public float shadowStrength = 0.85f;
+    [Tooltip("Highest the sun gets at noon (degrees). Lower = more light from the side.")]
+    [Range(20f, 85f)] public float sunMaxElevation = 58f;
+    [Tooltip("Turns the sun's path around the map: noon sun comes from this compass side (0 = south, 90 = west).")]
+    [Range(-180f, 180f)] public float sunAzimuth = 90f;
     public Color dayColor = new Color32(0xFF, 0xF4, 0xE0, 255);
     public Color horizonColor = new Color32(0xFF, 0x8A, 0x3D, 255);
     [Header("Ambient (blended between night and day)")]
@@ -60,9 +64,15 @@ public class DayNightCycle : MonoBehaviour
     void Apply(float dayProgress)
     {
         float angle = dayProgress * 360f - 90f;
-        sun.transform.rotation = Quaternion.Euler(angle, sunYaw, 0f);
+        // the sun climbs only to sunMaxElevation at noon (not overhead) and its path is turned to sunAzimuth, so the light falls on the
+        // side of the buildings and shadows stretch across the ground instead of lying under them
+        float H = (dayProgress - 0.5f) * Mathf.PI * 2f;
+        float lat = (90f - sunMaxElevation) * Mathf.Deg2Rad;
+        Vector3 toSunDir = new Vector3(-Mathf.Sin(H), Mathf.Cos(lat) * Mathf.Cos(H), -Mathf.Sin(lat) * Mathf.Cos(H));
+        toSunDir = Quaternion.Euler(0f, sunAzimuth, 0f) * toSunDir;
+        sun.transform.rotation = Quaternion.LookRotation(-toSunDir.normalized);
 
-        float elevation = Mathf.Sin((dayProgress - 0.25f) * Mathf.PI * 2f);
+        float elevation = toSunDir.y;
         float day = Mathf.Clamp01(elevation * 3f);
         sun.intensity = maxIntensity * Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((elevation + 0.08f) * 5f));   // gentle light even at sunrise and sunset
         sun.color = Color.Lerp(horizonColor, dayColor, Mathf.SmoothStep(0f, 1f, day));

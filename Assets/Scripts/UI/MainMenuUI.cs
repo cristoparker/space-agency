@@ -34,8 +34,6 @@ public class MainMenuUI : MonoBehaviour
         if (UITheme.Current == null) { Debug.LogError("MainMenuUI: Resources/UITheme is missing. Run Tools / Space Agency / Setup Game UI."); return; }
         var cam = Camera.main;
         if (cam != null) { cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = new Color(0.05f, 0.06f, 0.11f, 1f); }   // the glass blurs this, so keep it calm
-        var old = transform.Find("Main Menu Panel");
-        if (old != null) old.gameObject.SetActive(false);                  // replaced by the screens below
 
         var backdrop = UIKit.At(transform, "Backdrop", 0, 0, 100, 100); UIKit.Fill(backdrop);
         var bi = backdrop.gameObject.AddComponent<Image>(); bi.color = new Color(0.03f, 0.035f, 0.07f, 1f); bi.raycastTarget = false;

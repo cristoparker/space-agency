@@ -43,16 +43,28 @@ public static class UIKit
         var i = r.gameObject.AddComponent<Image>();
         i.sprite = T.round; i.type = Image.Type.Sliced; i.pixelsPerUnitMultiplier = 1f;
         i.material = T.glass; i.color = T.dark;
+        UIRound.Attach(i, 14f);                                       // panels: a larger, softer corner
         if (shadow) UIShadow.Attach(r);
         return i;
     }
 
     /// <summary>Flat translucent rounded fill for anything inside a glass panel.</summary>
+    /// <summary>A pale translucent white fill (the old "card" look) on a card-sized element becomes the frosted, dark card colour.</summary>
+    static bool IsPaleWhite(Color c) => (c.r > 0.95f && c.g > 0.95f && c.b > 0.95f && c.a >= 0.04f && c.a <= 0.2f)       // pale white card fill
+                                        || (c.r < 0.06f && c.g < 0.1f && c.b < 0.16f && c.a >= 0.08f && c.a <= 0.45f);         // or a thin dark one
+
     public static Image Tint(RectTransform r, Color c)
     {
         var i = r.gameObject.AddComponent<Image>();
         i.sprite = T.round; i.type = Image.Type.Sliced; i.pixelsPerUnitMultiplier = 1f;
-        i.material = T.flat; i.color = c;
+        i.material = T.flat;
+        if (IsPaleWhite(c) && r.sizeDelta.x >= 40f && r.sizeDelta.y >= 22f)
+        {
+            c = T.card;                                              // cards: frosted glass (blurred backdrop), while the panel behind stays clear
+            if (T.frost != null) i.material = T.frost;
+        }
+        i.color = c;
+        UIRound.Attach(i);                                           // gently curved on every size: capsule for controls, soft corners for cards
         return i;
     }
 
@@ -105,13 +117,14 @@ public static class UIKit
     /// <summary>A translucent wash of an accent colour: the fill of a secondary (tinted) button. Pair with the accent as label colour.</summary>
     public static Color Wash(Color accent, float a = 0.24f) => new Color(accent.r, accent.g, accent.b, a);
 
-    public static Button MakeButton(RectTransform r, string label, Color tint, UnityAction click, float size = 7.5f, bool head = true, Color? labelColor = null)
+    public static Button MakeButton(RectTransform r, string label, Color tint, UnityAction click, float size = 7.5f, bool head = true, Color? labelColor = null, bool hover = true)
     {
         var img = Tint(r, tint);
         var b = r.gameObject.AddComponent<Button>();
         b.targetGraphic = img;
         if (click != null) b.onClick.AddListener(click);
         StyleButton(b);
+        if (hover) UIHover.Attach(r.gameObject);
         if (!string.IsNullOrEmpty(label)) Text(r, label, size, TextAlignmentOptions.Center, head, labelColor);
         return b;
     }

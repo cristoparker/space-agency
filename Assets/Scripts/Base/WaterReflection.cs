@@ -46,7 +46,7 @@ public class WaterReflection : MonoBehaviour
 
     void OnBegin(ScriptableRenderContext ctx, Camera cam)
     {
-        if (rendering || (cam.cameraType != CameraType.Game && cam.cameraType != CameraType.SceneView)) return;
+        if (rendering || cam.name == "FacilityPreviewCam" || (cam.cameraType != CameraType.Game && cam.cameraType != CameraType.SceneView)) return;
         if (!isActiveAndEnabled) return;
         Setup(cam);
 

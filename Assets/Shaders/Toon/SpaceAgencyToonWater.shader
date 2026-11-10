@@ -20,22 +20,23 @@ Shader "SpaceAgency/Toon/Water"
 
     SubShader
     {
-        Tags { "RenderType" = "Transparent" "Queue" = "Transparent-50" "RenderPipeline" = "UniversalPipeline" }
+        Tags { "RenderType" = "Opaque" "Queue" = "Geometry+200" "RenderPipeline" = "UniversalPipeline" }
 
         Pass
         {
             Name "ForwardUnlit"
             Tags { "LightMode" = "UniversalForward" }
-            Blend SrcAlpha OneMinusSrcAlpha
-            ZWrite Off
+            ZWrite On
 
             HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
 
             TEXTURE2D(_WaterReflectionTex); SAMPLER(sampler_WaterReflectionTex);
+            TEXTURE2D(_WaterDepthMap); SAMPLER(sampler_WaterDepthMap);   // terrain height in metres (WaterDepthMap builds it), so the water is opaque and the UI glass can blur it
+            float4 _WaterDepthParams;                                    // x, z of the map corner, 1/size x, 1/size z
+            float _WaterLevel;
             float4 _SkySunDir;
             float4 _SpaceFogColor;
             float4 _SpaceFogParams;
@@ -77,8 +78,12 @@ Shader "SpaceAgency/Toon/Water"
                 float ripple = n1 * 0.5 + n2 * 0.5;
 
                 // depth below the surface -> banded colour
-                float sceneZ = LinearEyeDepth(SampleSceneDepth(suv), _ZBufferParams);
-                float diff = max(0.0, sceneZ - IN.positionCS.w);
+                float2 mapUV = (wp.xz - _WaterDepthParams.xy) * _WaterDepthParams.zw;
+                float groundY = SAMPLE_TEXTURE2D_LOD(_WaterDepthMap, sampler_WaterDepthMap, mapUV, 0).r;
+                bool inMap = all(mapUV > 0.0) && all(mapUV < 1.0);
+                float vDepth = inMap ? max(0.0, wp.y - groundY) : 99.0;                 // water depth straight down
+                float3 Vv = normalize(_WorldSpaceCameraPos - wp);
+                float diff = vDepth / clamp(Vv.y, 0.3, 1.0);                           // along the view ray, like looking through the water
                 float depthT = saturate(diff / _DepthRange);
                 float banded = floor(depthT * _Bands) / max(1.0, _Bands - 1.0);
                 float ct = saturate(lerp(depthT, banded, 0.75));
@@ -129,9 +134,10 @@ Shader "SpaceAgency/Toon/Water"
 
                 float fogF = saturate((IN.positionCS.w - _SpaceFogParams.x) / max(1.0, _SpaceFogParams.y - _SpaceFogParams.x)) * _SpaceFogParams.z;
                 col = lerp(col, _SpaceFogColor.rgb, fogF);
-                float alpha = lerp(0.55, 0.96, saturate(depthT * 4.0));
-                alpha = saturate(alpha + foam + glint);
-                return half4(col, alpha);
+                // very shallow water shows the sand under it
+                half3 sandTint = half3(0.80, 0.78, 0.60) * lerp(0.35, 1.0, day);
+                col = lerp(sandTint, col, saturate(vDepth / 0.55 + foam));
+                return half4(col, 1.0);
             }
             ENDHLSL
         }

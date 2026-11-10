@@ -104,10 +104,7 @@ public static class RocketBuilderSetup
     {
         foreach (var e in Object.FindObjectsByType<RocketBuilderUI>(FindObjectsInactive.Include)) Object.DestroyImmediate(e.gameObject);
 
-        Transform parent = null;
-        var mm = Object.FindAnyObjectByType<MissionManagerUI>(FindObjectsInactive.Include);
-        if (mm != null) parent = mm.transform.parent;
-        if (parent == null) parent = Object.FindObjectsByType<Canvas>(FindObjectsInactive.Include).First(c => c.isRootCanvas).transform;
+        Transform parent = Object.FindObjectsByType<Canvas>(FindObjectsInactive.Include).First(c => c.isRootCanvas).transform;
 
         var go = new GameObject("Rocket Builder Panel", typeof(RectTransform));
         go.transform.SetParent(parent, false);
@@ -126,17 +123,8 @@ public static class RocketBuilderSetup
         ui.headFont = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(HeadFont);
         go.SetActive(false);
 
-        var btn = GameObject.Find("Rocket Builder Button");
-        string wired = "no sidebar button found";
-        if (btn != null)
-        {
-            var toggle = btn.GetComponent<PanelToggleButton>() ?? btn.AddComponent<PanelToggleButton>();
-            toggle.panel = go;
-            EditorUtility.SetDirty(toggle);
-            wired = "sidebar button wired";
-        }
         EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
-        return lib.models.Length + " models, " + lib.icons.Length + " icons, " + wired + ".";
+        return lib.models.Length + " models, " + lib.icons.Length + " icons.";
     }
 
     static string AddDeploymentManager(PartLibrary lib)

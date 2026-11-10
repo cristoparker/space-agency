@@ -25,6 +25,22 @@ public class FacilityCatalog : ScriptableObject
         return null;
     }
 
+    /// <summary>A model of a facility level on its own (used by the menu previews).</summary>
+    public GameObject CreateModel(string id, int level, Transform parent, Vector3 position)
+    {
+        var e = Get(id);
+        if (e == null || level < 1 || level > e.levels.Length || e.levels[level - 1] == null) return null;
+        var go = Instantiate(e.levels[level - 1], position, Quaternion.identity, parent);
+        go.transform.localScale = Vector3.one * e.scale;
+        foreach (var r in go.GetComponentsInChildren<MeshRenderer>())
+        {
+            var mf = r.GetComponent<MeshFilter>();
+            int subs = mf != null && mf.sharedMesh != null ? mf.sharedMesh.subMeshCount : 1;
+            r.sharedMaterials = subs > 1 ? new[] { baseMaterial, lampOff } : new[] { baseMaterial };
+        }
+        return go;
+    }
+
     /// <summary>Creates the model of a facility level under a plot (same position and facing as the plot).</summary>
     public GameObject Spawn(string id, int level, Transform plot)
     {

@@ -15,6 +15,9 @@ public class RocketDesign
     public string payloadId;
     public List<string> equipment = new List<string>();
     public int livery;
+    [Tooltip("The simple builder: parts picked per category. When useSimple is on, stack/booster/fin/payload/equipment are generated from it.")]
+    public SimpleBuild simple = new SimpleBuild();
+    public bool useSimple;
 
     public string ToJson() => JsonUtility.ToJson(this);
     public static RocketDesign FromJson(string json)
@@ -28,6 +31,7 @@ public class RocketDesign
         stack.Clear(); equipment.Clear();
         boosterId = finId = payloadId = null;
         boosterCount = 2; finCount = 4;
+        simple = new SimpleBuild(); useSimple = false;
     }
 }
 
@@ -200,6 +204,9 @@ public class RocketReport
     public List<Check> checks = new List<Check>();
     public float heightM, widthM, dryKg, fuelKg, launchKg, payloadKg, thrustKn, liftoffTwr, dvTotal, dvRequired, costM;
     public float powerSupplyW, powerDemandW, commMbps;
+    // simple-builder numbers (filled by SimpleMetrics)
+    public float fuelSavePct, liftKg, burnKgS, payloadCapKg, stability, reliability;
+    public int orbitLevel;                 // 0 none, 1 suborbital, 2 Earth orbit, 3 Moon, 4 Mars
     public bool valid;
     public MissionDefinition mission;
 }
@@ -255,6 +262,10 @@ public static class RocketStats
             s0.thrustKn += bn * booster.thrustKn; s0.thrustOverIsp += bn * booster.thrustKn / ((booster.ispSl + booster.ispVac) * 0.5f);
         }
         if (fn > 0) { s0.dry += fn * fin.dryMassKg; r.costM += fn * fin.costM; }
+        // side boosters and fins make the first stage more efficient (less fuel burnt for the same push)
+        float bonus = SimpleMetrics.EfficiencyBonus(bn, booster, fn, fin);
+        if (bonus > 0f) s0.thrustOverIsp /= 1f + bonus;
+        r.fuelSavePct = bonus > 0f ? (1f - 1f / (1f + bonus)) * 100f : 0f;
 
         // ---- payload + equipment ----
         r.payloadKg = (payload != null ? payload.massKg : 0f) + equip.Sum(e => e.dryMassKg);
@@ -372,11 +383,12 @@ public static class RocketStats
         }
 
         r.valid = !r.checks.Any(c => c.sev == Sev.Error);
+        SimpleMetrics.Fill(r, d, lib, stack, booster, bn, fin, fn);
         return r;
     }
 }
 
-/// <summary>Builds the 3D rocket from a design (stack, boosters, fins and equipment).</summary>
+/// <summary>Builds the 3D rocket from a design (stack, boosters and fins; extras have no visual).</summary>
 public static class RocketAssembler
 {
     static readonly Dictionary<int, Material> ghostCache = new Dictionary<int, Material>();
@@ -482,15 +494,7 @@ public static class RocketAssembler
                 Spawn(fin, dir * (firstStageR * 0.98f) + Vector3.up * 0.4f, Quaternion.FromToRotation(Vector3.left, dir), SelKind.Fin, 0);
             }
 
-        // equipment rides on the ring just under the head
-        float ey = headBase >= 0f ? headBase : top;
-        for (int i = 0; i < d.equipment.Count; i++)
-        {
-            var e = lib.Get(d.equipment[i]); if (e == null) continue;
-            float a = 360f * i / d.equipment.Count + 20f;
-            Vector3 dir = Quaternion.Euler(0, a, 0) * Vector3.forward;
-            Spawn(e, dir * (topR + 0.04f) + Vector3.up * Mathf.Max(0f, ey - 0.5f), Quaternion.FromToRotation(Vector3.forward, dir), SelKind.Equip, i);
-        }
+        // extras (parachute, comms, power, RCS, legs) are equipped but never change how the rocket looks
 
         var rends = root.GetComponentsInChildren<Renderer>();
         bounds = rends.Length > 0 ? rends[0].bounds : new Bounds(Vector3.up, Vector3.one);
@@ -534,30 +538,44 @@ public static class RocketDemos
     public class Demo
     {
         public string name, description, missionId;
-        public RocketDesign design;
+        public SimpleBuild simple;
+        public int livery;
+
+        /// <summary>The full design (stack, boosters, fins...) generated from the simple build.</summary>
+        public RocketDesign Design(PartLibrary lib)
+        {
+            var d = new RocketDesign { useSimple = true, livery = livery, simple = JsonUtility.FromJson<SimpleBuild>(JsonUtility.ToJson(simple)) };
+            SimpleBuilder.Apply(d, lib);
+            return d;
+        }
     }
 
-    static Demo D(string name, string desc, string mission, string[] stack, string payload, string[] equip, string booster = null, int bn = 2, string fin = null, int fn = 3)
+    static Demo D(string name, string desc, string mission, SimpleBuild s, int livery = 0) => new Demo { name = name, description = desc, missionId = mission, simple = s, livery = livery };
+
+    static SimpleBuild B(string engine, string tank, int tankN, string head, string payload = null, string upEngine = null, string upTank = null, int upN = 1,
+                         string booster = null, int bn = 2, string fin = null, int fn = 4, params string[] extras)
     {
-        var d = new RocketDesign { boosterId = booster, boosterCount = bn, finId = fin, finCount = fn, payloadId = payload };
-        d.stack.AddRange(stack); d.equipment.AddRange(equip);
-        return new Demo { name = name, description = desc, missionId = mission, design = d };
+        var s = new SimpleBuild
+        {
+            engineId = engine, tankId = tank, tankCount = tankN, headId = head, payloadId = payload,
+            upperEngineId = upEngine, upperTankId = upTank, upperTankCount = upN,
+            boosterId = booster, boosterCount = bn, finId = fin, finCount = fn,
+        };
+        s.extras.AddRange(extras);
+        return s;
     }
 
     public static readonly List<Demo> All = new List<Demo>
     {
         D("Demo Pathfinder", "Small satellite launcher. Cheap, single stage.", "",
-          new[] { "Eng_S_Spark", "Tank_S_Long", "Avi_S", "Head_Fairing_S" }, "Pay_Satellite_S", new[] { "Com_Patch" }, null, 2, "Fin_S", 3),
+          B("Eng_S_Spark", "Tank_S_Long", 1, "Head_Fairing_S", "Pay_Satellite_S", fin: "Fin_S", fn: 3, extras: new[] { "Com_Patch" })),
         D("Demo Crew Ferry", "Two-stage capsule rocket with two side boosters.", "",
-          new[] { "Eng_M_Lifter", "Tank_M_Long", "Dec_M", "Eng_M_Vac", "Tank_M_Short", "Avi_M", "Head_Capsule_M" }, null, new[] { "Pow_Solar_S" }, "Booster_S", 2, "Fin_S", 4),
+          B("Eng_M_Lifter", "Tank_M_Long", 2, "Head_Capsule_M", null, "Eng_M_Vac", "Tank_M_Short", 1, "Booster_S", 2, "Fin_S", 4, "Pow_Solar_S"), 3),
         D("Demo Earth Watch", "For MISSION-002: sun-sync climate satellite. Two medium stages.", "MISSION-002",
-          new[] { "Eng_M_Cluster3", "Tank_M_Long", "Tank_M_Long", "Dec_M", "Eng_M_Vac", "Tank_M_Long", "Avi_M", "Head_Fairing_M" },
-          "Pay_Satellite_M", new[] { "Thr_RCS_Block", "Com_Patch" }),
-        D("Demo Lunar Lander", "For MISSION-003: soft-landing lunar station lander. Three large stages.", "MISSION-003",
-          new[] { "Eng_L_Cluster4", "Tank_L_Short", "Tank_L_Short", "Dec_L", "Eng_L_Vac", "Tank_L_Short", "Tank_L_Short", "Tank_L_Short", "Dec_L", "Eng_L_Vac", "Tank_L_Short", "Avi_L", "Head_Fairing_L" },
-          "Pay_Lander", new[] { "Rec_Parachute_M", "Rec_LandingLeg", "Pow_Solar_L" }, "Booster_S", 2),
-        D("Demo Mars Explorer", "For MISSION-001: Mars rover carrier with solar power. Three stages and two big boosters.", "MISSION-001",
-          new[] { "Eng_L_Cluster4", "Tank_L_Short", "Tank_L_Long", "Tank_L_Long", "Dec_L", "Adp_L_M", "Eng_M_Vac", "Tank_M_Long", "Tank_M_Long", "Tank_M_Long", "Dec_M", "Eng_M_Vac", "Tank_M_Long", "Avi_M", "Head_Fairing_M" },
-          "Pay_Rover", new[] { "Pow_Solar_L" }, "Booster_L", 2),
+          B("Eng_M_Lifter", "Tank_M_Long", 2, "Head_Fairing_M", "Pay_Satellite_M", "Eng_M_Vac", "Tank_M_Short", 1, "Booster_S", 2, "Fin_S", 4, "Thr_RCS_Block", "Com_Patch")),
+        D("Demo Lunar Lander", "For MISSION-003: soft-landing lunar station lander. Medium stages and four boosters.", "MISSION-003",
+          B("Eng_M_Lifter", "Tank_M_Long", 4, "Head_Fairing_L", "Pay_Lander", "Eng_M_Vac", "Tank_M_Long", 2, "Booster_M", 4, "Fin_S", 4, "Rec_Parachute_M", "Rec_LandingLeg", "Pow_Solar_L"), 5),
+        D("Demo Mars Explorer", "For MISSION-001: Mars rover carrier with solar power. Large first stage and six big boosters.", "MISSION-001",
+          B("Eng_M_Lifter", "Tank_L_Long", 4, "Head_Fairing_M", "Pay_Rover", "Eng_M_Vac", "Tank_M_Long", 2, "Booster_L", 6, "Fin_L", 4, "Pow_Solar_L"), 4),
     };
 }

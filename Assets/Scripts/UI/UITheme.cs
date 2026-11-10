@@ -12,6 +12,7 @@ public class UITheme : ScriptableObject
     [Header("Glass")]
     public Material glass;          // UI-Glass: blurred backdrop, top-level panels only
     public Material flat;           // UI-GlassFlat: translucent fill for anything inside a panel
+    public Material frost;          // UI-GlassFrost: strongly blurred glass for the cards inside a panel (frosted, the panel itself stays clear)
     public Sprite round;            // ui-glass-round
     public TMP_FontAsset body, head;
     public Sprite closeIcon;
@@ -20,6 +21,7 @@ public class UITheme : ScriptableObject
     public Color dark = new Color(0.085f, 0.095f, 0.13f, 1f);      // glass tint: graphite with a hint of blue
     public Color ink = new Color(1f, 1f, 1f, 0.96f);                // label
     public Color dim = new Color(0.92f, 0.94f, 1f, 0.60f);          // secondary label
+    public Color card = new Color(0.07f, 0.09f, 0.14f, 1f);          // inner card: tint of the frosted glass (a cool graphite, not black)
     public Color well = new Color(1f, 1f, 1f, 0.07f);              // grouped / sunken area
     public Color chip = new Color(1f, 1f, 1f, 0.13f);              // neutral control fill
     public Color track = new Color(0f, 0f, 0f, 0.28f);             // segmented control track, input fields
