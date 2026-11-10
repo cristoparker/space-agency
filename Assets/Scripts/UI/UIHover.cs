@@ -3,15 +3,16 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 /// <summary>
-/// Apple-style hover feedback for any UI element: it springs up slightly and gets a soft glow while the pointer is over it,
-/// and presses down a little while it is clicked. Added automatically to every UIKit button.
+/// macOS-style hover feedback for any UI element: a soft glass glow that stays inside the element's own box, plus a very small, limited
+/// scale (never more than 2.5 %), so nothing ever pushes out of its content box. It presses in a hair while clicked. Added automatically to every UIKit button.
 /// </summary>
 public class UIHover : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerDownHandler, IPointerUpHandler
 {
-    public float hoverScale = 1.07f, pressScale = 0.95f;
+    public float hoverScale = 1.015f, pressScale = 0.985f;
     public float glowAlpha = 0.20f;
-    [Tooltip("Extra size of the glow around the element, in canvas units.")]
-    public float glowSpread = 1.6f;
+    [Tooltip("Extra size of the glow around the element, in canvas units (0 = exactly the element's box).")]
+    public float glowSpread = 0f;
+    const float MaxHoverScale = 1.025f;
 
     Image glow;
     float scale = 1f, velocity, glowLevel;
@@ -19,11 +20,11 @@ public class UIHover : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler,
     Vector3 baseScale = Vector3.one;
 
     /// <summary>Adds hover feedback; if the element has nothing that can be hit, an invisible hit area is added.</summary>
-    public static UIHover Attach(GameObject go, float hoverScale = 1.07f, float glowAlpha = 0.20f)
+    public static UIHover Attach(GameObject go, float hoverScale = 1.015f, float glowAlpha = 0.20f)
     {
         var h = go.GetComponent<UIHover>();
         if (h == null) h = go.AddComponent<UIHover>();
-        h.hoverScale = hoverScale; h.glowAlpha = glowAlpha;
+        h.hoverScale = Mathf.Min(hoverScale, MaxHoverScale); h.glowAlpha = Mathf.Max(glowAlpha, 0.16f);
         if (go.GetComponent<Graphic>() == null)
         {
             var hit = go.AddComponent<Image>();
@@ -60,8 +61,8 @@ public class UIHover : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler,
     {
         float dt = Mathf.Min(Time.unscaledDeltaTime, 0.033f);
         float target = down ? pressScale : over ? hoverScale : 1f;
-        // a lightly damped spring: it overshoots a hair and settles, like Apple's UI
-        velocity += ((target - scale) * 520f - velocity * 26f) * dt;
+        // a well damped spring: it settles at once, no wobble
+        velocity += ((target - scale) * 420f - velocity * 34f) * dt;
         scale += velocity * dt;
         glowLevel = Mathf.MoveTowards(glowLevel, over ? 1f : 0f, dt * 7f);
         Apply();

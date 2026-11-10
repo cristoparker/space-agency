@@ -199,4 +199,14 @@ d.ellipse((290, 150, 400, 260), fill=255)                             # moon dis
 d.ellipse((330, 130, 430, 230), fill=0)                               # ... bitten into a crescent
 d.ellipse((330, 300, 360, 330), fill=255); d.ellipse((380, 340, 400, 360), fill=255)   # stars
 save(im, "icon_daynight")
+# settings: a gear
+im, d = canvas()
+d.ellipse((120, 120, 392, 392), fill=255)
+for k in range(8):
+    a = math.radians(k * 45)
+    cx, cy = 256 + math.cos(a) * 190, 256 + math.sin(a) * 190
+    pts = rot([(cx - 42, cy - 60), (cx + 42, cy - 60), (cx + 42, cy + 60), (cx - 42, cy + 60)], k * 45 + 90, (cx, cy))
+    d.polygon(pts, fill=255)
+d.ellipse((196, 196, 316, 316), fill=0)
+save(im, "icon_settings")
 print("icons written to", OUT)

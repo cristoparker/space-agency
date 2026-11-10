@@ -18,7 +18,7 @@ public class DayNightCycle : MonoBehaviour
     [Range(20f, 85f)] public float sunMaxElevation = 58f;
     [Tooltip("Turns the sun's path around the map: noon sun comes from this compass side (0 = south, 90 = west).")]
     [Range(-180f, 180f)] public float sunAzimuth = 90f;
-    public Color dayColor = new Color32(0xFF, 0xF4, 0xE0, 255);
+    public Color dayColor = new Color32(0xFF, 0xE6, 0xA8, 255);
     public Color horizonColor = new Color32(0xFF, 0x8A, 0x3D, 255);
     [Header("Ambient (blended between night and day)")]
     public Color daySky = new Color32(0x7A, 0x98, 0xBF, 255);
@@ -112,10 +112,15 @@ public class DayNightCycle : MonoBehaviour
         float sh = toSun.y;
         Color fcl = SkyHorizon(sh);
         Color fc = QualitySettings.activeColorSpace == ColorSpace.Linear ? fcl.gamma : fcl;
-        RenderSettings.fog = HazeEnabled; RenderSettings.fogMode = FogMode.Linear;
-        RenderSettings.fogStartDistance = fogStart; RenderSettings.fogEndDistance = fogEnd; RenderSettings.fogColor = fc;
+        // the player's fog intensity (Settings, 100 % = default): the haze starts close to the camera and covers the whole site; more fog = it
+        // starts and ends nearer, less fog = further away, 0 = off
+        float fi = VisualSettings.Fog, fs = 1f / Mathf.Max(0.25f, fi);
+        bool fogOn = HazeEnabled && fi > 0.03f;
+        float fStart = 150f * fs, fEnd = 1000f * fs;
+        RenderSettings.fog = fogOn; RenderSettings.fogMode = FogMode.Linear;
+        RenderSettings.fogStartDistance = fStart; RenderSettings.fogEndDistance = fEnd; RenderSettings.fogColor = fc;
         Shader.SetGlobalColor("_SpaceFogColor", QualitySettings.activeColorSpace == ColorSpace.Linear ? fcl : fc);
-        Shader.SetGlobalVector("_SpaceFogParams", new Vector4(fogStart, fogEnd, HazeEnabled ? 1f : 0f, 0f));
+        Shader.SetGlobalVector("_SpaceFogParams", new Vector4(fStart, fEnd, fogOn ? 1f : 0f, 0f));
 
     }
 

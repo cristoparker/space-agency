@@ -8,15 +8,17 @@ using UnityEngine.InputSystem;
 /// </summary>
 public class CameraRig : MonoBehaviour
 {
-    public Vector3 focus = new Vector3(0f, 6f, 130f);
-    public float distance = 520f, minDistance = 120f, maxDistance = 900f;
-    public float yaw = 0f, pitch = 28f;
+    public Vector3 focus = new Vector3(-15f, 12f, 170f);
+    public float distance = 400f, minDistance = 120f, maxDistance = 900f;
+    public float yaw = 0f, pitch = 8f;
     [Tooltip("Viewing angle when fully zoomed in: the camera rises so the plots and buildings are seen from above.")]
     public float zoomedPitch = 60f;
     [Tooltip("Half width of the map (metres) the camera may show; panning stops before the view reaches the broken terrain beyond it.")]
     public float visibleHalfWidth = 540f;
     public Vector2 zoomedZLimits = new Vector2(-20f, 340f);
     public Vector2 xLimits = new Vector2(-480f, 480f), zLimits = new Vector2(-120f, 420f);
+    [Tooltip("Field of view fully zoomed out (a wide, low view with sky) and fully zoomed in.")]
+    public float fovOut = 60f, fovIn = 42f;
     public float panSpeed = 0.9f, zoomSpeed = 0.05f, smoothing = 10f;
 
     Vector3 targetFocus, homeFocus;
@@ -82,6 +84,7 @@ public class CameraRig : MonoBehaviour
         var rot = Quaternion.Euler(curPitch, yaw, 0f);
         transform.rotation = rot;
         transform.position = focus - rot * Vector3.forward * distance;
+        if (cam != null && !CinematicCamera.Active && !LaunchSequence.Running) cam.fieldOfView = Mathf.Lerp(fovIn, fovOut, Mathf.Pow(ZoomOut01(distance), 1.3f));
     }
 
     // 0 = fully zoomed in, 1 = at the overview distance (logarithmic, so every wheel step feels the same)

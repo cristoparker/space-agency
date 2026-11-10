@@ -9,7 +9,7 @@ half3 SpaceFog(half3 col, float3 positionWS)
 {
     float viewZ = -TransformWorldToView(positionWS).z;
     float f = saturate((viewZ - _SpaceFogParams.x) / max(1.0, _SpaceFogParams.y - _SpaceFogParams.x));
-    return lerp(col, _SpaceFogColor.rgb, f * _SpaceFogParams.z);
+    return lerp(col, _SpaceFogColor.rgb, saturate(f * _SpaceFogParams.z));
 }
 
 // Hard-banded (cel) lighting from the main directional light, with shadows and an ambient floor.
@@ -58,5 +58,5 @@ half3 WindowGlow(float2 uv, float3 positionWS, float4 baseMapST)
     float h = frac(sin(dot(cell, float2(12.9898, 78.233))) * 43758.5453);
     float lit = step(0.2, h);
     half3 col = lerp(half3(1.0, 0.72, 0.36), half3(0.85, 0.93, 1.0), step(0.78, frac(h * 7.31)));
-    return col * (lit * _SpaceNight * (1.25 + 0.5 * frac(h * 3.7)));
+    return col * (lit * _SpaceNight * (2.0 + 0.8 * frac(h * 3.7)));
 }

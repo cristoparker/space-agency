@@ -156136,17 +156136,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: edeeadd511fb1449086c4d6f2386e3e1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CameraRig
-  focus: {x: -15, y: 6, z: 175}
-  distance: 640
+  focus: {x: -15, y: 12, z: 170}
+  distance: 400
   minDistance: 120
-  maxDistance: 640
+  maxDistance: 400
   yaw: 0
-  pitch: 23
+  pitch: 8
   zoomedPitch: 60
   visibleHalfWidth: 540
   zoomedZLimits: {x: -20, y: 340}
   xLimits: {x: -600, y: 600}
   zLimits: {x: -60, y: 380}
+  fovOut: 60
+  fovIn: 42
   panSpeed: 0.9
   zoomSpeed: 0.05
   smoothing: 10
@@ -235793,10 +235795,10 @@ MonoBehaviour:
   shadowStrength: 0.85
   sunMaxElevation: 58
   sunAzimuth: 90
-  dayColor: {r: 1, g: 0.95686275, b: 0.8784314, a: 1}
+  dayColor: {r: 1, g: 0.9, b: 0.66, a: 1}
   horizonColor: {r: 1, g: 0.5411765, b: 0.23921569, a: 1}
-  daySky: {r: 0.47843137, g: 0.59607846, b: 0.7490196, a: 1}
-  dayEquator: {r: 0.5411765, g: 0.57254905, b: 0.6039216, a: 1}
+  daySky: {r: 0.52, g: 0.6, b: 0.7, a: 1}
+  dayEquator: {r: 0.6, g: 0.58, b: 0.52, a: 1}
   dayGround: {r: 0.2901961, g: 0.2901961, b: 0.2901961, a: 1}
   nightSky: {r: 0.15686275, g: 0.20392157, b: 0.36078432, a: 1}
   nightEquator: {r: 0.1254902, g: 0.16470589, b: 0.28235295, a: 1}

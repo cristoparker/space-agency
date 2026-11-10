@@ -145,11 +145,17 @@ public class HudController : MonoBehaviour
         var rbar = new GameObject("Bottom Right", typeof(RectTransform)).GetComponent<RectTransform>();
         rbar.SetParent(transform, false);
         rbar.anchorMin = rbar.anchorMax = new Vector2(1f, 0f); rbar.pivot = new Vector2(1f, 0f);
-        rbar.anchoredPosition = new Vector2(-8f, 8f); rbar.sizeDelta = new Vector2(pad * 2 + 15f * 2 + gap, h);
+        rbar.anchoredPosition = new Vector2(-8f, 8f); rbar.sizeDelta = new Vector2(pad * 2 + 15f * 3 + gap * 2, h);
         UIKit.Glass(rbar);
         var cine = UIKit.At(rbar, "Cinematic", pad + 15f + gap, pad, 15f, bh);
         UIKit.MakeButton(cine, "", UIKit.T.chip, () => { CloseMenus(); CinematicCamera.Begin(this, canvasRt); });
         UIKit.IconAt(cine, Resources.Load<Sprite>("UIIcons/icon_camera"), 3.5f, 3.5f, bh - 7f, bh - 7f, UIKit.T.ink);
+        var setBtn = UIKit.At(rbar, "Settings Button", pad + 30f + gap * 2, pad, 15f, bh);
+        var settingsUi = SettingsPanelUI.Create(canvasRt);
+        UIKit.MakeButton(setBtn, "", UIKit.T.chip, () => { CloseMenus(); settingsUi.Toggle(); });
+        UIKit.IconAt(setBtn, Resources.Load<Sprite>("UIIcons/icon_settings"), 3.5f, 3.5f, bh - 7f, bh - 7f, UIKit.T.ink);
+        setBtn.gameObject.AddComponent<TooltipTrigger>().text = "Settings\nMusic, bloom, fog, main menu and exit.";
+        VisualSettings.ApplyBloom();
         cine.gameObject.AddComponent<TooltipTrigger>().text = "Cinematic camera\nThe interface hides and the camera tours the base. Click or Esc to leave.";
 
         for (int g = 0; g < Nav.Length; g++)
