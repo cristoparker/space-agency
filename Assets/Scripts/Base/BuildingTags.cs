@@ -212,11 +212,13 @@ public class BuildingTags : MonoBehaviour
             if (t.level != null) t.level.text = level > 0 ? level.ToString() : "-";
 
             var job = sim != null ? sim.Job(t.id) : null;
-            bool building = job != null && job.isBuild;
+            var rcon = RocketConstruction.Instance;
+            bool rocketBuild = t.id == "LaunchPad" && rcon != null && rcon.Building;
+            bool building = rocketBuild || (job != null && job.isBuild);
             t.bar.gameObject.SetActive(building);
             if (building)
             {
-                float p = BaseSim.Progress(job);
+                float p = rocketBuild ? rcon.Progress : BaseSim.Progress(job);
                 t.fill.anchorMax = new Vector2(Mathf.Clamp01(p), 1f);
                 t.pct.text = Mathf.RoundToInt(p * 100f) + "%";
                 t.bar.anchoredPosition = lp + new Vector2(0f, -t.bar.sizeDelta.y - 1f);

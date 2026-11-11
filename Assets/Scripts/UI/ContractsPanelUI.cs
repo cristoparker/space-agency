@@ -152,7 +152,11 @@ public class ContractsPanelUI : MonoBehaviour
     void Details(RectTransform card, MissionDefinition m)
     {
         float w = W - 16;
-        UIKit.TextAt(card, "Agency", 7, 3, w - 14, 11, m.displayName, 7.5f, TextAlignmentOptions.MidlineLeft, true);
+        UIKit.TextAt(card, "Agency", 7, 3, w - 66, 11, m.displayName, 7.5f, TextAlignmentOptions.MidlineLeft, true).overflowMode = TextOverflowModes.Ellipsis;
+        var dtag = UIKit.At(card, "Difficulty", w - 58, 4, 52, 10);
+        Color dc = m.Difficulty == 0 ? UIKit.T.green : m.Difficulty == 1 ? new Color(1f, 0.72f, 0.3f, 1f) : UIKit.T.red;
+        UIKit.Tint(dtag, UIKit.Wash(dc, 0.8f));
+        UIKit.Text(dtag, m.DifficultyName.ToUpperInvariant(), 5.4f, TextAlignmentOptions.Center, true, new Color(0.08f, 0.08f, 0.1f, 1f));
         // description box
         var box = UIKit.At(card, "Description", 5, 16, w * 0.44f, 52);
         UIKit.Tint(box, UIKit.T.well);

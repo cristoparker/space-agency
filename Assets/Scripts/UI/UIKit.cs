@@ -53,6 +53,8 @@ public static class UIKit
     /// dialogs, cards). Only the top bar and the bottom docks stay see-through glass.
     /// </summary>
     public static Color PanelColor => new Color(0.075f, 0.09f, 0.13f, 0.965f);
+    /// <summary>Tooltips are a little lighter than the panels they open over, so they stand out and stay readable.</summary>
+    public static Color TooltipColor => new Color(0.13f, 0.155f, 0.22f, 0.99f);
     public static Color CardColor => new Color(0.135f, 0.16f, 0.225f, 0.98f);
 
     public static Image Panel(RectTransform r, bool shadow = true)

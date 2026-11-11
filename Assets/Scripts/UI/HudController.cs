@@ -42,7 +42,7 @@ public class HudController : MonoBehaviour
     readonly Dictionary<string, Image> layerDots = new Dictionary<string, Image>();
     static readonly Dictionary<string, bool> layerOn = new Dictionary<string, bool> { { "Labels", true }, { "Haze", true }, { "UI", true } };
 
-    RectTransform canvasRt;
+    RectTransform canvasRt, moneyRect;
     readonly List<GameObject> subMenus = new List<GameObject>();
     readonly List<Image> navImages = new List<Image>();
     int openGroup = -1;
@@ -82,6 +82,10 @@ public class HudController : MonoBehaviour
         CalendarUI.Create(canvasRt);                        // drops down from the date in the top bar
         var objectiveMenu = ObjectiveMenuUI.Create(canvasRt);                  // the Objectives button at the left and its panel
         if (FlightManager.Instance == null) new GameObject("Flight Manager").AddComponent<FlightManager>();
+        if (RandomEvents.Instance == null) new GameObject("Random Events").AddComponent<RandomEvents>();
+        if (ResourceFlow.Instance == null) new GameObject("Resource Flow").AddComponent<ResourceFlow>();
+        if (RocketConstruction.Instance == null) new GameObject("Rocket Construction").AddComponent<RocketConstruction>();
+        ResourceUI.Create(canvasRt, moneyRect);                                 // hourly power/money popups, shortage warning, money hover panel
         FlightPanelUI.Create(canvasRt, objectiveMenu);                          // 'Mission in flight' under it after a launch
         Agency.Changed += RefreshStats;
         RefreshStats();
@@ -482,6 +486,7 @@ public class HudController : MonoBehaviour
         moneyText = UIKit.TextAt(money, "Amount", 13, 0, 62, 13, "", 7.4f, TextAlignmentOptions.MidlineLeft, true);
         moneyText.raycastTarget = false;
         UIHover.Attach(money.gameObject, 1.05f, 0.14f);
+        moneyRect = money;
         money.gameObject.AddComponent<TooltipTrigger>().text = "Money\nYour agency's budget.";
 
         // ---- centre: progress of the tracked contract

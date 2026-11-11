@@ -72,6 +72,12 @@ public static class MissionObjectives
         if (Far(d) || Needs(d, "landing")) list.Add(Program("test_struct", "Test the structure", "test_struct", "design"));
         list.Add(Deploy(d));
 
+        foreach (var pid in RandomEvents.RequestedPrograms(d.id))             // programmes the client asked for in a random event
+        {
+            var pdef = BaseData.Program(pid);
+            if (pdef != null) list.Add(Program("req_" + pid, "Client request: " + pdef.name, pid));
+        }
+
         var launch = Launch(d);
         foreach (var o in list) launch.requires.Add(o.id);                      // the launch needs everything else
         list.Add(launch);
@@ -137,13 +143,14 @@ public static class MissionObjectives
     static MissionObjective Deploy(MissionDefinition d)
     {
         var dep = DeploymentManager.Instance;
-        var o = new MissionObjective { id = "deploy", title = "Deploy the rocket to the pad", kind = ObjectiveKind.Deploy, detail = "Pick a launch date in the Rocket Designer" };
+        var o = new MissionObjective { id = "deploy", title = "Build the rocket and set the launch date", kind = ObjectiveKind.Deploy, detail = "Press Deploy in the Rocket Designer to start building" };
         o.requires.Add("design");
+        var rc = RocketConstruction.Instance;
         bool deployed = dep != null && dep.IsMissionDeployed(d.id) && dep.LaunchDate.HasValue;
-        o.state = deployed ? ObjectiveState.Done : ObjectiveState.Available;
-        o.progress = deployed ? 1f : 0f;
-        o.status = deployed ? "On the pad" : "Not on the pad yet";
-        if (!deployed) { o.actionLabel = "Designer"; o.action = () => Panels.Open("rocket"); }
+        if (deployed) { o.state = ObjectiveState.Done; o.progress = 1f; o.status = "On the pad"; }
+        else if (rc != null && rc.IsFor(d.id) && rc.Building) { o.state = ObjectiveState.Running; o.progress = rc.Progress; o.status = rc.DaysLeft + " days left" + (ResourceFlow.PowerShort ? " (power short)" : ""); }
+        else if (rc != null && rc.IsFor(d.id) && rc.WaitingForDate) { o.state = ObjectiveState.Available; o.status = "Built: choose the launch date"; o.actionLabel = "Launch date"; o.action = () => LaunchDateUI.Show(); }
+        else { o.state = ObjectiveState.Available; o.progress = 0f; o.status = "Not built yet"; o.actionLabel = "Designer"; o.action = () => Panels.Open("rocket"); }
         return o;
     }
 

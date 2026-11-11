@@ -31,6 +31,8 @@ public class MissionManager : MonoBehaviour
     public event Action Changed;
     public event Action<MissionInstance> MissionStarted;
     public event Action<MissionInstance> MissionCompleted;
+    /// <summary>A contract's work is over for any reason (launched, missed its deadline, completed or given up). The base resets its training and tests.</summary>
+    public event Action<MissionInstance> MissionEnded;
 
     void Awake()
     {
@@ -55,7 +57,7 @@ public class MissionManager : MonoBehaviour
             if (m.Definition.progressMode == ProgressMode.TimeBased && clock != null)
             {
                 double total = m.Definition.DurationDays * 86400.0;
-                m.SetProgress(total > 0 ? (float)((clock.GameTime - m.StartGameTime) / total) : 1f);
+                m.SetProgress(total > 0 ? (float)((clock.GameTime - m.StartGameTime + m.ShiftSeconds) / total) : 1f);
             }
             if (m.Progress >= 1f)
             {
@@ -65,6 +67,8 @@ public class MissionManager : MonoBehaviour
         }
     }
 
+    public void NotifyChanged() => Changed?.Invoke();
+
     /// <summary>The deadline ran out: the contract is lost.</summary>
     void Expire(MissionInstance m)
     {
@@ -73,6 +77,7 @@ public class MissionManager : MonoBehaviour
         Agency.AddReputation(-10);
         Hud.Toast("Contract failed: \"" + m.Definition.displayName + "\" missed its deadline (-10 reputation).");
         Changed?.Invoke();
+        MissionEnded?.Invoke(m);
         PromoteNext();
     }
 
@@ -93,6 +98,7 @@ public class MissionManager : MonoBehaviour
         running.Remove(m);
         if (Tracked == m) Tracked = running.Count > 0 ? running[0] : null;
         Changed?.Invoke();
+        MissionEnded?.Invoke(m);
         PromoteNext();
     }
 
@@ -156,6 +162,8 @@ public class MissionManager : MonoBehaviour
         if (Tracked == mission) Tracked = running.Count > 0 ? running[0] : null;
         Agency.AddReputation(-5);
         Changed?.Invoke();
+        MissionEnded?.Invoke(mission);
+        PromoteNext();
         return true;
     }
 
@@ -186,6 +194,7 @@ public class MissionManager : MonoBehaviour
         Agency.AddReputation(25);
         MissionCompleted?.Invoke(m);
         Changed?.Invoke();
+        MissionEnded?.Invoke(m);
         PromoteNext();
     }
 }

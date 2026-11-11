@@ -18,11 +18,16 @@ public class FlightRecord
     public float durationDays;
     public List<FlightLine> lines = new List<FlightLine>();
     public LaunchResult Result => (LaunchResult)result;
+    public bool orbit;                  // the flight simulation put the rocket in orbit
+    public float failAt;                // seconds into the flight when a failed rocket breaks up (0 = it never lifted off)
 }
 
 /// <summary>Works out whether a launch succeeds, partly succeeds or fails, from the rocket design and the contract. Nothing blocks a launch: weak rockets just fail more often.</summary>
 public static class FlightOutcome
 {
+    /// <summary>The simulated flight of the last launch evaluated (the flight scene plays it).</summary>
+    public static FlightProfile LastProfile { get; private set; }
+
     public static FlightRecord Evaluate(Deployment dep, PartLibrary lib, MissionDefinition mission)
     {
         var rec = new FlightRecord { missionId = dep.missionId, missionName = dep.missionName, rocketName = dep.rocketName };
@@ -31,10 +36,13 @@ public static class FlightOutcome
         var rep = RocketStats.Evaluate(design, lib, mission);
         var core = RocketRules.MissingCore(design, lib);
 
+        var prof = FlightSimulator.Simulate(rep);                                // the real design, flown
+        bool orbit = prof.orbit;
         int errs = rep.checks.Count(c => c.sev == Sev.Error), warns = rep.checks.Count(c => c.sev == Sev.Warn);
         int contractErrs = rep.checks.Count(c => c.contract && c.sev == Sev.Error);
         float rel = rep.reliability > 0f ? rep.reliability : 80f;
         float pf = 0.02f + (100f - rel) / 100f * 0.5f + 0.09f * errs + 0.03f * warns + (rep.stability < 40f ? 0.12f : 0f);
+        pf += RandomEvents.LaunchRisk(dep.missionId);                           // decisions made in the contract's random events
         pf *= 1f - 0.06f * (Agency.Stat(3) - 1);                              // the Safety stat: fewer failures
         pf = Mathf.Clamp(pf, 0.02f, 0.92f);
 
@@ -54,7 +62,8 @@ public static class FlightOutcome
         if (cause != null) res = LaunchResult.Failure;
         else if (contractErrs > 0 || anomaly) res = LaunchResult.Partial;
         else res = LaunchResult.Success;
-        rec.result = (int)res; rec.cause = cause;
+        if (res == LaunchResult.Success && !orbit) { res = LaunchResult.Partial; cause = null; }            // it flew, but it did not reach orbit
+        rec.result = (int)res; rec.cause = cause; rec.orbit = orbit;
 
         // ---- what the player sees: the flight in steps, then the contract's requirements
         var L = rec.lines;
@@ -66,12 +75,24 @@ public static class FlightOutcome
             if (rep.liftoffTwr >= 1f)
             {
                 Line("Ascent", res == LaunchResult.Failure ? 2 : anomaly ? 1 : 0);
-                if (res != LaunchResult.Failure) Line("Orbit", rep.dvTotal >= rep.dvRequired || mission == null ? 0 : 1);
+                if (res != LaunchResult.Failure) Line(orbit ? (prof.escape ? "Escape trajectory" : "Orbit reached (" + prof.perigeeKm.ToString("0") + " x " + prof.apogeeKm.ToString("0") + " km)") : "Orbit not reached (apogee " + prof.maxAltKm.ToString("0") + " km)", orbit ? 0 : 1);
             }
         }
         foreach (var c in rep.checks.Where(c => c.contract)) Line(c.text, c.sev == Sev.Ok ? 0 : c.sev == Sev.Warn ? 1 : 2);
         if (anomaly && cause == null && contractErrs == 0) rec.cause = "A minor anomaly cost some of the mission's value.";
+        else if (res == LaunchResult.Partial && !orbit && contractErrs == 0) rec.cause = "The rocket flew, but it did not reach orbit. It needs more delta-v (a bigger tank, a stronger engine or boosters).";
         else if (res == LaunchResult.Partial && contractErrs > 0) rec.cause = contractErrs + " contract requirement" + (contractErrs == 1 ? " was" : "s were") + " not met.";
+
+        // ---- failure: when it broke up, and which parts were to blame
+        if (res == LaunchResult.Failure)
+        {
+            rec.failAt = rep.liftoffTwr < 1f || core.Count > 0 ? 0f : Mathf.Max(8f, prof.burnoutT > 0f ? prof.burnoutT * UnityEngine.Random.Range(0.25f, 0.9f) : 60f);
+            var weakest = design.stack.Select(lib.Get).Where(p => p != null && p.category != "Structure").OrderBy(PartRatings.Rating).FirstOrDefault();
+            if (weakest != null) Line("Weakest part: " + weakest.DisplayName + " (rated " + PartRatings.Rating(weakest) + "/100)", 2);
+            if (rep.stability < 70f) Line("Stability was " + SimpleMetrics.StabilityWord(rep.stability) + " (" + Mathf.RoundToInt(rep.stability) + "/100): fins or boosters help", 2);
+            if (rep.liftoffTwr < 1.2f) Line("Liftoff thrust-to-weight was only " + rep.liftoffTwr.ToString("0.00"), rep.liftoffTwr < 1f ? 2 : 1);
+            if (rel < 90f) Line("Average part rating was " + Mathf.RoundToInt(rel) + "/100: test the parts first", 1);
+        }
 
         // ---- stars and reward
         int stars;
@@ -82,11 +103,12 @@ public static class FlightOutcome
         float mult = res == LaunchResult.Failure ? 0f
             : res == LaunchResult.Success ? (stars == 3 ? 1.3f : 1.0f)
             : (stars == 2 ? 0.6f : 0.4f);
-        rec.reward = mission != null ? (long)(mission.budget * Agency.RewardFactor * mult) : 0L;
+        rec.reward = mission != null ? (long)((mission.budget * mult + (res != LaunchResult.Failure ? RandomEvents.ExtraBudget(dep.missionId) : 0L)) * Agency.RewardFactor * RandomEvents.RewardFactor) : 0L;
 
         // ---- how long the flight takes (game days)
         string target = mission != null ? (mission.target ?? "").ToLowerInvariant() : "";
         rec.durationDays = res == LaunchResult.Failure ? 0f : target.Contains("mars") ? 20f : target.Contains("moon") || target.Contains("lunar") ? 8f : target.Contains("asteroid") ? 14f : mission == null ? 2f : 4f;
+        LastProfile = prof;
         return rec;
     }
 

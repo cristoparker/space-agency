@@ -30,6 +30,7 @@ public class ProgramDef
     public ProgramKind kind;
     public float costM, days;
     public int level;                     // 1..n inside a group (Scientist I, II, III); 0 = one-off
+    public float validDays;               // training fades after this many game days (0 = the result stays for good)
 }
 
 /// <summary>The design data of the base: buildings and programmes. Change numbers here.</summary>
@@ -66,23 +67,23 @@ public static class BaseData
 
     public static readonly ProgramDef[] Programs =
     {
-        new ProgramDef { id = "sci1", group = "sci", level = 1, kind = ProgramKind.Training, name = "Scientist Training I", building = "AdminOffice", costM = 40f, days = 6f,
+        new ProgramDef { id = "sci1", group = "sci", validDays = 120f, level = 1, kind = ProgramKind.Training, name = "Scientist Training I", building = "AdminOffice", costM = 40f, days = 8f,
             description = "Teach your staff the basics of rocket science.", effect = "Tests finish 10% faster, +8% reputation gains" },
-        new ProgramDef { id = "sci2", group = "sci", level = 2, kind = ProgramKind.Training, name = "Scientist Training II", building = "AdminOffice", minLevel = 2, costM = 80f, days = 8f,
+        new ProgramDef { id = "sci2", group = "sci", validDays = 120f, level = 2, kind = ProgramKind.Training, name = "Scientist Training II", building = "AdminOffice", minLevel = 2, costM = 80f, days = 12f,
             description = "Advanced propulsion and materials courses.", effect = "Tests finish 20% faster, +16% reputation gains" },
-        new ProgramDef { id = "sci3", group = "sci", level = 3, kind = ProgramKind.Training, name = "Scientist Training III", building = "AdminOffice", minLevel = 3, costM = 160f, days = 10f,
+        new ProgramDef { id = "sci3", group = "sci", validDays = 120f, level = 3, kind = ProgramKind.Training, name = "Scientist Training III", building = "AdminOffice", minLevel = 3, costM = 160f, days = 18f,
             description = "A full research fellowship programme.", effect = "Tests finish 30% faster, +24% reputation gains" },
-        new ProgramDef { id = "pilot1", group = "pilot", level = 1, kind = ProgramKind.Training, name = "Pilot Training I", building = "Hangar", costM = 60f, days = 7f,
+        new ProgramDef { id = "pilot1", group = "pilot", validDays = 150f, level = 1, kind = ProgramKind.Training, name = "Pilot Training I", building = "Hangar", costM = 60f, days = 10f,
             description = "Simulator hours for your first astronauts.", effect = "Qualifies a crew for capsule flights, +15 reputation" },
-        new ProgramDef { id = "pilot2", group = "pilot", level = 2, kind = ProgramKind.Training, name = "Pilot Training II", building = "Hangar", minLevel = 2, costM = 120f, days = 9f,
+        new ProgramDef { id = "pilot2", group = "pilot", validDays = 150f, level = 2, kind = ProgramKind.Training, name = "Pilot Training II", building = "Hangar", minLevel = 2, costM = 120f, days = 16f,
             description = "Emergency drills and orbital rendezvous.", effect = "Safer crews (coming soon), +15 reputation" },
-        new ProgramDef { id = "pilot3", group = "pilot", level = 3, kind = ProgramKind.Training, name = "Pilot Training III", building = "Hangar", minLevel = 3, costM = 240f, days = 12f,
+        new ProgramDef { id = "pilot3", group = "pilot", validDays = 150f, level = 3, kind = ProgramKind.Training, name = "Pilot Training III", building = "Hangar", minLevel = 3, costM = 240f, days = 24f,
             description = "Long-duration mission preparation.", effect = "Veteran crews (coming soon), +15 reputation" },
-        new ProgramDef { id = "test_engine", kind = ProgramKind.Testing, name = "Engine Static-Fire Test", building = "TestStand", costM = 90f, days = 6f,
+        new ProgramDef { id = "test_engine", kind = ProgramKind.Testing, name = "Engine Static-Fire Test", building = "TestStand", costM = 90f, days = 10f,
             description = "Burn every engine type on the test stand.", effect = "Rockets cost 4% less to build" },
-        new ProgramDef { id = "test_struct", kind = ProgramKind.Testing, name = "Structural Load Test", building = "ResearchLab", costM = 70f, days = 5f,
+        new ProgramDef { id = "test_struct", kind = ProgramKind.Testing, name = "Structural Load Test", building = "ResearchLab", costM = 70f, days = 8f,
             description = "Shake and stress the airframe.", effect = "Rockets cost 3% less to build" },
-        new ProgramDef { id = "test_comms", kind = ProgramKind.Testing, name = "Comms Link Test", building = "RadarTower", costM = 60f, days = 5f,
+        new ProgramDef { id = "test_comms", kind = ProgramKind.Testing, name = "Comms Link Test", building = "RadarTower", costM = 60f, days = 7f,
             description = "Prove your antennas against the radar.", effect = "Contracts pay 10% more" },
     };
 
@@ -143,6 +144,11 @@ public class BaseSave
     public List<LevelEntry> levels = new List<LevelEntry>();
     public List<string> done = new List<string>();
     public List<BaseJob> jobs = new List<BaseJob>();
+    [Serializable] public class Stamp { public string id, expires; }                 // when a finished training fades (yyyy-MM-dd)
+    [Serializable] public class FailEntry { public string id; public int count; }    // failed attempts: each one makes the next try a little safer
+    public List<Stamp> stamps = new List<Stamp>();
+    public List<FailEntry> fails = new List<FailEntry>();
+    public int FailsOf(string id) { var e = fails.FirstOrDefault(x => x.id == id); return e == null ? 0 : e.count; }
     [Serializable] public class PlotEntry { public int plot; public string id; }
     public List<PlotEntry> plots = new List<PlotEntry>();            // which facility stands (or is being built) on which plot
 
@@ -202,10 +208,24 @@ public class BaseSim : MonoBehaviour
     {
         ApplyVisibility();
         Changed?.Invoke();
+        if (MissionManager.Instance != null) MissionManager.Instance.MissionEnded += OnContractEnded;
+    }
+
+    /// <summary>
+    /// Training and tests belong to one contract: when it ends, everybody has to be trained and every test repeated for the next one. Only the buildings
+    /// (the facilities) stay. A training or test that is still running keeps going and counts for the next contract.
+    /// </summary>
+    void OnContractEnded(MissionInstance m)
+    {
+        int n = D.done.Count;
+        D.done.Clear(); D.stamps.Clear(); D.fails.Clear(); expiryWarned.Clear();
+        Commit();
+        if (n > 0) Hud.Toast("Contract over: training and tests must be done again for the next contract.");
     }
 
     void OnDestroy()
     {
+        if (MissionManager.Instance != null) MissionManager.Instance.MissionEnded -= OnContractEnded;
         BaseSave.Save();
         if (Instance == this) Instance = null;
     }
@@ -250,6 +270,8 @@ public class BaseSim : MonoBehaviour
         if (LevelOf(p.building) < p.minLevel)
             return p.minLevel <= 1 ? "Needs the " + BaseData.BuildingName(p.building) : "Needs " + BaseData.BuildingName(p.building) + " level " + p.minLevel;
         if (BuildingBusy(p.building)) return BaseData.BuildingName(p.building) + " is busy";
+        if (ResourceFlow.PowerShort) return "Power short";
+        if (PowerDemand + ProgramPowerMW(p) > PowerSupply + 0.01f) return "Not enough power";
         if (!Agency.CanAfford(MoneyOf(p.costM))) return "Not enough money";
         return null;
     }
@@ -266,6 +288,7 @@ public class BaseSim : MonoBehaviour
         {
             if (plot >= 0 ? !PlotFree(plot) : FreePlot() < 0) return "No free plot";
         }
+        if (b.id != "PowerGrid" && ResourceFlow.PowerShort) return "Power short";
         if (b.id != "PowerGrid" && next > PowerLevel) return "Needs Power Grid level " + next;
         if (b.id != "PowerGrid" && PowerDemand - BaseData.PowerOf(b, next - 1) + BaseData.PowerOf(b, next) > PowerSupply + 0.01f) return "Not enough power";
         if (!Agency.CanAfford(MoneyOf(CostOf(b, next)))) return "Not enough money";
@@ -275,7 +298,10 @@ public class BaseSim : MonoBehaviour
     /// <summary>Power the grid makes (MW) at its current level.</summary>
     public float PowerSupply => BaseData.GridSupplyMW[Mathf.Clamp(PowerLevel, 1, BaseData.GridSupplyMW.Length) - 1];
 
-    /// <summary>Power all finished buildings draw (MW).</summary>
+    /// <summary>Power a running training (3 MW) or test (6 MW) draws on top of the buildings.</summary>
+    public static float ProgramPowerMW(ProgramDef p) => p == null ? 0f : p.kind == ProgramKind.Testing ? 6f : 3f;
+
+    /// <summary>Power all finished buildings and running programmes draw (MW).</summary>
     public float PowerDemand
     {
         get
@@ -288,6 +314,7 @@ public class BaseSim : MonoBehaviour
                 if (job != null && job.isBuild) p = Mathf.Max(p, BaseData.PowerOf(b, job.level));        // power is reserved from the moment construction starts
                 sum += p;
             }
+            foreach (var j in D.jobs) if (!j.isBuild) sum += ProgramPowerMW(BaseData.Program(j.id));
             return sum;
         }
     }
@@ -301,6 +328,49 @@ public class BaseSim : MonoBehaviour
 
     public static float CostOf(BuildingDef b, int level) => b.costM == null || b.costM.Length == 0 ? 0f : b.costM[Mathf.Clamp(level - 1, 0, b.costM.Length - 1)];
     public static float DaysOf(BuildingDef b, int level) => b.days == null || b.days.Length == 0 ? 0f : b.days[Mathf.Clamp(level - 1, 0, b.days.Length - 1)];
+
+    // ---------------------------------------------------------------- chance and fading
+    /// <summary>Chance that a programme succeeds. Tests are riskier than training; scientists help; every earlier failure helps a little.</summary>
+    public static float ChanceOf(ProgramDef p)
+    {
+        float c = p.kind == ProgramKind.Training ? 0.92f : 0.76f + 0.04f * BaseSave.Level("sci");
+        c += 0.08f * BaseSave.Current.FailsOf(p.id);
+        return Mathf.Clamp(c, 0.3f, 0.97f);
+    }
+
+    static string Day(DateTime d) => d.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>Game days a finished training still counts (0 = not a fading programme or not done).</summary>
+    public int DaysValid(string programId)
+    {
+        var st = D.stamps.FirstOrDefault(x => x.id == programId); var clock = GameClock.Instance;
+        if (st == null || clock == null || !DateTime.TryParseExact(st.expires, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var e)) return 0;
+        return Mathf.Max(0, (int)(e.Date - clock.Now.Date).TotalDays);
+    }
+
+    float expiryTimer;
+    readonly HashSet<string> expiryWarned = new HashSet<string>();
+
+    /// <summary>Trained scientists and pilots do not stay forever: a finished training fades after its valid days and has to be repeated.</summary>
+    void CheckExpiry()
+    {
+        var clock = GameClock.Instance; if (clock == null) return;
+        bool changed = false;
+        foreach (var pd in BaseData.Programs)
+        {
+            if (pd.validDays <= 0f || !D.done.Contains(pd.id)) continue;
+            var st = D.stamps.FirstOrDefault(x => x.id == pd.id);
+            if (st == null) { D.stamps.Add(new BaseSave.Stamp { id = pd.id, expires = Day(clock.Now.Date.AddDays(pd.validDays)) }); changed = true; continue; }   // older saves: start the clock now
+            int left = DaysValid(pd.id);
+            if (left <= 0)
+            {
+                D.done.Remove(pd.id); D.stamps.Remove(st); changed = true;
+                Hud.Toast(pd.name + " has faded. Train your people again.");
+            }
+            else if (left <= 10 && expiryWarned.Add(pd.id)) Hud.Toast(pd.name + " fades in " + left + " days.");
+        }
+        if (changed) Commit();
+    }
 
     // ---------------------------------------------------------------- actions
     public bool StartProgram(ProgramDef p)
@@ -341,14 +411,19 @@ public class BaseSim : MonoBehaviour
     void Update()
     {
         var clock = GameClock.Instance;
-        if (clock == null || D.jobs.Count == 0) return;
+        if (clock == null) return;
+        expiryTimer += Time.unscaledDeltaTime;
+        if (expiryTimer > 1f) { expiryTimer = 0f; CheckExpiry(); }
+        if (D.jobs.Count == 0) return;
         float dt = clock.GameDeltaSeconds;
         if (dt <= 0f) return;
 
         bool finished = false;
+        bool powerShort = ResourceFlow.PowerShort;
         for (int i = D.jobs.Count - 1; i >= 0; i--)
         {
             var j = D.jobs[i];
+            if (powerShort && j.id != "PowerGrid") continue;                    // no power: construction, upgrades and tests stand still
             j.remaining -= dt;
             if (j.remaining > 0f) continue;
             D.jobs.RemoveAt(i);
@@ -371,7 +446,18 @@ public class BaseSim : MonoBehaviour
         }
         var p = BaseData.Program(j.id);
         if (p == null) return;
+        if (UnityEngine.Random.value > ChanceOf(p))
+        {
+            // the programme failed: the money and the days are gone, but the lesson makes the next try safer
+            var fe = D.fails.FirstOrDefault(x => x.id == p.id);
+            if (fe == null) D.fails.Add(new BaseSave.FailEntry { id = p.id, count = 1 }); else fe.count++;
+            Hud.Toast(p.name + " failed: $" + p.costM.ToString("0.#") + " M and " + Mathf.CeilToInt(p.days) + " days are lost. The next try is a little safer.");
+            return;
+        }
         if (!D.done.Contains(p.id)) D.done.Add(p.id);
+        D.fails.RemoveAll(x => x.id == p.id);
+        var clk = GameClock.Instance;
+        if (p.validDays > 0f && clk != null) { D.stamps.RemoveAll(x => x.id == p.id); D.stamps.Add(new BaseSave.Stamp { id = p.id, expires = Day(clk.Now.Date.AddDays(p.validDays)) }); expiryWarned.Remove(p.id); }
         Agency.AddReputation(p.kind == ProgramKind.Training ? 15 : 10);
         Hud.Toast(p.name + " complete: " + p.effect);
     }

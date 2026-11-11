@@ -28,6 +28,12 @@ public class TooltipUI : MonoBehaviour
         group = GetComponent<CanvasGroup>();
         var bg = GetComponent<Image>();
         if (bg != null && bg.sprite != null && bg.type == Image.Type.Sliced) UIRound.Attach(bg, 7f);        // the same gentle corner as the rest of the UI
+        if (bg != null && UIKit.T != null && UIKit.T.flat != null)
+        {
+            // a solid card, not see-through glass: the glass material shows the game behind the interface, which looked like a hole in the UI
+            bg.material = UIKit.T.flat; bg.color = UIKit.TooltipColor;
+            UIShadow.Attach(rect);
+        }
         canvas = GetComponentInParent<Canvas>();
         // small and tidy: tiny text, tight padding, wraps long lines
         if (label != null) { label.fontSize = fontSize; label.enableAutoSizing = false; label.lineSpacing = -6f; label.richText = true; }

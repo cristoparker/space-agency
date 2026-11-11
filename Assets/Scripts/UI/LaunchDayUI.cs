@@ -42,19 +42,20 @@ public class LaunchDayUI : MonoBehaviour
         // the glowing Launch button, where the mission bar is
         buttonRt = new GameObject("Launch Button", typeof(RectTransform)).GetComponent<RectTransform>();
         buttonRt.SetParent(topBar, false);
-        buttonRt.anchorMin = buttonRt.anchorMax = new Vector2(0.5f, 0.5f); buttonRt.pivot = new Vector2(0.5f, 0.5f);
-        buttonRt.anchoredPosition = mission != null ? mission.anchoredPosition : new Vector2(34f, 0f); buttonRt.sizeDelta = new Vector2(80f, 15f);
+        // the glowing button hangs under the top bar, so the contract bar (the deadline and its progress) stays visible
+        buttonRt.anchorMin = buttonRt.anchorMax = new Vector2(0.5f, 0f); buttonRt.pivot = new Vector2(0.5f, 1f);
+        buttonRt.anchoredPosition = new Vector2(0f, -7f); buttonRt.sizeDelta = new Vector2(92f, 16f);
         var gr = new GameObject("Glow", typeof(RectTransform)).GetComponent<RectTransform>();
         gr.SetParent(buttonRt, false);
         gr.anchorMin = Vector2.zero; gr.anchorMax = Vector2.one; gr.offsetMin = new Vector2(-5f, -4f); gr.offsetMax = new Vector2(5f, 4f);
         glow = gr.gameObject.AddComponent<Image>();
         glow.sprite = T.round; glow.type = Image.Type.Sliced; glow.pixelsPerUnitMultiplier = 1f; glow.color = new Color(1f, 0.85f, 0.2f, 0.3f); glow.raycastTarget = false;
         UIRound.Attach(glow);
-        var btn = UIKit.At(buttonRt, "Button", 0, 0, 80, 15);
+        var btn = UIKit.At(buttonRt, "Button", 0, 0, 92, 16);
         var b = UIKit.MakeButton(btn, "", new Color(1f, 0.82f, 0.22f, 1f), () => { var d = DeploymentManager.Instance; if (d == null || d.Current == null || d.library == null) return; LaunchResultUI.PreLaunch(d.Current, d.library, () => LaunchSequence.Begin()); });
         buttonBg = (Image)b.targetGraphic;
-        UIKit.IconAt(btn, Resources.Load<Sprite>("UIIcons/icon_launch"), 6, 2.5f, 10, 10, new Color(0.25f, 0.16f, 0f, 1f));
-        UIKit.TextAt(btn, "Label", 19, 0, 58, 15, "LAUNCH", 7.4f, TextAlignmentOptions.MidlineLeft, true, new Color(0.25f, 0.16f, 0f, 1f)).raycastTarget = false;
+        UIKit.IconAt(btn, Resources.Load<Sprite>("UIIcons/icon_launch"), 8, 3f, 10, 10, new Color(0.25f, 0.16f, 0f, 1f));
+        UIKit.TextAt(btn, "Label", 22, 0, 66, 16, "LAUNCH", 7.4f, TextAlignmentOptions.MidlineLeft, true, new Color(0.25f, 0.16f, 0f, 1f)).raycastTarget = false;
         buttonRt.gameObject.AddComponent<TooltipTrigger>().text = "Launch day\nPress to launch your rocket.";
         buttonRt.gameObject.SetActive(false);
 
@@ -105,7 +106,7 @@ public class LaunchDayUI : MonoBehaviour
             }
         }
         if (buttonRt != null) buttonRt.gameObject.SetActive(ready);
-        if (missionBar != null) missionBar.gameObject.SetActive(!ready);          // the mission bar is replaced by the Launch button
+        if (missionBar != null) missionBar.gameObject.SetActive(true);            // the contract stays on screen until the rocket has been launched
 
         // launch day begins: pause once so the player cannot sail past it
         if (ready && !wasReady)

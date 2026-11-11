@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fd5d15febe4ca4f4bb7c776b5ee338b4, type: 3}
+  m_Name: MISSION-011
+  m_EditorClassIdentifier: Assembly-CSharp::MissionDefinition
+  id: MISSION-011
+  displayName: Deep Space Comms Relay
+  missionType: Communications
+  target: Mars
+  budget: 380000000
+  massLimit: 1400
+  payload:
+    type: Satellite
+    quantity: 1
+    description: 
+  duration:
+    value: 60
+    unit: 0
+  objective: Park a relay satellite near Mars so future missions can talk to Earth.
+  specialRequirements:
+  - type: Communication
+    value: 
+    hasMinimum: 1
+    minimum: 4
+    unit: Mbps
+  - type: Power
+    value: 
+    hasMinimum: 1
+    minimum: 600
+    unit: W
+  progressMode: 0

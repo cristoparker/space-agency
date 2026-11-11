@@ -10,6 +10,8 @@ public class MissionInstance
     public MissionState State { get; internal set; } = MissionState.Running;
     public double StartGameTime { get; }
     public DateTime StartDate { get; }
+    /// <summary>Game seconds added to (or taken off) the time that has passed: events that cost or save days move the deadline this way.</summary>
+    public double ShiftSeconds;
 
     /// <summary>0..1</summary>
     public float Progress { get; private set; }

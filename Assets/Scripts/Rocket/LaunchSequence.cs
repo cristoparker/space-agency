@@ -20,6 +20,7 @@ public class LaunchSequence : MonoBehaviour
     public static void ResetStatics() { Running = false; inst = null; }
 
     FlightRecord record;
+    FlightProfile profile;
 
     public static bool Begin()
     {
@@ -30,6 +31,7 @@ public class LaunchSequence : MonoBehaviour
         var mission = MissionManager.Instance != null && dep.Current != null && !string.IsNullOrEmpty(dep.Current.missionId)
             ? MissionManager.Instance.Running.FirstOrDefault(x => x.Definition.id == dep.Current.missionId)?.Definition : null;
         inst.record = dep.library != null && dep.Current != null ? FlightOutcome.Evaluate(dep.Current, dep.library, mission) : new FlightRecord();
+        inst.profile = FlightOutcome.LastProfile;
         inst.StartCoroutine(inst.Run(dep));
         return true;
     }
@@ -201,9 +203,13 @@ public class LaunchSequence : MonoBehaviour
         Running = false;
         skip = false;
 
-        if (FlightManager.Instance != null && record != null) FlightManager.Instance.Launched(record);
-        else Hud.Toast("Launch complete.");
-        record = null;
+        // next: the flight scene (the office monitor). It can be skipped too; afterwards the launch report opens in the game
+        var rec = record; var prof = profile; record = null; profile = null;
+        FlightSceneLauncher.Begin(rec, prof, () =>
+        {
+            if (FlightManager.Instance != null && rec != null) FlightManager.Instance.Launched(rec);
+            else Hud.Toast("Launch complete.");
+        });
     }
 
     float fadeAlpha, cutT;

@@ -209,4 +209,51 @@ for k in range(8):
     d.polygon(pts, fill=255)
 d.ellipse((196, 196, 316, 316), fill=0)
 save(im, "icon_settings")
+# ---- designer toolbar: rotate, move, reset view, undo, redo, delete, save
+im, d = canvas()                                                   # rotate: a circular arrow
+d.arc((70, 70, 442, 442), 30, 330, fill=255, width=46)
+ang = math.radians(330); px, py = 256 + 186 * math.cos(ang), 256 + 186 * math.sin(ang)
+tx, ty = -math.sin(ang), math.cos(ang); nx, ny = ty, -tx
+d.polygon([(px + tx * 70, py + ty * 70), (px + nx * 62, py + ny * 62), (px - nx * 62, py - ny * 62)], fill=255)
+save(im, "icon_rotate")
+
+im, d = canvas()                                                   # move: a four-way arrow
+thick_line(d, [(256, 90), (256, 422)], 44); thick_line(d, [(90, 256), (422, 256)], 44)
+for (dx, dy) in ((0, -1), (0, 1), (-1, 0), (1, 0)):
+    cx, cy = 256 + dx * 190, 256 + dy * 190
+    pts = [(cx + dx * 60, cy + dy * 60), (cx - dx * 30 + dy * 80, cy - dy * 30 + dx * 80), (cx - dx * 30 - dy * 80, cy - dy * 30 - dx * 80)]
+    d.polygon(pts, fill=255)
+save(im, "icon_move")
+
+im, d = canvas()                                                   # reset view: corner brackets round a dot
+for sx in (-1, 1):
+    for sy in (-1, 1):
+        cx, cy = 256 + sx * 170, 256 + sy * 170
+        thick_line(d, [(cx, cy - sy * 110), (cx, cy), (cx - sx * 110, cy)], 40)
+d.ellipse((206, 206, 306, 306), fill=255)
+save(im, "icon_reset")
+
+im, d = canvas()                                                   # undo: an arrow that turns back
+thick_line(d, [(190, 190), (300, 190)], 44)
+d.arc((190, 190, 410, 410), -90, 90, fill=255, width=44)
+thick_line(d, [(300, 410), (170, 410)], 44)
+d.polygon([(50, 190), (200, 80), (200, 300)], fill=255)
+save(im, "icon_undo")
+from PIL import ImageOps
+save(ImageOps.mirror(im), "icon_redo")
+
+im, d = canvas()                                                   # delete: a bin
+d.rounded_rectangle((90, 110, 422, 160), radius=18, fill=255)
+d.rounded_rectangle((190, 60, 322, 130), radius=18, fill=255)
+d.polygon([(120, 190), (392, 190), (366, 450), (146, 450)], fill=255)
+for x in (200, 256, 312):
+    d.rounded_rectangle((x - 14, 225, x + 14, 415), radius=12, fill=0)
+save(im, "icon_trash")
+
+im, d = canvas()                                                   # save: a floppy disk
+d.rounded_rectangle((60, 60, 452, 452), radius=44, fill=255)
+d.rectangle((140, 60, 372, 180), fill=0); d.rectangle((300, 80, 346, 160), fill=255)
+d.rounded_rectangle((120, 250, 392, 420), radius=18, fill=0)
+d.rectangle((150, 290, 362, 305), fill=255); d.rectangle((150, 330, 362, 345), fill=255); d.rectangle((150, 370, 300, 385), fill=255)
+save(im, "icon_save")
 print("icons written to", OUT)

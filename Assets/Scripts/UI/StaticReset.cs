@@ -16,6 +16,14 @@ static class StaticReset
         LaunchResultUI.ResetStatics();
         FlightManager.ResetStatics();
         UIConfirm.ResetStatics();
+        ImpactCard.ResetStatics();
+        EventCard.ResetStatics();
+        RandomEvents.ResetStatics();
+        ResourceFlow.ResetStatics();
+        PartTooltipUI.ResetStatics();
+        RocketConstruction.ResetStatics();
+        LaunchDateUI.ResetStatics();
+        FlightSceneLauncher.ResetStatics();
         FacilityPanelUI.ResetStatics();
         FacilityPreview.ResetStatics();
         BuildingSelector.LabelsVisible = true;

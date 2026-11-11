@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fd5d15febe4ca4f4bb7c776b5ee338b4, type: 3}
+  m_Name: MISSION-007
+  m_EditorClassIdentifier: Assembly-CSharp::MissionDefinition
+  id: MISSION-007
+  displayName: Space Telescope Delivery
+  missionType: Astronomy
+  target: Earth Orbit
+  budget: 220000000
+  massLimit: 1800
+  payload:
+    type: Satellite
+    quantity: 1
+    description: 
+  duration:
+    value: 60
+    unit: 0
+  objective: Deliver a small space telescope above the atmosphere.
+  specialRequirements:
+  - type: Power
+    value: 
+    hasMinimum: 1
+    minimum: 700
+    unit: W
+  - type: Communication
+    value: 
+    hasMinimum: 1
+    minimum: 3
+    unit: Mbps
+  progressMode: 0

@@ -9,6 +9,7 @@ public static class LaunchResultUI
 {
     static GameObject current;
     static int prevSpeed = -1;
+    public static bool IsOpen => current != null;
     public static void ResetStatics() { current = null; prevSpeed = -1; }
 
     public static readonly Color Gold = new Color(1f, 0.82f, 0.28f, 1f), Amber = new Color(1f, 0.72f, 0.3f, 1f);

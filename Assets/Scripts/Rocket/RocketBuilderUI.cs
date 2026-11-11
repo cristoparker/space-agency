@@ -102,7 +102,8 @@ public class RocketBuilderUI : MonoBehaviour
     DateTime viewMonth, minDate;
     DateTime? pickDate;
 
-    MissionDefinition Mission => missionIndex > 0 && missionIndex < missions.Count ? missions[missionIndex] : null;
+    // only one contract runs at a time, so the designer always checks the rocket against it (no contract selector)
+    MissionDefinition Mission { get { var mm = MissionManager.Instance; return mm != null && mm.Running.Count > 0 ? mm.Running[0].Definition : null; } }
     (string label, string cat)[] Cats => mode == DesignerMode.Rocket ? RocketCats : PayloadCats;
     Color Accent => mode == DesignerMode.Rocket ? UIKit.T.orange : UIKit.T.purple;
 
@@ -194,17 +195,17 @@ public class RocketBuilderUI : MonoBehaviour
 
         // top row: undo / redo / delete / auto
         var T = UIKit.T;
-        undoBtn = UIKit.Btn(frame, "Undo", 4, 4, 26, 12, T.chip, Undo, 6f);
-        redoBtn = UIKit.Btn(frame, "Redo", 32, 4, 26, 12, T.chip, Redo, 6f);
-        deleteBtn = UIKit.Btn(frame, "Delete", 60, 4, 30, 12, T.chip, DeleteSelected, 6f, true, new Color(1f, 0.45f, 0.42f, 1f));
+        undoBtn = IconBtn(frame, "icon_undo", 4, 4, T.chip, Undo, "Undo");
+        redoBtn = IconBtn(frame, "icon_redo", 21, 4, T.chip, Redo, "Redo");
+        deleteBtn = IconBtn(frame, "icon_trash", 38, 4, T.chip, DeleteSelected, "Delete the selected part", new Color(1f, 0.5f, 0.46f, 1f));
 
         // bottom row: view controls
-        var bRot = UIKit.Btn(frame, "Rotate", 4, 134, 26, 12, T.teal, () => SetPan(false), 6f);
-        var bPan = UIKit.Btn(frame, "Move", 32, 134, 26, 12, T.chip, () => SetPan(true), 6f);
-        UIKit.Btn(frame, "Reset", 60, 134, 26, 12, T.chip, () => preview.ResetView(), 6f);
+        var bRot = IconBtn(frame, "icon_rotate", 4, 132, T.teal, () => SetPan(false), "Rotate the view");
+        var bPan = IconBtn(frame, "icon_move", 21, 132, T.chip, () => SetPan(true), "Move the view");
+        IconBtn(frame, "icon_reset", 38, 132, T.chip, () => preview.ResetView(), "Reset the view");
         rotImg = (Image)bRot.targetGraphic; panImg = (Image)bPan.targetGraphic;
-        Tip(bRot.gameObject, "Drag the view to rotate around it\nScroll to zoom, click a part to select it");
-        Tip(bPan.gameObject, "Drag the view to move it anywhere.\nRight or middle mouse button does this too.");
+        Tip(bRot.gameObject, "Rotate the view\nDrag to turn around the rocket. Scroll to zoom, click a part to select it.");
+        Tip(bPan.gameObject, "Move the view\nDrag to move it anywhere. Right or middle mouse button does this too.");
 
         // selected part caption
         var sc = UIKit.At(frame, "Selected", 4, 100, 172, 30);
@@ -226,9 +227,7 @@ public class RocketBuilderUI : MonoBehaviour
         var vOrder = UIKit.At(card, "OrderView", 5, ay, 180, ah);
         hierList = UIKit.ScrollList(vOrder, "Order", 0, 0, 180, ah, T.well, 2f);
         var vChecks = UIKit.At(card, "ChecksView", 5, ay, 180, ah);
-        UIKit.Btn(vChecks, "<", 0, 0, 14, 12, T.chip, () => ChangeMission(-1), 7f);
-        missionLabel = UIKit.TextAt(vChecks, "Contract", 16, 0, 148, 12, "", 6.5f, TextAlignmentOptions.Center);
-        UIKit.Btn(vChecks, ">", 166, 0, 14, 12, T.chip, () => ChangeMission(1), 7f);
+        missionLabel = UIKit.TextAt(vChecks, "Contract", 0, 0, 180, 12, "", 6.5f, TextAlignmentOptions.Center);
         var chk = UIKit.At(vChecks, "Checks", 0, 14, 180, ah - 14);
         checksHead = UIKit.TextAt(chk, "Head", 3, 0, 174, 10, "", 6.2f, TextAlignmentOptions.MidlineLeft, true);
         checksList = UIKit.ScrollList(chk, "Rows", 0, 11, 180, ah - 25, UIKit.T.well, 1.5f);
@@ -240,13 +239,23 @@ public class RocketBuilderUI : MonoBehaviour
 
         // ---- name / save / deploy ----
         nameInput = UIKit.Input(card, 5, 261, 88, 14, "Rocket name", 18, 7f);
-        saveBtn = UIKit.Btn(card, "Save", 96, 261, 40, 14, T.chip, SaveRocket, 6.5f);
+        saveBtn = IconBtn(card, "icon_save", 96, 261, T.chip, SaveRocket, "Save the rocket", null, 36f, 14f);
         deployBtn = UIKit.Btn(card, "Deploy", 139, 261, 46, 14, T.chip, OpenDeploy, 6.5f);
 
         // ---- blueprints (as in the reference) ----
         var bp = UIKit.Btn(card, "Blueprints", 5, 280, 89, 18, UIKit.Wash(T.blue, 0.35f), () => { infoView = infoView == 3 ? 0 : 3; RefreshAll(); }, 7f, true, new Color(0.7f, 0.69f, 1f, 1f));
         var buy = UIKit.Btn(card, "Buy blueprints", 96, 280, 89, 18, UIKit.Wash(T.purple, 0.35f), () => { infoView = infoView == 4 ? 0 : 4; RefreshAll(); }, 7f, true, new Color(0.9f, 0.7f, 1f, 1f));
         bpBtnImg = (Image)bp.targetGraphic; buyBtnImg = (Image)buy.targetGraphic;
+    }
+
+    /// <summary>A square icon button with a tooltip (Blender-style toolbar).</summary>
+    Button IconBtn(RectTransform parent, string icon, float x, float y, Color tint, UnityEngine.Events.UnityAction act, string tip, Color? iconColor = null, float w = 14f, float h = 14f)
+    {
+        var r = UIKit.At(parent, "Tool " + icon, x, y, w, h);
+        var b = UIKit.MakeButton(r, "", tint, act);
+        UIKit.IconAt(r, Resources.Load<Sprite>("UIIcons/" + icon), (w - 9f) * 0.5f, (h - 9f) * 0.5f, 9, 9, iconColor ?? UIKit.T.ink).raycastTarget = false;
+        r.gameObject.AddComponent<TooltipTrigger>().text = tip;
+        return b;
     }
 
     TMP_Text ScrollText(RectTransform parent, float w, float h)
@@ -296,7 +305,7 @@ public class RocketBuilderUI : MonoBehaviour
         subRow.gameObject.SetActive(rocket);
         if (paintCard != null) paintCard.gameObject.SetActive(true);
         deployBtn.gameObject.SetActive(rocket);
-        var saveLabel = saveBtn.GetComponentInChildren<TMP_Text>(); if (saveLabel != null) saveLabel.text = rocket ? "Save" : "Save cargo";
+        var saveTip = saveBtn.GetComponent<TooltipTrigger>(); if (saveTip != null) saveTip.text = rocket ? "Save the rocket" : "Save the cargo";
         nameInput.GetComponentInChildren<TMP_InputField>(true).text = PlayerPrefs.GetString(NameKey, "");
         nameInput.placeholder.GetComponent<TMP_Text>().text = rocket ? "Rocket name" : "Cargo name";
         // category chips
@@ -438,6 +447,7 @@ public class RocketBuilderUI : MonoBehaviour
 
     void RefreshMissions()
     {
+        return;       // (the contract selector is gone: the running contract is used)
         var mm = MissionManager.Instance;
         var prev = Mission;
         missions.Clear(); missions.Add(null);
@@ -500,9 +510,12 @@ public class RocketBuilderUI : MonoBehaviour
             return;
         }
         if (DeploymentManager.Instance == null) { Toast("No launch pad found in this scene.", true); return; }
+        if (RocketConstruction.Instance != null && RocketConstruction.Instance.Current != null) { Toast("A rocket is already " + (RocketConstruction.Instance.WaitingForDate ? "waiting for its launch date." : "under construction."), true); return; }
         string nm = (nameInput.text ?? "").Trim();
         if (nm.Length == 0) nm = "Rocket " + (RocketSaves.All().Count + 1);
         nameInput.text = nm;
+        BuildRocketCard(nm);
+        return;
         minDate = Today;
         var cur = DeploymentManager.Instance.LaunchDate;
         pickDate = cur.HasValue && cur.Value >= minDate ? cur.Value : minDate.AddDays(1);
@@ -549,6 +562,33 @@ public class RocketBuilderUI : MonoBehaviour
             b.interactable = ok;
         }
         deployDate.text = pickDate.HasValue ? "Launch date: <b>" + pickDate.Value.ToString("ddd, dd MMM yyyy", CultureInfo.InvariantCulture) + "</b>" : "";
+    }
+
+    // building the rocket: how long it takes comes from the design (size, stages, boosters, crew); the launch date is asked for when it is finished
+    void BuildRocketCard(string nm)
+    {
+        float days = RocketConstruction.DaysFor(report, design, library);
+        long cost = DeployCost;
+        var m = Mission;
+        var benefits = new List<string> { "The rocket is built in about " + Mathf.CeilToInt(days) + " days", "Then you choose the launch date" };
+        var costs = new List<string> { "$" + UIKit.Money(cost) + ", paid now", Mathf.CeilToInt(days) + " days of construction (it stops when the power is short)" };
+        var risks = new List<string>();
+        int errs = report.checks.Count(c => c.sev == Sev.Error);
+        if (errs > 0) risks.Add(errs + " requirement(s) not met: the launch may fail or only partly succeed");
+        if (m != null) risks.Add("Contract \"" + m.displayName + "\": the deadline keeps running while you build");
+        if (DeploymentManager.Instance.Current != null) risks.Add("The finished rocket replaces the one now on the pad");
+        if (!Agency.CanAfford(cost)) risks.Add("Not enough money yet");
+        ImpactCard.Show("Build \"" + nm + "\"", benefits.ToArray(), costs.ToArray(), risks.ToArray(), -1f, () => ConfirmBuild(days), null, "Start building");
+    }
+
+    void ConfirmBuild(float days)
+    {
+        long cost = DeployCost;
+        if (!Agency.TrySpend(cost)) { Toast("Not enough money to build this rocket.", true); return; }
+        SaveRocket();
+        string nm = nameInput.text;
+        if (RocketConstruction.Instance == null || !RocketConstruction.Instance.Begin(nm, design, Mission, days)) { Agency.Earn(cost); Toast("Could not start building.", true); return; }
+        Toast("Building \"" + nm + "\": about " + Mathf.CeilToInt(days) + " days   (-$" + UIKit.Money(cost) + ")");
     }
 
     void ConfirmDeploy()
@@ -707,7 +747,7 @@ public class RocketBuilderUI : MonoBehaviour
             UIKit.TextAt(cell, "Price", 2, 49, 52, 11, "$" + part.costM.ToString("0.#") + " M", 7f, TextAlignmentOptions.Center, true, UIKit.T.priceText);
             var b = UIKit.Btn(cell, equipped ? "Equipped" : "Equip", 4, 62, 48, 13, equipped ? UIKit.T.chip : UIKit.Wash(UIKit.T.green, 0.6f), () => AddPart(part), 6.8f, true, equipped ? UIKit.T.dim : UIKit.T.ink);
             b.interactable = !equipped;
-            Tip(cell.gameObject, Describe(part) + (string.IsNullOrEmpty(advisory) ? "" : "\n<color=" + Warn + ">" + advisory + "</color>"));
+            PartTipOn(cell.gameObject, () => { var tp = BuildPartTip(part); if (!string.IsNullOrEmpty(advisory)) tp.note = advisory; return tp; });
         }
     }
 
@@ -942,6 +982,38 @@ public class RocketBuilderUI : MonoBehaviour
         var t = UIKit.TextAt(r, "T", 3, 0, 170, 14, text, 5.6f, TextAlignmentOptions.MidlineLeft, false, UIKit.T.dim); t.textWrappingMode = TextWrappingModes.Normal; t.raycastTarget = false;
     }
 
+    /// <summary>What the player has to change to meet a check: names the tab and the kind of part. Shown when the pointer is over the check.</summary>
+    string CheckAdvice(Check ch)
+    {
+        string t = ch.text;
+        string head = ch.sev == Sev.Ok ? "<color=" + Good + "><b>Met</b></color>\n" : "<b>How to fix it</b>\n";
+        string tip;
+        if (ch.sev == Sev.Ok) tip = "Nothing to change. This part of the rocket is fine.";
+        else if (t.StartsWith("Empty rocket")) tip = "Pick an <b>Engine</b>, a <b>Fuel tank</b> and a <b>Head</b> (Payload tab) from the right.";
+        else if (t.StartsWith("No engine")) tip = "<b>Engine</b> tab: pick an engine.";
+        else if (t.StartsWith("No head")) tip = "<b>Payload</b> tab, section Head: pick a fairing, a nose cone or a capsule.";
+        else if (t.StartsWith("Size mismatch")) tip = "The tank, engine and head must be the same size (S, M or L). Pick the same size in the <b>Fuel tank</b>, <b>Engine</b> and <b>Payload</b> tabs.";
+        else if (t.StartsWith("No fuel")) tip = "<b>Fuel tank</b> tab: pick a tank (and raise the count with + if you need more).";
+        else if (t.Contains("has fuel but no engine")) tip = "<b>Engine</b> tab: pick an engine.";
+        else if (t.Contains("only has vacuum engines")) tip = "<b>Engine</b> tab: pick an engine that can start on the ground (not a Vac engine).";
+        else if (t.StartsWith("No avionics")) tip = "Avionics are fitted by themselves once the rocket has an engine and a tank.";
+        else if (t.StartsWith("Cannot lift off") || t.StartsWith("Weak liftoff")) tip = "The engine is too weak for the weight. Pick a <b>stronger engine</b>, add <b>boosters</b> (Outer tab), use fewer tanks or a lighter cargo.";
+        else if (t.StartsWith("Liftoff")) tip = "The rocket can lift off.";
+        else if (t.StartsWith("Payload needs a fairing")) tip = "<b>Payload</b> tab, section Head: pick a <b>Fairing</b> (a nose cone cannot carry cargo).";
+        else if (t.Contains("does not fit the")) tip = "Pick a <b>bigger fairing</b> (Payload tab, Head) or a smaller cargo.";
+        else if (t.StartsWith("Payload is heavier")) tip = "Pick a <b>bigger fairing</b> (Payload tab, Head) or a lighter cargo.";
+        else if (t.StartsWith("Power short") || (t.StartsWith("Power:") && t.Contains("/"))) tip = "<b>Extras</b> tab, section Power: add solar panels, a battery or an RTG.";
+        else if (t.StartsWith("Comms")) tip = "<b>Extras</b> tab, section Communication: add an antenna or a dish with a higher data rate.";
+        else if (t.Contains("needs a parachute or landing legs")) tip = "<b>Extras</b> tab, section Recovery: add a parachute or landing legs.";
+        else if (t.Contains("needs avionics")) tip = "Avionics are fitted by themselves once the rocket has an engine and a tank.";
+        else if (t.StartsWith("Contract needs a")) tip = "<b>Payload</b> tab, section Cargo: build the right cargo in the Payload Builder (a crew mission needs a Capsule head).";
+        else if (t.StartsWith("Payload mass")) tip = "The cargo and extras weigh too much. Remove extras, or build a lighter cargo in the Payload Builder.";
+        else if (t.StartsWith("Cost")) tip = "Too expensive for this contract. Use a smaller tank or engine, fewer boosters, or cheaper extras.";
+        else if (t.StartsWith("Delta-v")) tip = "The rocket cannot go far enough. Add <b>more tanks</b> (Fuel tank tab), a <b>stronger engine</b> (Engine tab), or <b>boosters</b> (Outer tab). A lighter cargo helps too.";
+        else tip = "Change the rocket until this line turns green.";
+        return head + tip;
+    }
+
     void AddCheckRow(Check ch)
     {
         bool two = ch.text.Length > 46;
@@ -955,6 +1027,8 @@ public class RocketBuilderUI : MonoBehaviour
         else UIKit.TextAt(chip, "G", 0, 0, 8, 8, ch.sev == Sev.Warn ? "!" : "x", 6f, TextAlignmentOptions.Center, true, new Color(0.15f, 0.05f, 0.03f, 1f)).raycastTarget = false;
         var t = UIKit.TextAt(row, "Text", 15, 0, 157, h, ch.text, 5.8f, TextAlignmentOptions.MidlineLeft, false, ch.sev == Sev.Ok ? UIKit.T.ink : col);
         t.textWrappingMode = TextWrappingModes.Normal; t.lineSpacing = -6f; t.raycastTarget = false;
+        UIKit.Tint(row, Color.clear);                                           // lets the row catch the pointer
+        Tip(row.gameObject, CheckAdvice(ch));
     }
 
     // =============================================================== simple builder (rocket mode)
@@ -1053,6 +1127,68 @@ public class RocketBuilderUI : MonoBehaviour
         }
     }
 
+    // the universal-icon tooltip of a part: category icon + title, then one icon line per fact
+    static readonly Dictionary<string, string> CatIcon = new Dictionary<string, string>
+    { { "Engine", "cat_engine" }, { "Tank", "cat_tank" }, { "Head", "cat_payload" }, { "Payload", "cat_payload" }, { "Booster", "cat_outer" }, { "Structure", "cat_outer" },
+      { "Power", "icon_power" }, { "Comms", "icon_comms" }, { "Recovery", "cat_extras" }, { "Thruster", "cat_extras" } };
+
+    static string Tons(float kg) => kg >= 1000f ? (kg / 1000f).ToString("0.#") + " t" : kg.ToString("0") + " kg";
+
+    PartTip BuildPartTip(PartInfo p, string title = null, PartInfo second = null)
+    {
+        var tip = new PartTip { title = title ?? p.DisplayName };
+        string cat = p.id.StartsWith("Fin_") ? "Structure" : p.category;
+        if (CatIcon.TryGetValue(cat, out var ci)) tip.icon = Resources.Load<Sprite>("UIIcons/" + ci);
+        int rt = PartRatings.Rating(p);
+        Color green = UIKit.T.green, ink = UIKit.T.ink;
+        switch (p.category)
+        {
+            case "Engine":
+                tip.Row("icon_engine", "Thrust  " + (p.thrustKn > 0 ? p.thrustKn.ToString("N0") + " kN" : p.thrustVacKn.ToString("N0") + " kN (space only)"));
+                tip.Row("stat_fuel", "Burns  " + SimpleMetrics.BurnKgS(p).ToString("N0") + " kg/s");
+                tip.Row("stat_mass", "Weighs  " + Tons(p.dryMassKg));
+                tip.note = PartRatings.AbilityOf(p);
+                break;
+            case "Tank":
+                tip.Row("stat_fuel", "Fuel  " + Tons(p.fuelKg));
+                tip.Row("stat_mass", "Weighs  " + Tons(p.dryMassKg + p.fuelKg) + " full");
+                break;
+            case "Head":
+                if (p.payloadMaxKg > 0) tip.Row("stat_payload", "Carries  " + Tons(p.payloadMaxKg));
+                else if (p.crew > 0) tip.Row("icon_pilot", "Crew  " + p.crew);
+                else tip.Row("stat_stability", "No cargo bay, smooth nose");
+                tip.Row("stat_mass", "Weighs  " + Tons(p.dryMassKg));
+                break;
+            case "Payload":
+                tip.Row("stat_mass", "Weighs  " + Tons(p.massKg));
+                if (p.powerW != 0) tip.Row("icon_power", (p.powerW > 0 ? "Makes  " : "Needs  ") + Mathf.Abs(p.powerW).ToString("0") + " W");
+                if (p.commMbps > 0) tip.Row("icon_comms", "Sends  " + p.commMbps.ToString("0.##") + " Mbps");
+                break;
+            case "Booster":
+                tip.Row("stat_lift", "Push  +" + p.thrustKn.ToString("N0") + " kN each");
+                tip.Row("stat_fuel", "Fuel  " + Tons(p.fuelKg));
+                tip.Row("stat_mass", "Weighs  " + Tons(p.dryMassKg + p.fuelKg));
+                if (second != null) tip.Row("stat_stability", "With fins: steadier flight", green);
+                tip.note = "Saves fuel and steadies the flight";
+                break;
+            case "Power": tip.Row("icon_power", "Makes  " + p.powerW.ToString("0") + " W"); tip.Row("stat_mass", "Weighs  " + Tons(p.dryMassKg)); break;
+            case "Comms": tip.Row("icon_comms", "Sends  " + p.dataMbps.ToString("0.##") + " Mbps"); tip.Row("stat_mass", "Weighs  " + Tons(p.dryMassKg)); break;
+            case "Recovery": tip.Row("stat_stability", p.id.Contains("Parachute") ? "Slows the landing" : p.id.Contains("Leg") ? "Helps a safe touchdown" : "Steers the fall"); tip.Row("stat_mass", "Weighs  " + Tons(p.dryMassKg)); break;
+            default:
+                if (p.id.StartsWith("Fin_")) { tip.Row("stat_stability", "Steadier flight", green); tip.Row("stat_mass", "Weighs  " + Tons(p.dryMassKg)); }
+                break;
+        }
+        tip.Row("stat_rating", "Rated  " + rt + "/100  ·  " + PartRatings.Tier(rt), ColorFromHex(RatingColor(rt)));
+        tip.Row("icon_money", "$" + (p.costM + (second != null ? second.costM * 4f : 0f)).ToString("0.##") + " M", UIKit.T.priceText);
+        return tip;
+    }
+
+    static void PartTipOn(GameObject go, System.Func<PartTip> build)
+    {
+        var pt = go.GetComponent<PartTipTrigger>() ?? go.AddComponent<PartTipTrigger>();
+        pt.build = build;
+    }
+
     string Compact(PartInfo p)
     {
         int rt = PartRatings.Rating(p);
@@ -1121,7 +1257,7 @@ public class RocketBuilderUI : MonoBehaviour
         return false;
     }
 
-    void PartCell(PartInfo part, string label, PartInfo second, bool equipped, bool toggle, System.Action click, string tip, string statText = null, bool needed = false)
+    void PartCell(PartInfo part, string label, PartInfo second, bool equipped, bool toggle, System.Action click, string tip, string statText = null, bool needed = false, System.Func<PartTip> customTip = null)
     {
         var cell = NextCell(part.id);
         UIKit.Tint(cell, equipped ? UIKit.Wash(UIKit.T.green, 0.22f) : new Color(1f, 1f, 1f, 0.12f));
@@ -1136,7 +1272,7 @@ public class RocketBuilderUI : MonoBehaviour
         string btn = toggle ? (equipped ? "Remove" : "Equip") : equipped ? "Equipped" : "Equip";
         var b2 = UIKit.Btn(cell, btn, 4, 68, 48, 13, equipped && !toggle ? UIKit.T.chip : UIKit.Wash(equipped ? UIKit.T.red : UIKit.T.green, 0.6f), () => click(), 6.4f, true, equipped && !toggle ? UIKit.T.dim : UIKit.T.ink);
         b2.interactable = toggle || !equipped;
-        Tip(cell.gameObject, tip);
+        PartTipOn(cell.gameObject, customTip ?? (() => BuildPartTip(part, label, second)));        // icons instead of paragraphs
     }
 
     void NoneCell(string name, bool on, System.Action act)
@@ -1183,8 +1319,15 @@ public class RocketBuilderUI : MonoBehaviour
                     var c = cp; var basePart = library.Get(c.payloadId); if (basePart == null) continue;
                     bool on = s.customPayload == c.name;
                     PartCell(basePart, c.name, null, on, false, () => SetSimple(sb => { sb.customPayload = c.name; sb.payloadId = c.payloadId; }, c.name + " loaded"),
-                        "<b>" + c.name + "</b>\n<color=" + Soft + ">Your cargo: " + basePart.DisplayName + (c.equipment.Count > 0 ? " + " + c.equipment.Count + " extras" : "") + "</color>\nWeighs " + c.massKg.ToString("N0") + " kg",
-                        c.massKg.ToString("N0") + " kg");
+                        "", c.massKg.ToString("N0") + " kg", false,
+                        () =>
+                        {
+                            var tp = new PartTip { title = c.name, icon = Resources.Load<Sprite>("UIIcons/cat_payload") };
+                            tp.Row("stat_mass", "Weighs  " + Tons(c.massKg));
+                            tp.Row("stat_payload", basePart.DisplayName + (c.equipment.Count > 0 ? "  +  " + c.equipment.Count + " extras" : ""));
+                            tp.Row("icon_money", "$" + c.costM.ToString("0.##") + " M", UIKit.T.priceText);
+                            return tp;
+                        });
                 }
                 break;
             case "Tank":

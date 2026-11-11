@@ -74,6 +74,242 @@
           "value": "Soft Landing"
         }
       ]
+    },
+    {
+      "id": "MISSION-004",
+      "name": "Coastal Weather Satellite",
+      "missionType": "Earth Observation",
+      "target": "Earth Orbit",
+      "budget": 85000000,
+      "massLimit": 600,
+      "payload": {
+        "type": "Satellite",
+        "quantity": 1
+      },
+      "duration": {
+        "value": 60,
+        "unit": "days"
+      },
+      "objective": "Launch a small weather satellite to watch storms forming over the coast.",
+      "specialRequirements": [
+        {
+          "type": "Communication",
+          "minimum": 0.5,
+          "unit": "Mbps"
+        }
+      ]
+    },
+    {
+      "id": "MISSION-005",
+      "name": "University Cubesat Launch",
+      "missionType": "Education",
+      "target": "Earth Orbit",
+      "budget": 45000000,
+      "massLimit": 250,
+      "payload": {
+        "type": "Satellite",
+        "quantity": 1
+      },
+      "duration": {
+        "value": 60,
+        "unit": "days"
+      },
+      "objective": "Put a student-built research satellite into low Earth orbit.",
+      "specialRequirements": []
+    },
+    {
+      "id": "MISSION-006",
+      "name": "Polar Ice Survey",
+      "missionType": "Earth Observation",
+      "target": "Earth Orbit",
+      "budget": 140000000,
+      "massLimit": 900,
+      "payload": {
+        "type": "Satellite",
+        "quantity": 1
+      },
+      "duration": {
+        "value": 60,
+        "unit": "days"
+      },
+      "objective": "Map the polar ice with a radar satellite in a polar orbit.",
+      "specialRequirements": [
+        {
+          "type": "Orbit",
+          "value": "Polar Orbit"
+        },
+        {
+          "type": "Communication",
+          "minimum": 1,
+          "unit": "Mbps"
+        },
+        {
+          "type": "Power",
+          "minimum": 300,
+          "unit": "W"
+        }
+      ]
+    },
+    {
+      "id": "MISSION-007",
+      "name": "Space Telescope Delivery",
+      "missionType": "Astronomy",
+      "target": "Earth Orbit",
+      "budget": 220000000,
+      "massLimit": 1800,
+      "payload": {
+        "type": "Satellite",
+        "quantity": 1
+      },
+      "duration": {
+        "value": 60,
+        "unit": "days"
+      },
+      "objective": "Deliver a small space telescope above the atmosphere.",
+      "specialRequirements": [
+        {
+          "type": "Power",
+          "minimum": 700,
+          "unit": "W"
+        },
+        {
+          "type": "Communication",
+          "minimum": 3,
+          "unit": "Mbps"
+        }
+      ]
+    },
+    {
+      "id": "MISSION-008",
+      "name": "Crew Capsule Test Flight",
+      "missionType": "Human Spaceflight",
+      "target": "Earth Orbit",
+      "budget": 260000000,
+      "massLimit": 3500,
+      "payload": {
+        "type": "Crew",
+        "quantity": 1
+      },
+      "duration": {
+        "value": 60,
+        "unit": "days"
+      },
+      "objective": "Fly the crew capsule to orbit and bring it home safely.",
+      "specialRequirements": [
+        {
+          "type": "Landing",
+          "value": "Parachute Splashdown"
+        }
+      ]
+    },
+    {
+      "id": "MISSION-009",
+      "name": "Lunar Orbiter Survey",
+      "missionType": "Lunar Exploration",
+      "target": "Moon",
+      "budget": 210000000,
+      "massLimit": 1100,
+      "payload": {
+        "type": "Satellite",
+        "quantity": 1
+      },
+      "duration": {
+        "value": 60,
+        "unit": "days"
+      },
+      "objective": "Place a survey satellite in orbit around the Moon to map landing sites.",
+      "specialRequirements": [
+        {
+          "type": "Communication",
+          "minimum": 2,
+          "unit": "Mbps"
+        },
+        {
+          "type": "Power",
+          "minimum": 400,
+          "unit": "W"
+        }
+      ]
+    },
+    {
+      "id": "MISSION-010",
+      "name": "Lunar Rover Pathfinder",
+      "missionType": "Lunar Exploration",
+      "target": "Moon",
+      "budget": 340000000,
+      "massLimit": 1600,
+      "payload": {
+        "type": "Rover",
+        "quantity": 1
+      },
+      "duration": {
+        "value": 60,
+        "unit": "days"
+      },
+      "objective": "Land a small rover and drive it across the lunar surface.",
+      "specialRequirements": [
+        {
+          "type": "Landing",
+          "value": "Soft Landing"
+        }
+      ]
+    },
+    {
+      "id": "MISSION-011",
+      "name": "Deep Space Comms Relay",
+      "missionType": "Communications",
+      "target": "Mars",
+      "budget": 380000000,
+      "massLimit": 1400,
+      "payload": {
+        "type": "Satellite",
+        "quantity": 1
+      },
+      "duration": {
+        "value": 60,
+        "unit": "days"
+      },
+      "objective": "Park a relay satellite near Mars so future missions can talk to Earth.",
+      "specialRequirements": [
+        {
+          "type": "Communication",
+          "minimum": 4,
+          "unit": "Mbps"
+        },
+        {
+          "type": "Power",
+          "minimum": 600,
+          "unit": "W"
+        }
+      ]
+    },
+    {
+      "id": "MISSION-012",
+      "name": "Mars Lander Demonstration",
+      "missionType": "Planetary Exploration",
+      "target": "Mars",
+      "budget": 520000000,
+      "massLimit": 2200,
+      "payload": {
+        "type": "Lander",
+        "quantity": 1
+      },
+      "duration": {
+        "value": 60,
+        "unit": "days"
+      },
+      "objective": "Prove a soft landing on Mars with a technology demonstration lander.",
+      "specialRequirements": [
+        {
+          "type": "Landing",
+          "value": "Soft Landing"
+        },
+        {
+          "type": "Power",
+          "minimum": 450,
+          "unit": "W"
+        }
+      ]
     }
   ]
 }
