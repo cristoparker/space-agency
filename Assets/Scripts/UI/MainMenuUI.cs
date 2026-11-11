@@ -35,13 +35,7 @@ public class MainMenuUI : MonoBehaviour
         var cam = Camera.main;
         if (cam != null) { cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = new Color(0.05f, 0.06f, 0.11f, 1f); }   // the glass blurs this, so keep it calm
 
-        var backdrop = UIKit.At(transform, "Backdrop", 0, 0, 100, 100); UIKit.Fill(backdrop);
-        var bi = backdrop.gameObject.AddComponent<Image>(); bi.color = new Color(0.03f, 0.035f, 0.07f, 1f); bi.raycastTarget = false;
-        backdrop.SetAsFirstSibling();
-        // soft colour glows: the glass cards blur these, which is what gives them their depth
-        Glow(backdrop, new Vector2(-190f, 90f), 380f, new Color(0.04f, 0.52f, 1f, 0.55f));
-        Glow(backdrop, new Vector2(210f, -70f), 420f, new Color(0.75f, 0.35f, 0.95f, 0.45f));
-        Glow(backdrop, new Vector2(30f, -170f), 300f, new Color(0.2f, 0.8f, 0.75f, 0.28f));
+        MenuBackdrop.Create(cam);                                       // the game's own scenery, drifting slowly behind the menu (drawn by the camera so the glass can blur it)
 
         var st = new GameObject("Stage", typeof(RectTransform)).GetComponent<RectTransform>();
         st.SetParent(transform, false);
@@ -86,21 +80,54 @@ public class MainMenuUI : MonoBehaviour
         return r.gameObject;
     }
 
+    // =============================================================== game logo
+    /// <summary>
+    /// The game's wordmark, "SPACE MISSION TYCOON": Audiowide (SIL Open Font License, Resources/Fonts) with a vertical colour gradient,
+    /// a soft glow behind it and a thin accent rule. Falls back to the theme's heading font if the font asset is missing.
+    /// </summary>
+    void BuildLogo(Transform s)
+    {
+        var display = Resources.Load<TMP_FontAsset>("Fonts/Audiowide SDF");
+        if (display != null) display.TryAddCharacters("SPACEMISONTYCO ");     // load the glyphs up front so the first layout has every advance (no uneven gaps)
+        TMP_Text Line(string name, float y, string text, float size, float spacing, Color top, Color bottom)
+        {
+            var t = UIKit.TextAt(s, name, 44, y, 520, size * 1.25f, text, size, TextAlignmentOptions.MidlineLeft, true);
+            if (display != null) { t.font = display; t.fontStyle = FontStyles.Normal; }
+            t.characterSpacing = spacing;
+            t.fontFeatures = new System.Collections.Generic.List<UnityEngine.TextCore.OTL_FeatureTag>();   // no kerning: with wide tracking it made the gaps uneven
+            t.ForceMeshUpdate();
+            t.enableVertexGradient = true; t.colorGradient = new VertexGradient(top, top, bottom, bottom);
+            return t;
+        }
+        Line("Logo Space Mission", 30f, "SPACE MISSION", 33f, 2f, Color.white, new Color(0.62f, 0.8f, 1f, 1f));
+        Line("Logo Tycoon", 66f, "TYCOON", 33f, 36f, new Color(1f, 0.82f, 0.4f, 1f), new Color(1f, 0.5f, 0.12f, 1f));
+        // a thin rule and the tagline under the wordmark
+        var rule = UIKit.At(s, "Logo Rule", 46f, 108f, 150f, 1.5f);
+        UIKit.Tint(rule, new Color(1f, 0.62f, 0.2f, 0.9f)).raycastTarget = false;
+        var tag = UIKit.TextAt(s, "Sub", 46, 112, 460, 14, "Build the agency. Design the rockets. Reach orbit.", 8f, TextAlignmentOptions.MidlineLeft, false, UIKit.T.dim);
+        tag.characterSpacing = 1.5f;
+    }
+
     // =============================================================== title screen
     void BuildTitle()
     {
         titleScreen = Screen_("Title Screen");
         var s = titleScreen.transform;
-        var t = UIKit.TextAt(s, "Title", 46, 56, 420, 40, "Orbital Architect", 30f, TextAlignmentOptions.MidlineLeft, true);
-        t.characterSpacing = 1f;
-        UIKit.TextAt(s, "Sub", 48, 96, 420, 14, "Build the agency. Design the rockets. Reach orbit.", 8f, TextAlignmentOptions.MidlineLeft, false, UIKit.T.dim);
+        BuildLogo(s);
 
-        var panel = UIKit.Card(s, "Menu", 40, 136, 130, 132);
+        // each menu button is one glass capsule (blurred scenery behind it, fully rounded ends) with its label on it: no card, no inner chip
         string[] labels = { "Play", "Load Game", "Settings", "Exit" };
         for (int i = 0; i < labels.Length; i++)
         {
             int idx = i;
-            var b = UIKit.Btn(panel, labels[i], 8, 8 + i * 30, 114, 24, UIKit.T.chip, () => OnTitle(idx), 9f);
+            var r = UIKit.At(s, "Menu " + labels[i], 44, 134 + i * 34, 150, 26);
+            var glass = UIKit.Glass(r);                                   // the game's own blurred glass
+            var round = r.GetComponent<UIRound>(); round.radius = 13f; round.Force();     // exactly half the height: ends are full half-circles
+            var b = r.gameObject.AddComponent<Button>();
+            b.targetGraphic = glass; b.onClick.AddListener(() => OnTitle(idx));
+            UIKit.StyleButton(b);
+            UIHover.Attach(r.gameObject);
+            UIKit.Text(r, labels[i], 9f, TextAlignmentOptions.Center, true).raycastTarget = false;
             if (i == 1) loadBtn = b;
         }
         UIKit.TextAt(s, "Version", 40, 336, 200, 12, Agency.Registered ? "Agency: " + Agency.Name : "No agency registered yet", 7f, TextAlignmentOptions.MidlineLeft, false, UIKit.T.dim);

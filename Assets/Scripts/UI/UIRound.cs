@@ -24,6 +24,9 @@ public class UIRound : MonoBehaviour
         u.Apply();
     }
 
+    /// <summary>Recomputes the corner now (even if the size did not change), e.g. after the radius was changed.</summary>
+    public void Force() { last = Vector2.zero; Apply(); }
+
     void Awake() { img = GetComponent<Image>(); rt = (RectTransform)transform; }
     void OnEnable() { Apply(); }
     void OnRectTransformDimensionsChange() { Apply(); }
