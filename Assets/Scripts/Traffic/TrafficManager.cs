@@ -183,7 +183,7 @@ public class TrafficManager : MonoBehaviour
     void RemoveBlocked()
     {
         var rects = CollectBlockers();
-        int removed = 0;
+
         for (int i = 0; i < nodes.Count; i++)
         {
             foreach (var r in rects)
@@ -192,12 +192,11 @@ public class TrafficManager : MonoBehaviour
                 {
                     foreach (int n in links[i]) links[n].Remove(i);
                     links[i].Clear();
-                    removed++;
+
                     break;
                 }
             }
         }
-        Debug.Log($"TrafficManager: {nodes.Count} road nodes, {removed} blocked by {rects.Count} obstacles.");
     }
 
     // only spawn on connected stretches of road that are long enough to be worth driving
