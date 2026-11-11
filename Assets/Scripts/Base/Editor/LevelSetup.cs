@@ -359,6 +359,8 @@ public static class LevelSetup
         m.CopyPropertiesFromMaterial(baseMat);
         m.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(texPath));
         m.SetColor("_BaseColor", Color.white);
+        // road UVs run over the whole texture, so they would hit the palette's "window" cell and glow at night: switch the window glow off
+        var lv = m.GetVector("_ToonLevels"); m.SetVector("_ToonLevels", new Vector4(lv.x, lv.y, 1f, lv.w));
         EditorUtility.SetDirty(m);
         return m;
     }

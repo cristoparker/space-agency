@@ -7,7 +7,7 @@ Shader "SpaceAgency/Toon/Lit"
         [MainTexture] _BaseMap ("Base Map", 2D) = "white" {}
         [MainColor] _BaseColor ("Tint", Color) = (1,1,1,1)
         _ToonParams ("Thresholds (low, high, softness, ambient)", Vector) = (0.05, 0.5, 0.02, 0.4)
-        _ToonLevels ("Band levels (dark, mid)", Vector) = (0.12, 0.58, 0, 0)
+        _ToonLevels ("Band levels (dark, mid, z: 1 = no window glow)", Vector) = (0.12, 0.58, 0, 0)
     }
 
     SubShader
@@ -72,7 +72,7 @@ Shader "SpaceAgency/Toon/Lit"
                 half4 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, IN.uv) * _BaseColor;
                 float3 n = normalize(IN.normalWS) * IS_FRONT_VFACE(face, 1.0, -1.0);      // double sided: light the back faces correctly
                 half3 col = ToonShade(albedo.rgb, n, IN.positionWS, GetNormalizedScreenSpaceUV(IN.positionCS), _ToonParams, _ToonLevels);
-                col += WindowGlow(IN.uv, IN.positionWS, _BaseMap_ST);
+                col += WindowGlow(IN.uv, IN.positionWS, _BaseMap_ST) * (1.0 - step(0.5, _ToonLevels.z));      // _ToonLevels.z = 1: not a palette material (roads), no window glow
                 return half4(col, 1);
             }
             ENDHLSL
