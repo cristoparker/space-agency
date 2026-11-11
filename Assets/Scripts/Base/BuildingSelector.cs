@@ -173,7 +173,7 @@ public class BuildingSelector : MonoBehaviour
                 bool ok = !built && why == null;
                 string label = built ? def2.name + "  (built)" : def2.name + "  $" + BaseSim.CostOf(def2, 1).ToString("0.#", CultureInfo.InvariantCulture) + " M";
                 float x = (n % 2) * 109f, y = (n / 2) * 20f;
-                var b = UIKit.Btn(cardButtons, label, x, y, 107, 18, ok ? UIKit.T.green : UIKit.T.chip, () => { int plot = selected.plot; sim.StartBuild(def2, plot); }, 6.2f, true, ok ? (Color?)null : UIKit.T.dim);
+                var b = UIKit.Btn(cardButtons, label, x, y, 107, 18, ok ? UIKit.Soft(UIKit.T.green) : UIKit.T.chip, () => { int plot = selected.plot; sim.StartBuild(def2, plot); }, 6.2f, true, ok ? UIKit.SoftInk(UIKit.T.green) : UIKit.T.dim);
                 b.interactable = ok;
                 if (!ok && !built) b.gameObject.AddComponent<TooltipTrigger>().text = why;
                 n++;
@@ -223,7 +223,7 @@ public class BuildingSelector : MonoBehaviour
             bool ok = blockedBy == null;
             string cost = "$" + BaseSim.CostOf(def, next).ToString("0.#", CultureInfo.InvariantCulture) + " M  ·  " + Mathf.CeilToInt(BaseSim.DaysOf(def, next)) + " days";
             var rt = UIKit.At(cardButtons, "Upgrade", bx, 0, upgW, 24);
-            var b = UIKit.MakeButton(rt, "", ok ? UIKit.T.green : UIKit.Wash(UIKit.T.orange, 0.30f), () => sim.StartBuild(def));
+            var b = UIKit.MakeButton(rt, "", ok ? UIKit.Soft(UIKit.T.green) : UIKit.Wash(UIKit.T.orange, 0.30f), () => sim.StartBuild(def));
             // an arrow, the action, and under it the price and time (or why it cannot start yet)
             UIKit.IconAt(rt, Resources.Load<Sprite>("UIIcons/icon_upgrade"), 6, 5.5f, 12, 12, ok ? Color.white : new Color(1f, 0.78f, 0.45f, 1f)).raycastTarget = false;
             UIKit.TextAt(rt, "Label", 21, 2, upgW - 24, 11, "Upgrade to level " + next, 7f, TextAlignmentOptions.MidlineLeft, true, ok ? Color.white : new Color(1f, 0.85f, 0.6f, 1f)).raycastTarget = false;

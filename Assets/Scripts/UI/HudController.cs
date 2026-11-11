@@ -305,7 +305,7 @@ public class HudController : MonoBehaviour
         r.SetParent(transform, false);
         r.anchorMin = r.anchorMax = new Vector2(0.5f, 0f); r.pivot = new Vector2(0.5f, 0f);
         r.anchoredPosition = new Vector2(0f, 40f); r.sizeDelta = new Vector2(220f, 16f);
-        UIKit.Panel(r);
+        UIKit.Pill(r);
         toastText = UIKit.Text(r, "", 7.5f, TextAlignmentOptions.Center);
         toastBox = r;
         r.gameObject.SetActive(false);
@@ -498,12 +498,23 @@ public class HudController : MonoBehaviour
 
     RectTransform agencyLogo, badgeRt;
 
+    string statsMoney, statsRep, statsStaff, statsIdentity;
+    float statsProgress = -1f;
+
+    // Runs on every money change (hourly at fast speed): touch a text or the logo only when its value really changed.
     void RefreshStats()
     {
-        if (moneyText != null) moneyText.text = UIKit.MoneyM(Agency.Money);
-        if (repText != null) repText.text = "Rep LVL " + Agency.RepLevel;
-        if (repFill != null) ((RectTransform)repFill.transform).sizeDelta = new Vector2(42f * Agency.RepProgress, 2f);
-        if (resText != null) resText.text = "Staff " + Agency.Staff;
+        string m = UIKit.MoneyM(Agency.Money);
+        if (moneyText != null && m != statsMoney) { statsMoney = m; moneyText.text = m; }
+        string r = "Rep LVL " + Agency.RepLevel;
+        if (repText != null && r != statsRep) { statsRep = r; repText.text = r; }
+        float prog = Agency.RepProgress;
+        if (repFill != null && !Mathf.Approximately(prog, statsProgress)) { statsProgress = prog; ((RectTransform)repFill.transform).sizeDelta = new Vector2(42f * prog, 2f); }
+        string st = "Staff " + Agency.Staff;
+        if (resText != null && st != statsStaff) { statsStaff = st; resText.text = st; }
+        string ident = Agency.Name + "|" + Agency.LogoJson;
+        if (ident == statsIdentity) return;
+        statsIdentity = ident;
         if (agencyName != null)
         {
             agencyName.text = Agency.Name;

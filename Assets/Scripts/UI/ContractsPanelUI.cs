@@ -59,8 +59,8 @@ public class ContractsPanelUI : MonoBehaviour
     {
         if (!built) return;
         transform.SetAsLastSibling();
-        if (MissionManager.Instance != null) MissionManager.Instance.Changed += Refresh;
-        if (DeploymentManager.Instance != null) DeploymentManager.Instance.Changed += Refresh;
+        if (MissionManager.Instance != null) MissionManager.Instance.Changed += Request;
+        if (DeploymentManager.Instance != null) DeploymentManager.Instance.Changed += Request;
         if (svc != null) svc.Changed += OnGlobalChanged;
         pendingAbandon = null;
         var mm = MissionManager.Instance;
@@ -70,12 +70,14 @@ public class ContractsPanelUI : MonoBehaviour
 
     void OnDisable()
     {
-        if (MissionManager.Instance != null) MissionManager.Instance.Changed -= Refresh;
-        if (DeploymentManager.Instance != null) DeploymentManager.Instance.Changed -= Refresh;
+        if (MissionManager.Instance != null) MissionManager.Instance.Changed -= Request;
+        if (DeploymentManager.Instance != null) DeploymentManager.Instance.Changed -= Request;
         if (svc != null) svc.Changed -= OnGlobalChanged;
     }
 
-    void OnGlobalChanged() { if (tab == TabGlobal) Refresh(); }
+    bool dirty;
+    void Request() { dirty = true; }                                  // rebuilt in Update, never while the mouse button is held
+    void OnGlobalChanged() { if (tab == TabGlobal) dirty = true; }
 
     public void ShowOffers() { tab = 0; }
     public void ShowActive() { tab = TabActive; }
@@ -83,6 +85,7 @@ public class ContractsPanelUI : MonoBehaviour
 
     void Update()
     {
+        if (dirty && !UIKit.PointerHeld) { dirty = false; Refresh(); }
         // keep the deadline pips live while the game clock runs
         if (built && tab == TabActive && Time.frameCount % 20 == 0) RefreshPips();
         if (built && tab == TabGlobal && Time.unscaledTime >= nextLive) { nextLive = Time.unscaledTime + 0.4f; RefreshLive(); }
@@ -132,13 +135,15 @@ public class ContractsPanelUI : MonoBehaviour
     }
 
     // one grey data row: "PAYLOAD   ROVER"
-    void Field(Transform card, float x, float y, float w, string key, string val)
+    void Field(Transform card, float x, float y, float w, string key, string val, string icon = null)
     {
         var r = UIKit.At(card, key, x, y, w, 11);
         UIKit.Tint(r, UIKit.T.chip);
-        UIKit.TextAt(r, "k", 3, 0, w * 0.5f, 11, key, 5.8f, TextAlignmentOptions.MidlineLeft, false, UIKit.T.dim);
-        var v = UIKit.TextAt(r, "v", w * 0.42f, 0, w * 0.58f - 3, 11, val, 6.2f, TextAlignmentOptions.MidlineRight);
-        v.overflowMode = TextOverflowModes.Ellipsis;
+        if (icon != null) UIKit.IconAt(r, Resources.Load<Sprite>("UIIcons/" + icon), 3, 1.5f, 8, 8, UIKit.T.dim);
+        else UIKit.TextAt(r, "k", 3, 0, w * 0.5f, 11, key, 5.8f, TextAlignmentOptions.MidlineLeft, false, UIKit.T.dim);
+        var v = UIKit.TextAt(r, "v", icon != null ? 13 : w * 0.42f, 0, icon != null ? w - 16 : w * 0.58f - 3, 11, val, 6.2f, TextAlignmentOptions.MidlineRight);
+        v.overflowMode = TextOverflowModes.Ellipsis; v.raycastTarget = false;
+        r.gameObject.AddComponent<TooltipTrigger>().text = key;
     }
 
     RectTransform CardShell(float h, Color tint)
@@ -153,10 +158,16 @@ public class ContractsPanelUI : MonoBehaviour
     {
         float w = W - 16;
         UIKit.TextAt(card, "Agency", 7, 3, w - 66, 11, m.displayName, 7.5f, TextAlignmentOptions.MidlineLeft, true).overflowMode = TextOverflowModes.Ellipsis;
-        var dtag = UIKit.At(card, "Difficulty", w - 58, 4, 52, 10);
+        // difficulty as a three-part bar: easy lights one part, average two, hard three
+        var diff = UIKit.At(card, "Difficulty", w - 52, 5, 46, 7);
         Color dc = m.Difficulty == 0 ? UIKit.T.green : m.Difficulty == 1 ? new Color(1f, 0.72f, 0.3f, 1f) : UIKit.T.red;
-        UIKit.Tint(dtag, UIKit.Wash(dc, 0.8f));
-        UIKit.Text(dtag, m.DifficultyName.ToUpperInvariant(), 5.4f, TextAlignmentOptions.Center, true, new Color(0.08f, 0.08f, 0.1f, 1f));
+        for (int i = 0; i < 3; i++)
+        {
+            var seg = UIKit.At(diff, "Seg" + i, i * 16f, 1.5f, 14, 4);
+            UIKit.Tint(seg, i <= m.Difficulty ? dc : new Color(1f, 1f, 1f, 0.16f)).raycastTarget = false;
+        }
+        var hit = UIKit.At(diff, "Hit", 0, 0, 46, 7); UIKit.Tint(hit, Color.clear);
+        hit.gameObject.AddComponent<TooltipTrigger>().text = "Difficulty: " + m.DifficultyName + "\n" + (m.Difficulty == 0 ? "A long deadline." : m.Difficulty == 1 ? "A fair deadline." : "A short deadline. Plan well.");
         // description box
         var box = UIKit.At(card, "Description", 5, 16, w * 0.44f, 52);
         UIKit.Tint(box, UIKit.T.well);
@@ -166,14 +177,15 @@ public class ContractsPanelUI : MonoBehaviour
         // data rows
         float fx = 5 + w * 0.44f + 3, fw = w - fx - 5;
         string payload = m.payload != null && !string.IsNullOrEmpty(m.payload.type) ? m.payload.type : "-";
-        Field(card, fx, 16, fw, "Payload", payload);
-        Field(card, fx, 28, fw, "Target", m.target ?? "-");
-        Field(card, fx, 40, fw, "Mass", m.massLimit.ToString("N0", CultureInfo.InvariantCulture) + " kg");
-        Field(card, fx, 52, fw, "Deadline", Months(m));
+        Field(card, fx, 16, fw, "Payload", payload, "stat_payload");
+        Field(card, fx, 28, fw, "Target", m.target ?? "-", "stat_orbit");
+        Field(card, fx, 40, fw, "Maximum payload mass", m.massLimit.ToString("N0", CultureInfo.InvariantCulture) + " kg", "stat_mass");
+        Field(card, fx, 52, fw, "Deadline", Months(m), "icon_time");
         // reward chip
         var rew = UIKit.At(card, "Reward", fx, 66, fw, 13);
-        UIKit.Tint(rew, UIKit.Wash(UIKit.T.green, 0.6f));
-        UIKit.Text(rew, "$" + UIKit.Money(m.budget) + " reward", 7f, TextAlignmentOptions.Center, true);
+        UIKit.Tint(rew, UIKit.T.well);
+        UIKit.IconAt(rew, Resources.Load<Sprite>("UIIcons/icon_money"), 5, 2.5f, 8, 8, UIKit.SoftInk(UIKit.T.green));
+        UIKit.Text(rew, "$" + UIKit.Money(m.budget) + " reward", 7f, TextAlignmentOptions.Center, true, UIKit.SoftInk(UIKit.T.green));
     }
 
     void PendingCard(MissionDefinition m, MissionManager mm)
@@ -184,7 +196,7 @@ public class ContractsPanelUI : MonoBehaviour
         UIKit.TextAt(card, "Pending", 7, 3, 60, 11, "", 6f, TextAlignmentOptions.MidlineLeft, true).raycastTarget = false;
         var tag = UIKit.At(card, "Tag", w - 62, 3, 56, 11); UIKit.Tint(tag, UIKit.Wash(new Color(1f, 0.72f, 0.3f, 1f), 0.8f));
         UIKit.Text(tag, "PENDING", 5.8f, TextAlignmentOptions.Center, true, new Color(0.2f, 0.1f, 0f, 1f));
-        UIKit.Btn(card, "Remove from pending", 8, 82, w - 16, 14, UIKit.T.chip, () => { mm.RemovePending(m); Refresh(); }, 6.5f, true, new Color(1f, 0.45f, 0.42f, 1f));
+        UIKit.SoftBtn(card, "Remove from pending", 8, 82, w - 16, 14, UIKit.T.red, () => { mm.RemovePending(m); Refresh(); }, 6.5f);
     }
 
     void OfferCard(MissionDefinition m, MissionManager mm)
@@ -192,9 +204,9 @@ public class ContractsPanelUI : MonoBehaviour
         float w = W - 16;
         var card = CardShell(100, new Color(1f, 1f, 1f, 0.10f));
         Details(card, m);
-        UIKit.Btn(card, "Decline", 8, 82, w * 0.5f - 11, 14, UIKit.T.chip, () => mm.DiscardMission(m), 6.8f, true, new Color(1f, 0.45f, 0.42f, 1f));
+        UIKit.SoftBtn(card, "Decline", 8, 82, w * 0.5f - 11, 14, UIKit.T.red, () => mm.DiscardMission(m), 6.8f);
         bool busy = mm.Running.Count > 0;
-        UIKit.Btn(card, busy ? "Add as pending" : "Accept", w * 0.5f + 3, 82, w * 0.5f - 11, 14, busy ? UIKit.Wash(new Color(1f, 0.72f, 0.3f, 1f), 0.7f) : UIKit.T.green, () => { mm.StartMission(m); tab = TabActive; Refresh(); Hud.Toast(busy ? "Pending: " + m.displayName + " starts when the current contract is launched." : "Contract accepted: " + m.displayName); }, 6.5f);
+        UIKit.SoftBtn(card, busy ? "Add as pending" : "Accept", w * 0.5f + 3, 82, w * 0.5f - 11, 14, busy ? UIKit.Amber : UIKit.T.green, () => { mm.StartMission(m); tab = TabActive; Refresh(); Hud.Toast(busy ? "Pending: " + m.displayName + " starts when the current contract is launched." : "Contract accepted: " + m.displayName); }, 6.5f);
     }
 
     // =============================================================== global contract finder (bidding front end)
@@ -279,7 +291,7 @@ public class ContractsPanelUI : MonoBehaviour
         UIKit.Tint(amt, UIKit.T.well);
         lc.bid = UIKit.Text(amt, "$" + UIKit.Money(Draft(l)), 6.8f, TextAlignmentOptions.Center, true);
         UIKit.Btn(card, "+", 75, 91, 14, 14, UIKit.T.chip, () => { draft[id] = Draft(l) + Step(l); lc.bid.text = "$" + UIKit.Money(Draft(l)); }, 8f);
-        UIKit.Btn(card, "Place bid", 93, 91, w - 98, 14, UIKit.T.green, () =>
+        UIKit.SoftBtn(card, "Place bid", 93, 91, w - 98, 14, UIKit.T.green, () =>
         {
             string err = svc.PlaceBid(id, Draft(l));
             if (err != null) Hud.Toast(err);
@@ -337,13 +349,13 @@ public class ContractsPanelUI : MonoBehaviour
 
         if (pendingAbandon == inst)
         {
-            UIKit.Btn(card, "Confirm abandon", 8, 107, w * 0.62f - 10, 14, UIKit.T.red, () => { pendingAbandon = null; mm.AbandonMission(inst); Hud.Toast("Contract abandoned (-5 reputation)."); }, 6f);
-            UIKit.Btn(card, "Keep", w * 0.62f + 1, 107, w * 0.38f - 9, 14, UIKit.T.chip, () => { pendingAbandon = null; Refresh(); }, 6f);
+            UIKit.SolidBtn(card, "Confirm abandon", 8, 107, w * 0.62f - 10, 14, UIKit.T.red, () => { pendingAbandon = null; mm.AbandonMission(inst); Hud.Toast("Contract abandoned (-5 reputation)."); }, 6f);
+            UIKit.PlainBtn(card, "Keep", w * 0.62f + 1, 107, w * 0.38f - 9, 14, () => { pendingAbandon = null; Refresh(); }, 6f);
         }
         else
         {
-            UIKit.Btn(card, "Design rocket", 8, 107, w * 0.45f - 4, 14, UIKit.Wash(UIKit.T.orange), () => { mm.TrackMission(inst); Panels.Open("rocket"); }, 6.5f, true, UIKit.T.orange);
-            UIKit.Btn(card, "Abandon", w * 0.45f + 6, 107, w * 0.55f - 14, 14, UIKit.T.chip, () => { pendingAbandon = inst; Refresh(); }, 6.5f, true, new Color(1f, 0.45f, 0.42f, 1f));
+            UIKit.SoftBtn(card, "Design rocket", 8, 107, w * 0.45f - 4, 14, UIKit.T.orange, () => { mm.TrackMission(inst); Panels.Open("rocket"); }, 6.5f);
+            UIKit.SoftBtn(card, "Abandon", w * 0.45f + 6, 107, w * 0.55f - 14, 14, UIKit.T.red, () => { pendingAbandon = inst; Refresh(); }, 6.5f);
         }
     }
 

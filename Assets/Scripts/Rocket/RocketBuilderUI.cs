@@ -200,12 +200,10 @@ public class RocketBuilderUI : MonoBehaviour
         deleteBtn = IconBtn(frame, "icon_trash", 38, 4, T.chip, DeleteSelected, "Delete the selected part", new Color(1f, 0.5f, 0.46f, 1f));
 
         // bottom row: view controls
-        var bRot = IconBtn(frame, "icon_rotate", 4, 132, T.teal, () => SetPan(false), "Rotate the view");
-        var bPan = IconBtn(frame, "icon_move", 21, 132, T.chip, () => SetPan(true), "Move the view");
+        var bRot = IconBtn(frame, "icon_rotate", 4, 132, T.teal, () => SetPan(false), "Rotate the view\nDrag to turn around the rocket. Scroll to zoom, click a part to select it.");
+        var bPan = IconBtn(frame, "icon_move", 21, 132, T.chip, () => SetPan(true), "Move the view\nDrag to move it anywhere. Right or middle mouse button does this too.");
         IconBtn(frame, "icon_reset", 38, 132, T.chip, () => preview.ResetView(), "Reset the view");
         rotImg = (Image)bRot.targetGraphic; panImg = (Image)bPan.targetGraphic;
-        Tip(bRot.gameObject, "Rotate the view\nDrag to turn around the rocket. Scroll to zoom, click a part to select it.");
-        Tip(bPan.gameObject, "Move the view\nDrag to move it anywhere. Right or middle mouse button does this too.");
 
         // selected part caption
         var sc = UIKit.At(frame, "Selected", 4, 100, 172, 30);
@@ -243,8 +241,8 @@ public class RocketBuilderUI : MonoBehaviour
         deployBtn = UIKit.Btn(card, "Deploy", 139, 261, 46, 14, T.chip, OpenDeploy, 6.5f);
 
         // ---- blueprints (as in the reference) ----
-        var bp = UIKit.Btn(card, "Blueprints", 5, 280, 89, 18, UIKit.Wash(T.blue, 0.35f), () => { infoView = infoView == 3 ? 0 : 3; RefreshAll(); }, 7f, true, new Color(0.7f, 0.69f, 1f, 1f));
-        var buy = UIKit.Btn(card, "Buy blueprints", 96, 280, 89, 18, UIKit.Wash(T.purple, 0.35f), () => { infoView = infoView == 4 ? 0 : 4; RefreshAll(); }, 7f, true, new Color(0.9f, 0.7f, 1f, 1f));
+        var bp = UIKit.Btn(card, "Blueprints", 5, 280, 89, 18, UIKit.Soft(T.blue), () => { infoView = infoView == 3 ? 0 : 3; RefreshAll(); }, 7f, true, UIKit.SoftInk(T.blue));
+        var buy = UIKit.Btn(card, "Buy blueprints", 96, 280, 89, 18, UIKit.Soft(T.purple), () => { infoView = infoView == 4 ? 0 : 4; RefreshAll(); }, 7f, true, UIKit.SoftInk(T.purple));
         bpBtnImg = (Image)bp.targetGraphic; buyBtnImg = (Image)buy.targetGraphic;
     }
 
@@ -272,7 +270,8 @@ public class RocketBuilderUI : MonoBehaviour
         tm.textWrappingMode = TextWrappingModes.Normal; tm.raycastTarget = false; tm.lineSpacing = -6f;
         t.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
         var sr = root.gameObject.AddComponent<ScrollRect>();
-        sr.viewport = vp; sr.content = t; sr.horizontal = false; sr.scrollSensitivity = 14f; sr.movementType = ScrollRect.MovementType.Clamped;
+        sr.viewport = vp; sr.content = t; sr.horizontal = false; sr.movementType = ScrollRect.MovementType.Clamped;
+        UIKit.StyleScroll(sr, root);
         return tm;
     }
 
@@ -361,7 +360,7 @@ public class RocketBuilderUI : MonoBehaviour
             dayButtons.Add(b);
         }
         deployDate = UIKit.TextAt(box, "Picked", 0, 182, bw, 12, "", 7.5f, TextAlignmentOptions.Center);
-        UIKit.Btn(box, "Confirm deploy", 12, 200, 104, 16, UIKit.T.green, ConfirmDeploy, 6.8f);
+        UIKit.SolidBtn(box, "Confirm deploy", 12, 200, 104, 16, UIKit.T.green, ConfirmDeploy, 6.8f);
         UIKit.Btn(box, "Cancel", bw - 116, 200, 104, 16, UIKit.T.chip, () => deployDialog.SetActive(false), 6.8f);
     }
 
@@ -745,7 +744,7 @@ public class RocketBuilderUI : MonoBehaviour
             PartIcon(cell, part.id, 5, 3, 46, 36);
             UIKit.TextAt(cell, "Name", 2, 40, 52, 9, part.DisplayName, 5.5f, TextAlignmentOptions.Center, false, UIKit.T.dim).overflowMode = TextOverflowModes.Ellipsis;
             UIKit.TextAt(cell, "Price", 2, 49, 52, 11, "$" + part.costM.ToString("0.#") + " M", 7f, TextAlignmentOptions.Center, true, UIKit.T.priceText);
-            var b = UIKit.Btn(cell, equipped ? "Equipped" : "Equip", 4, 62, 48, 13, equipped ? UIKit.T.chip : UIKit.Wash(UIKit.T.green, 0.6f), () => AddPart(part), 6.8f, true, equipped ? UIKit.T.dim : UIKit.T.ink);
+            var b = UIKit.Btn(cell, equipped ? "Equipped" : "Equip", 4, 62, 48, 13, equipped ? UIKit.T.chip : UIKit.Soft(UIKit.T.green), () => AddPart(part), 6.8f, true, equipped ? UIKit.T.dim : UIKit.SoftInk(UIKit.T.green));
             b.interactable = !equipped;
             PartTipOn(cell.gameObject, () => { var tp = BuildPartTip(part); if (!string.IsNullOrEmpty(advisory)) tp.note = advisory; return tp; });
         }
@@ -1270,7 +1269,7 @@ public class RocketBuilderUI : MonoBehaviour
         float price = part.costM + (second != null ? second.costM * 4f : 0f);
         UIKit.TextAt(cell, "Price", 2, 54, 52, 10, "$" + price.ToString("0.#") + " M", 6.8f, TextAlignmentOptions.Center, true, UIKit.T.priceText);
         string btn = toggle ? (equipped ? "Remove" : "Equip") : equipped ? "Equipped" : "Equip";
-        var b2 = UIKit.Btn(cell, btn, 4, 68, 48, 13, equipped && !toggle ? UIKit.T.chip : UIKit.Wash(equipped ? UIKit.T.red : UIKit.T.green, 0.6f), () => click(), 6.4f, true, equipped && !toggle ? UIKit.T.dim : UIKit.T.ink);
+        var b2 = UIKit.Btn(cell, btn, 4, 68, 48, 13, equipped && !toggle ? UIKit.T.chip : UIKit.Soft(equipped ? UIKit.T.red : UIKit.T.green), () => click(), 6.4f, true, equipped && !toggle ? UIKit.T.dim : UIKit.SoftInk(equipped ? UIKit.T.red : UIKit.T.green));
         b2.interactable = toggle || !equipped;
         PartTipOn(cell.gameObject, customTip ?? (() => BuildPartTip(part, label, second)));        // icons instead of paragraphs
     }
@@ -1281,7 +1280,7 @@ public class RocketBuilderUI : MonoBehaviour
         UIKit.Tint(cell, on ? UIKit.Wash(UIKit.T.green, 0.22f) : new Color(1f, 1f, 1f, 0.06f));
         UIKit.TextAt(cell, "X", 2, 8, 52, 26, "-", 18f, TextAlignmentOptions.Center, true, UIKit.T.dim);
         UIKit.TextAt(cell, "Name", 2, 40, 52, 10, name, 5.6f, TextAlignmentOptions.Center, false, UIKit.T.dim);
-        var b = UIKit.Btn(cell, on ? "Chosen" : "Select", 4, 68, 48, 13, on ? UIKit.T.chip : UIKit.Wash(UIKit.T.green, 0.6f), () => act(), 6.4f, true, on ? UIKit.T.dim : UIKit.T.ink);
+        var b = UIKit.Btn(cell, on ? "Chosen" : "Select", 4, 68, 48, 13, on ? UIKit.T.chip : UIKit.Soft(UIKit.T.green), () => act(), 6.4f, true, on ? UIKit.T.dim : UIKit.SoftInk(UIKit.T.green));
         b.interactable = !on;
     }
 
@@ -1310,7 +1309,7 @@ public class RocketBuilderUI : MonoBehaviour
                     UIKit.Tint(cell, UIKit.Wash(UIKit.T.purple, 0.28f));
                     UIKit.TextAt(cell, "Plus", 2, 8, 52, 26, "+", 22f, TextAlignmentOptions.Center, true, UIKit.T.ink).raycastTarget = false;
                     UIKit.TextAt(cell, "Name", 2, 38, 52, 22, "Build new\ncargo", 5.8f, TextAlignmentOptions.Center, true, UIKit.T.ink).raycastTarget = false;
-                    UIKit.Btn(cell, "Go build", 4, 68, 48, 13, UIKit.Wash(UIKit.T.purple, 0.6f), OpenPayloadBuilder, 6.4f, true, UIKit.T.ink);
+                    UIKit.Btn(cell, "Go build", 4, 68, 48, 13, UIKit.Soft(UIKit.T.purple), OpenPayloadBuilder, 6.4f, true, UIKit.SoftInk(UIKit.T.purple));
                     Tip(cell.gameObject, "<b>Payload Builder</b>\n<color=" + Soft + ">Build your own cargo: a satellite, rover or lander with power and comms. It will show up here when saved.</color>");
                 }
                 NoneCell("No cargo", s.payloadId == null && string.IsNullOrEmpty(s.customPayload), () => SetSimple(sb => { sb.payloadId = null; sb.customPayload = null; }, "No cargo"));
@@ -1392,7 +1391,7 @@ public class RocketBuilderUI : MonoBehaviour
     // ---- paint menu beside the rocket ----
     void BuildPaintCard(RectTransform root, float x)
     {
-        paintCard = UIKit.Card(root, "Paint Card", x, CardY, 30f, 24f + 8 * 17f);
+        paintCard = UIKit.At(root, "Paint Card", x, CardY, 30f, 24f + 8 * 17f); UIKit.Pill(paintCard);
         paintTitle = UIKit.TextAt(paintCard, "Title", 0, 3, 30, 9, "Paint", 5.4f, TextAlignmentOptions.Center, true, UIKit.T.dim);
         paintRings = new Image[8];
         for (int i = 0; i < 8; i++)

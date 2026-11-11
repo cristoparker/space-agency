@@ -66,17 +66,17 @@ public class ObjectiveMenuUI : MonoBehaviour
         panel.gameObject.AddComponent<UIPopIn>();
         panel.gameObject.SetActive(false);
 
-        if (MissionManager.Instance != null) MissionManager.Instance.Changed += Refresh;
-        if (BaseSim.Instance != null) BaseSim.Instance.Changed += Refresh;
-        if (DeploymentManager.Instance != null) DeploymentManager.Instance.Changed += Refresh;
+        if (MissionManager.Instance != null) MissionManager.Instance.Changed += Request;
+        if (BaseSim.Instance != null) BaseSim.Instance.Changed += Request;
+        if (DeploymentManager.Instance != null) DeploymentManager.Instance.Changed += Request;
         Refresh();
     }
 
     void OnDestroy()
     {
-        if (MissionManager.Instance != null) MissionManager.Instance.Changed -= Refresh;
-        if (BaseSim.Instance != null) BaseSim.Instance.Changed -= Refresh;
-        if (DeploymentManager.Instance != null) DeploymentManager.Instance.Changed -= Refresh;
+        if (MissionManager.Instance != null) MissionManager.Instance.Changed -= Request;
+        if (BaseSim.Instance != null) BaseSim.Instance.Changed -= Request;
+        if (DeploymentManager.Instance != null) DeploymentManager.Instance.Changed -= Request;
     }
 
     public void Toggle() => SetOpen(!open);
@@ -89,8 +89,12 @@ public class ObjectiveMenuUI : MonoBehaviour
         if (on) { panel.SetAsLastSibling(); Refresh(); }
     }
 
+    bool dirty;
+    void Request() { dirty = true; }                                  // rebuilt in Update, never while the mouse button is held
+
     void Update()
     {
+        if (dirty && !UIKit.PointerHeld) { dirty = false; Refresh(); }
         timer += Time.unscaledDeltaTime;
         if (timer < 0.4f) return;
         timer = 0f;

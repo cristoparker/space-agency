@@ -57,7 +57,7 @@ public static class EventCard
             var box = UIKit.At(card, "Choice", 10, y, w - 20, rh);
             UIKit.Tint(box, UIKit.CardColor);
             var btn = UIKit.At(box, "Pick", w - 20 - 58, 5, 52, 14);
-            var b = UIKit.Btn(btn, row.enabled ? "Choose" : "-", 0, 0, 52, 14, row.enabled ? UIKit.Wash(UIKit.T.green, 0.75f) : UIKit.T.chip, () => { Close(); row.onPick?.Invoke(); }, 6.4f);
+            var b = UIKit.Btn(btn, row.enabled ? "Choose" : "-", 0, 0, 52, 14, row.enabled ? UIKit.Soft(UIKit.T.green) : UIKit.T.chip, () => { Close(); row.onPick?.Invoke(); }, 6.4f, true, row.enabled ? UIKit.SoftInk(UIKit.T.green) : UIKit.T.dim);
             b.interactable = row.enabled;
             UIKit.TextAt(box, "Label", 8, 4, w - 20 - 70, 14, row.label, 7.2f, TextAlignmentOptions.MidlineLeft, true).raycastTarget = false;
             float ly = 20f;

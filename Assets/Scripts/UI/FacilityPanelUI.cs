@@ -63,8 +63,9 @@ public class FacilityPanelUI : MonoBehaviour
     {
         if (!built) return;
         transform.SetAsLastSibling();
-        if (BaseSim.Instance != null) BaseSim.Instance.Changed += Refresh;
-        Agency.Changed += Refresh;
+        if (BaseSim.Instance != null) BaseSim.Instance.Changed += Request;
+        Agency.Changed += OnMoney;
+        moneySig = MoneySig();
         var sim = BaseSim.Instance;
         if (PlotContext >= 0 && sim != null && !sim.PlotFree(PlotContext)) PlotContext = -1;
         Refresh();
@@ -72,12 +73,25 @@ public class FacilityPanelUI : MonoBehaviour
 
     void OnDisable()
     {
-        if (BaseSim.Instance != null) BaseSim.Instance.Changed -= Refresh;
-        Agency.Changed -= Refresh;
+        if (BaseSim.Instance != null) BaseSim.Instance.Changed -= Request;
+        Agency.Changed -= OnMoney;
     }
+
+    bool dirty; string moneySig;
+    void Request() { dirty = true; }
+    // Money changes every game hour. Only rebuild the grid when a lock reason on some card really changed.
+    string MoneySig()
+    {
+        var sim = BaseSim.Instance; if (sim == null) return "";
+        var sb = new System.Text.StringBuilder();
+        foreach (var b in BaseData.Buildings) sb.Append(sim.WhyNotBuild(b, PlotContext)).Append('|');
+        return sb.ToString();
+    }
+    void OnMoney() { var s = MoneySig(); if (s != moneySig) { moneySig = s; dirty = true; } }
 
     void Update()
     {
+        if (dirty && !UIKit.PointerHeld) { dirty = false; Refresh(); }       // never swap the buttons under a pressed pointer
         refreshTimer += Time.unscaledDeltaTime;
         if (refreshTimer < 0.25f) return;
         refreshTimer = 0f;
@@ -96,6 +110,7 @@ public class FacilityPanelUI : MonoBehaviour
         var sim = BaseSim.Instance;
         UIKit.Clear(list);
         live.Clear();
+        moneySig = MoneySig();
         if (sim == null) return;
 
         float used = sim.PowerDemand, supply = sim.PowerSupply;
@@ -201,7 +216,7 @@ public class FacilityPanelUI : MonoBehaviour
             string verb = newBuild ? (plot >= 0 ? "Build on P" + (plot + 1) : "Build…") : level == 0 ? "Build" : "Upgrade to level " + next;
             if (why == null)
             {
-                var btn = UIKit.Btn(act, verb, 0, 1, cw - 8, 16, T.green, () => Choose(b, newBuild), 6.6f);
+                var btn = UIKit.SoftBtn(act, verb, 0, 1, cw - 8, 16, T.green, () => Choose(b, newBuild), 6.6f);
                 if (newBuild && plot < 0) btn.gameObject.AddComponent<TooltipTrigger>().text = "Build\nYou will pick the plot on the map next.";
             }
             else

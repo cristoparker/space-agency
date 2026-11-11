@@ -122,7 +122,7 @@ public class SettingsPanelUI : MonoBehaviour
         fogVal.text = Mathf.RoundToInt(VisualSettings.Fog * 100f) + "%"; y += 18f;
 
         UIKit.Btn(panel, "Main menu", 10, y, (W - 28f) * 0.5f, 16, UIKit.T.chip, () => UIConfirm.Show("Main menu", "Go back to the main menu? Your progress is saved automatically.", "Main menu", ToMenu), 6.6f);
-        UIKit.Btn(panel, "Exit game", 10 + (W - 28f) * 0.5f + 8f, y, (W - 28f) * 0.5f, 16, UIKit.Wash(UIKit.T.red, 0.7f), () => UIConfirm.Show("Exit game", "Close the game? Your progress is saved automatically.", "Exit", Quit), 6.6f);
+        UIKit.SoftBtn(panel, "Exit game", 10 + (W - 28f) * 0.5f + 8f, y, (W - 28f) * 0.5f, 16, UIKit.T.red, () => UIConfirm.Show("Exit game", "Close the game? Your progress is saved automatically.", "Exit", Quit), 6.6f);
         panel.gameObject.AddComponent<CanvasGroup>(); panel.gameObject.AddComponent<UIPopIn>();
         panel.gameObject.SetActive(false);
     }

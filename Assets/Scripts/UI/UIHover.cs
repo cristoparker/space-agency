@@ -59,6 +59,12 @@ public class UIHover : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler,
 
     void Update()
     {
+        // settled and idle: touch nothing (an idle button must not dirty the canvas every frame)
+        if (!over && !down && glowLevel <= 0f && Mathf.Abs(scale - 1f) < 0.0005f && Mathf.Abs(velocity) < 0.001f)
+        {
+            if (scale != 1f) { scale = 1f; velocity = 0f; Apply(); }
+            return;
+        }
         float dt = Mathf.Min(Time.unscaledDeltaTime, 0.033f);
         float target = down ? pressScale : over ? hoverScale : 1f;
         // a well damped spring: it settles at once, no wobble
@@ -70,7 +76,8 @@ public class UIHover : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler,
 
     void Apply()
     {
-        transform.localScale = baseScale * scale;
+        var ls = baseScale * scale;
+        if (transform.localScale != ls) transform.localScale = ls;
         if (glow != null) glow.color = new Color(1f, 1f, 1f, glowAlpha * glowLevel * (down ? 1.4f : 1f));
     }
 }

@@ -37,7 +37,7 @@ public class ResourceUI : MonoBehaviour
         warning.SetParent(rt, false);
         warning.anchorMin = warning.anchorMax = new Vector2(0.5f, 1f); warning.pivot = new Vector2(0.5f, 1f);
         warning.anchoredPosition = new Vector2(0f, -50f); warning.sizeDelta = new Vector2(250f, 16f);
-        var img = UIKit.Panel(warning); img.color = new Color(0.35f, 0.08f, 0.07f, 0.96f);
+        UIKit.Pill(warning, new Color(0.35f, 0.08f, 0.07f, 0.96f));
         UIKit.IconAt(warning, Resources.Load<Sprite>("UIIcons/icon_power"), 6, 3, 10, 10, new Color(1f, 0.6f, 0.45f, 1f));
         warningText = UIKit.TextAt(warning, "T", 20, 0, 226, 16, "", 6.2f, TextAlignmentOptions.MidlineLeft, true, new Color(1f, 0.82f, 0.74f, 1f));
         warning.gameObject.SetActive(false);
@@ -127,14 +127,21 @@ public class ResourceUI : MonoBehaviour
         go.SetParent(transform, false);
         go.sizeDelta = new Vector2(76f, delta > 0.5f ? 30f : 21f);
         go.anchorMin = go.anchorMax = new Vector2(0.5f, 0.5f); go.pivot = new Vector2(0.5f, 0f);
-        UIKit.Tint(go, new Color(0f, 0f, 0f, 0.55f)).raycastTarget = false;
         UIKit.IconAt(go, Resources.Load<Sprite>("UIIcons/icon_power"), 4, 3, 8, 8, new Color(1f, 0.85f, 0.4f, 1f));
-        UIKit.TextAt(go, "E", 14, 1.5f, 60, 10, "-" + mwh.ToString("0") + " MWh" + (hours > 1 ? "  (" + hours + " h)" : ""), 6.2f, TextAlignmentOptions.MidlineLeft, true, new Color(1f, 0.92f, 0.65f, 1f)).raycastTarget = false;
+        Shadowed(go, "E", 14, 1.5f, 60, 10, "-" + mwh.ToString("0") + " MWh" + (hours > 1 ? "  (" + hours + " h)" : ""), 6.2f, TextAlignmentOptions.MidlineLeft, true, new Color(1f, 0.92f, 0.65f, 1f)).raycastTarget = false;
         UIKit.IconAt(go, Resources.Load<Sprite>("UIIcons/icon_money"), 4, 13, 8, 8, new Color(0.62f, 1f, 0.76f, 1f));
-        UIKit.TextAt(go, "M", 14, 11.5f, 60, 10, "-$" + money.ToString("0.00", CultureInfo.InvariantCulture) + " M", 6.2f, TextAlignmentOptions.MidlineLeft, true, new Color(0.7f, 1f, 0.82f, 1f)).raycastTarget = false;
-        if (delta > 0.5f) UIKit.TextAt(go, "D", 14, 21.5f, 60, 8, "+" + delta.ToString("0") + " MW (upgrade)", 5.2f, TextAlignmentOptions.MidlineLeft, true, new Color(1f, 0.72f, 0.3f, 1f)).raycastTarget = false;
+        Shadowed(go, "M", 14, 11.5f, 60, 10, "-$" + money.ToString("0.00", CultureInfo.InvariantCulture) + " M", 6.2f, TextAlignmentOptions.MidlineLeft, true, new Color(0.7f, 1f, 0.82f, 1f)).raycastTarget = false;
+        if (delta > 0.5f) Shadowed(go, "D", 14, 21.5f, 60, 8, "+" + delta.ToString("0") + " MW (upgrade)", 5.2f, TextAlignmentOptions.MidlineLeft, true, new Color(1f, 0.72f, 0.3f, 1f)).raycastTarget = false;
         var p = go.gameObject.AddComponent<FloatingPopup>();
         p.Init(this, canvasRt, cam, GridPoint());
+    }
+
+    /// <summary>Text on the open scene has no backing, so a soft dark copy just behind it keeps it readable on any background.</summary>
+    static TMP_Text Shadowed(Transform parent, string name, float x, float y, float w, float h, string text, float size, TextAlignmentOptions al, bool head, Color color)
+    {
+        foreach (var o in new[] { new Vector2(0.45f, 0.45f), new Vector2(-0.35f, 0.35f) })
+            UIKit.TextAt(parent, name + " shadow", x + o.x, y + o.y, w, h, text, size, al, head, new Color(0f, 0f, 0f, 0.7f)).raycastTarget = false;
+        return UIKit.TextAt(parent, name, x, y, w, h, text, size, al, head, color);
     }
 
     class FloatingPopup : MonoBehaviour

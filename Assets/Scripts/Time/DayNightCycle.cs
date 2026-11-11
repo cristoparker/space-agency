@@ -61,6 +61,8 @@ public class DayNightCycle : MonoBehaviour
         Apply(t);
     }
 
+    float skyClock;
+
     void Apply(float dayProgress)
     {
         float angle = dayProgress * 360f - 90f;
@@ -105,7 +107,9 @@ public class DayNightCycle : MonoBehaviour
         Vector3 toSun = -sun.transform.forward;
         Shader.SetGlobalFloat("_SpaceNight", 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((elevation + 0.02f) / 0.2f)));   // windows glow when it is dark
         Shader.SetGlobalVector("_SkySunDir", new Vector4(toSun.x, toSun.y, toSun.z, 0f));
-        Shader.SetGlobalFloat("_SkyTime", Application.isPlaying ? Time.time : (float)UnityEngine.Time.realtimeSinceStartupAsDouble);
+        if (!Application.isPlaying || GameClock.Instance == null) skyClock = (float)UnityEngine.Time.realtimeSinceStartupAsDouble;
+        else if (GameClock.Instance.Speed > 0f) skyClock += Time.unscaledDeltaTime;      // moves while the game runs (at normal pace at any speed), stops on pause
+        Shader.SetGlobalFloat("_SkyTime", skyClock);
         if (skyMaterial != null) skyMaterial.SetFloat("_CloudCoverage", cloudCoverage);
 
         // haze: exactly the sky shader's horizon colour for this sun height (same keyframes and blending, in linear space)

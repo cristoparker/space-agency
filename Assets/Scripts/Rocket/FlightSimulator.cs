@@ -110,8 +110,11 @@ public static class FlightSimulator
                 double hAng = x * vy - y * vx, ecc = System.Math.Sqrt(System.Math.Max(0, 1 + 2 * E * hAng * hAng / (Mu * Mu)));
                 prof.perigeeKm = (float)((a * (1 - ecc) - Re) / 1000.0); prof.apogeeKm = (float)((a * (1 + ecc) - Re) / 1000.0);
                 prof.energy = E;
-                if (E >= 0) { prof.orbit = true; prof.escape = true; prof.events.Add(((float)t, "Escape trajectory")); }
-                else if (prof.perigeeKm > 90f) { prof.orbit = true; prof.events.Add(((float)t, "Orbit reached")); }
+                if (!prof.orbit)
+                {
+                    if (E >= 0) { prof.orbit = true; prof.escape = true; prof.events.Add(((float)t, "Escape trajectory")); }
+                    else if (prof.perigeeKm > 90f) { prof.orbit = true; prof.events.Add(((float)t, "Orbit reached")); }
+                }
                 // keep flying a little longer so the path is shown, then stop
                 double stopAt = prof.burnoutT + (prof.orbit ? 150 : 600);
                 if (t >= stopAt) break;

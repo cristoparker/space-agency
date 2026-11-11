@@ -62,7 +62,7 @@ public static class LaunchDateUI
         }
         Refresh();
         UIKit.Btn(card, "Later", 12, h - 28f, 60, 18, UIKit.T.chip, Close, 7f);
-        UIKit.Btn(card, "Confirm launch date", 80, h - 28f, w - 92f, 18, UIKit.Wash(UIKit.T.green, 0.75f), () => { Close(); rc.Finish(picked); }, 7f);
+        UIKit.SolidBtn(card, "Confirm launch date", 80, h - 28f, w - 92f, 18, UIKit.T.green, () => { Close(); rc.Finish(picked); }, 7f);
     }
 
     public static void Close()

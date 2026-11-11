@@ -71,7 +71,7 @@ public static class ImpactCard
         }
         float bw = (w - 28f) * 0.42f;
         UIKit.Btn(card, "Cancel", 12, h - 28f, bw, 18, UIKit.T.chip, () => { Close(); onCancel?.Invoke(); }, 7f);
-        UIKit.Btn(card, confirmLabel, 12 + bw + 8f, h - 28f, (w - 28f) * 0.58f, 18, UIKit.Wash(UIKit.T.green, 0.75f), () => { Close(); onConfirm?.Invoke(); }, 7f);
+        UIKit.SolidBtn(card, confirmLabel, 12 + bw + 8f, h - 28f, (w - 28f) * 0.58f, 18, UIKit.T.green, () => { Close(); onConfirm?.Invoke(); }, 7f);
     }
 
     static float Section(RectTransform card, float w, float y, string head, string[] lines, int sev, Color col)

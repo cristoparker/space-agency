@@ -114,7 +114,7 @@ public static class LaunchResultUI
                 UIKit.TextAt(card, "Hint", 12, y + 16f, w - 24, 8, "Follow it under Objectives. Reward comes when it finishes.", 5.2f, TextAlignmentOptions.MidlineLeft, false, UIKit.T.dim);
             }
         }
-        UIKit.Btn(card, "Continue", w - 12 - 70, h - 26f, 70, 18, UIKit.Wash(col, 0.7f), Close, 7f);
+        UIKit.SolidBtn(card, "Continue", w - 12 - 70, h - 26f, 70, 18, col, Close, 7f);
     }
 
     /// <summary>Before the launch: lists what is not met. The player may still go ahead.</summary>
@@ -150,7 +150,7 @@ public static class LaunchResultUI
         }
         float by = h - 26f;
         UIKit.Btn(card, "Cancel", 12, by, 70, 18, UIKit.T.chip, Close, 7f);
-        UIKit.Btn(card, "Launch anyway", w - 12 - 100, by, 100, 18, UIKit.Wash(Amber, 0.75f), () => { Close(); proceed(); }, 7f);
+        UIKit.SoftBtn(card, "Launch anyway", w - 12 - 100, by, 100, 18, Amber, () => { Close(); proceed(); }, 7f);
     }
 }
 

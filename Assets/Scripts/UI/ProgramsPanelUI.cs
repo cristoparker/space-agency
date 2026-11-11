@@ -37,20 +37,34 @@ public class ProgramsPanelUI : MonoBehaviour
     {
         if (!built) return;
         transform.SetAsLastSibling();
-        if (BaseSim.Instance != null) BaseSim.Instance.Changed += Refresh;
-        Agency.Changed += Refresh;
+        if (BaseSim.Instance != null) BaseSim.Instance.Changed += Request;
+        Agency.Changed += OnMoney;
+        moneySig = MoneySig();
         tabs.Select(tab);
         Refresh();
     }
 
     void OnDisable()
     {
-        if (BaseSim.Instance != null) BaseSim.Instance.Changed -= Refresh;
-        Agency.Changed -= Refresh;
+        if (BaseSim.Instance != null) BaseSim.Instance.Changed -= Request;
+        Agency.Changed -= OnMoney;
     }
+
+    bool dirty; string moneySig;
+    void Request() { dirty = true; }
+    // Money changes every game hour. Only rebuild the list when something the cards show (a lock reason) really changed.
+    string MoneySig()
+    {
+        var sim = BaseSim.Instance; if (sim == null) return "";
+        var sb = new System.Text.StringBuilder();
+        foreach (var p in BaseData.Programs) sb.Append(sim.WhyNot(p)).Append('|');
+        return sb.ToString();
+    }
+    void OnMoney() { var s = MoneySig(); if (s != moneySig) { moneySig = s; dirty = true; } }
 
     void Update()
     {
+        if (dirty && !UIKit.PointerHeld) { dirty = false; Refresh(); }       // never swap the buttons under a pressed pointer
         refreshTimer += Time.unscaledDeltaTime;
         if (refreshTimer < 0.25f) return;
         refreshTimer = 0f;
@@ -70,6 +84,7 @@ public class ProgramsPanelUI : MonoBehaviour
         tabs.Select(tab);
         UIKit.Clear(list);
         live.Clear();
+        moneySig = MoneySig();
         if (sim == null) return;
         var kind = tab == 0 ? ProgramKind.Training : ProgramKind.Testing;
         foreach (var p in BaseData.Programs)

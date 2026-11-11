@@ -57,6 +57,8 @@ public static class Agency
     public static string Name => PlayerPrefs.GetString(K("AgencyName"), "Space Agency");
     public static int TypeIndex => Mathf.Clamp(PlayerPrefs.GetInt(K("AgencyType"), 1), 0, Types.Length - 1);
     public static string Type => Types[TypeIndex];
+    /// <summary>The saved logo as text; lets the HUD notice a change without parsing it.</summary>
+    public static string LogoJson => PlayerPrefs.GetString(K("Logo"), "");
     public static LogoDesign Logo => LogoDesign.FromJson(PlayerPrefs.GetString(K("Logo"), ""));
 
     public static int Stat(int i)

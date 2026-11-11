@@ -97,7 +97,7 @@ public class FlightScene : MonoBehaviour
     bool finished, leaving; float openedAt;
     int lastIdx = -1;
     const float Cx = 250f, Cy = -150f, Rpx = 330f;
-    float k = 1f, angExag = 1f, theta0;
+    float angExag = 1f, theta0;
 
     void Start()
     {
@@ -217,27 +217,53 @@ public class FlightScene : MonoBehaviour
         q.GetComponent<MeshRenderer>().sharedMaterial = m;
 
         // the text sits just in front of the screen; positions and sizes are in screen pixels (960 x 540), 1 px = 6.2 / 960 m
-        var root = new GameObject("Screen Text").transform; root.SetParent(transform, false);
-        root.position = Origin + new Vector3(0, 2.15f, 4.82f);
-        float px = 6.2f / TW;
-        var f = UIKit.T != null ? UIKit.T.body : null;
-        TextMeshPro Text(string n, float x, float y, float size, TextAlignmentOptions al, Color c, float w)
-        {
-            var g = new GameObject(n); g.transform.SetParent(root, false);
-            g.transform.localPosition = new Vector3((x - TW / 2f) * px, (y - TH / 2f) * px, 0f);     // x, y from the top-left of the screen image
-            g.transform.localScale = Vector3.one * px * 10f;
-            var tm = g.AddComponent<TextMeshPro>(); if (f != null) tm.font = f;
-            tm.fontSize = size; tm.alignment = al; tm.color = c; tm.textWrappingMode = TextWrappingModes.NoWrap; tm.richText = true;
-            tm.rectTransform.pivot = al == TextAlignmentOptions.Center ? new Vector2(0.5f, 0.5f) : new Vector2(0f, 1f);       // left texts start exactly at (x, y)
-            tm.rectTransform.sizeDelta = new Vector2(w / 10f, size / 5f);
-            return tm;
-        }
+        textRoot = new GameObject("Screen Text").transform; textRoot.SetParent(transform, false);
+        textRoot.position = Origin + new Vector3(0, 2.15f, 4.82f);
+        TextMeshPro Text(string n, float x, float y, float size, TextAlignmentOptions al, Color c, float w) => MakeText(n, x, y, size, al, c, w);
         title = Text("Title", 24f, TH - 22f, 28f, TextAlignmentOptions.TopLeft, new Color(0.8f, 0.9f, 1f), 900f);
         readout = Text("Readout", 700f, TH - 70f, 26f, TextAlignmentOptions.TopLeft, new Color(0.75f, 1f, 0.85f), 240f);
         events = Text("Events", 640f, TH - 200f, 18f, TextAlignmentOptions.TopLeft, new Color(0.7f, 0.8f, 0.95f), 310f);
         banner = Text("Banner", TW / 2f, 70f, 36f, TextAlignmentOptions.Center, Color.white, 900f);
         hint = Text("Hint", TW / 2f, 22f, 16f, TextAlignmentOptions.Center, new Color(1f, 1f, 1f, 0.6f), 900f);
         hint.text = "Esc, Space or click to leave";
+    }
+
+    Transform textRoot;
+
+    TextMeshPro MakeText(string n, float x, float y, float size, TextAlignmentOptions al, Color c, float w)
+    {
+        float px = 6.2f / TW;
+        var g = new GameObject(n); g.transform.SetParent(textRoot, false);
+        g.transform.localPosition = new Vector3((x - TW / 2f) * px, (y - TH / 2f) * px, 0f);          // x, y in screen pixels, y up
+        g.transform.localScale = Vector3.one * px * 10f;
+        var tm = g.AddComponent<TextMeshPro>(); var f = UIKit.T != null ? UIKit.T.body : null; if (f != null) tm.font = f;
+        tm.fontSize = size; tm.alignment = al; tm.color = c; tm.textWrappingMode = TextWrappingModes.NoWrap; tm.richText = true;
+        tm.rectTransform.pivot = al == TextAlignmentOptions.Center ? new Vector2(0.5f, 0.5f) : new Vector2(0f, 1f);       // left texts start exactly at (x, y)
+        tm.rectTransform.sizeDelta = new Vector2(w / 10f, size / 5f);
+        return tm;
+    }
+
+    // ---- the orbits the monitor draws: name, altitude (km). The radial scale is logarithmic so that low orbits and geostationary orbit both fit.
+    static readonly (string name, float km)[] Orbits = { ("KARMAN LINE", 100f), ("LEO", 400f), ("MEO", 20200f), ("GEO", 35786f) };
+    const float RingSpan = 250f, MaxRingKm = 40000f;
+    static float F(float altKm) => RingSpan * Mathf.Log10(1f + Mathf.Max(0f, altKm) / 100f) / Mathf.Log10(1f + MaxRingKm / 100f);
+
+    static string OrbitName(float perigeeKm, float apogeeKm)
+    {
+        float a = (perigeeKm + Mathf.Min(apogeeKm, 60000f)) * 0.5f;
+        return a < 2000f ? "LOW EARTH ORBIT (LEO)" : a < 30000f ? "MEDIUM EARTH ORBIT (MEO)" : "GEOSTATIONARY RANGE (GEO)";
+    }
+
+    void BuildOrbitLabels()
+    {
+        foreach (var o in Orbits)
+        {
+            float r = Rpx + F(o.km), a = 97f * Mathf.Deg2Rad;
+            float x = Cx + r * Mathf.Cos(a), y = Cy + r * Mathf.Sin(a);
+            if (y > TH - 40f) { a = 120f * Mathf.Deg2Rad; x = Cx + r * Mathf.Cos(a); y = Cy + r * Mathf.Sin(a); }
+            var tm = MakeText("Orbit " + o.name, x + 6f, y + 6f, 14f, TextAlignmentOptions.TopLeft, new Color(0.62f, 0.82f, 1f, 0.9f), 260f);
+            tm.text = "<b>" + o.name + "</b>  " + (o.km >= 1000f ? (o.km / 1000f).ToString("0.#") + "k km" : o.km.ToString("0") + " km");
+        }
     }
 
     void Setup()
@@ -258,7 +284,7 @@ public class FlightScene : MonoBehaviour
         float maxAng = 0.0001f, maxAlt = 150f;
         for (int i = 0; i < prof.Count; i++) { maxAng = Mathf.Max(maxAng, Mathf.Abs(Ang(i))); maxAlt = Mathf.Max(maxAlt, prof.alt[i]); }
         angExag = Mathf.Min(40f, (55f * Mathf.Deg2Rad) / maxAng);
-        k = 230f / Mathf.Max(320f, Mathf.Min(maxAlt, 1500f));
+        BuildOrbitLabels();
         PaintBackground();
         title.text = (string.IsNullOrEmpty(rec.missionName) ? "FLIGHT" : rec.missionName.ToUpperInvariant()) + "  ·  " + (string.IsNullOrEmpty(rec.rocketName) ? "Rocket" : rec.rocketName);
     }
@@ -268,7 +294,7 @@ public class FlightScene : MonoBehaviour
     Vector2 ToScreen(int i)
     {
         float a = Mathf.PI / 2f - Ang(i) * angExag;
-        float r = Rpx + Mathf.Min(prof.alt[i], 2000f) * k;
+        float r = Rpx + F(Mathf.Min(prof.alt[i], MaxRingKm));
         return new Vector2(Cx + r * Mathf.Cos(a), Cy + r * Mathf.Sin(a));
     }
 
@@ -303,6 +329,10 @@ public class FlightScene : MonoBehaviour
         // grid and frame
         for (int x = 0; x < TW; x += 80) for (int y = 0; y < TH; y++) Blend(bg, x, y, new Color32(80, 110, 160, 255), 0.07f);
         for (int y = 0; y < TH; y += 80) for (int x = 0; x < TW; x++) Blend(bg, x, y, new Color32(80, 110, 160, 255), 0.07f);
+        // the named orbits never change: paint them once into the background (Ring/Disc draw into buf, so point it at bg for a moment)
+        var live = buf; buf = bg;
+        foreach (var o in Orbits) Ring(Rpx + F(o.km), new Color32(130, 160, 220, 255), o.name == "KARMAN LINE" ? 0.28f : 0.38f, true);
+        buf = live;
     }
 
     static void Blend(Color32[] b, int x, int y, Color32 c, float a)
@@ -348,8 +378,9 @@ public class FlightScene : MonoBehaviour
         bool orbitNow = prof.orbit && (rec == null || rec.Result != LaunchResult.Failure) && time >= prof.burnoutT;
         if (orbitNow)
         {
-            float orbitAlt = Mathf.Clamp((prof.perigeeKm + Mathf.Min(prof.apogeeKm, 3000f)) * 0.5f, 120f, 2000f);
-            Ring(Rpx + orbitAlt * k, new Color32(120, 220, 255, 255), 0.7f, true);
+            float orbitAlt = Mathf.Clamp((prof.perigeeKm + Mathf.Min(prof.apogeeKm, 60000f)) * 0.5f, 100f, MaxRingKm);
+            Ring(Rpx + F(orbitAlt), new Color32(120, 255, 200, 255), 0.95f, true);                   // the orbit the rocket reached, brighter
+            Ring(Rpx + F(orbitAlt) + 1.5f, new Color32(120, 255, 200, 255), 0.5f, true);
         }
         // the trail so far
         for (int i = 1; i <= idx; i++)
@@ -401,8 +432,8 @@ public class FlightScene : MonoBehaviour
         string cause = string.IsNullOrEmpty(rec.cause) ? "" : "\n" + rec.cause;
         switch (rec.Result)
         {
-            case LaunchResult.Success: banner.text = "<color=#7CFFB0>" + (prof.escape ? "ESCAPE TRAJECTORY" : "ORBIT REACHED") + "</color>"; break;
-            case LaunchResult.Partial: banner.text = "<color=#FFC46B>" + (prof.orbit ? "ORBIT, WITH PROBLEMS" : "SUBORBITAL FLIGHT") + "</color>"; break;
+            case LaunchResult.Success: banner.text = "<color=#7CFFB0>" + (prof.escape ? "ESCAPE TRAJECTORY" : OrbitName(prof.perigeeKm, prof.apogeeKm)) + "</color>"; break;
+            case LaunchResult.Partial: banner.text = "<color=#FFC46B>" + (prof.orbit ? OrbitName(prof.perigeeKm, prof.apogeeKm) + ", WITH PROBLEMS" : "SUBORBITAL FLIGHT") + "</color>"; break;
             default: banner.text = "<color=#FF7A6B>VEHICLE LOST</color>"; break;
         }
     }

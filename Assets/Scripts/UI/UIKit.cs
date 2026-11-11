@@ -1,6 +1,7 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 /// <summary>Small helpers that build glass-styled UI in code. All sizes are in canvas units (the canvas is 640 x 360).</summary>
@@ -93,6 +94,19 @@ public static class UIKit
         return r;
     }
 
+    /// <summary>
+    /// A small flat rounded panel for little things (toasts, banners, hints, check lists): a plain oval fill with no blur and no
+    /// outer shadow layer, because stacking glass inside glass looks heavy.
+    /// </summary>
+    public static Image Pill(RectTransform r, Color? fill = null)
+    {
+        var i = r.gameObject.GetComponent<Image>() ?? r.gameObject.AddComponent<Image>();
+        i.sprite = T.round; i.type = Image.Type.Sliced; i.pixelsPerUnitMultiplier = 1f;
+        i.material = T.flat; i.color = fill ?? PanelColor;
+        UIRound.Attach(i);
+        return i;
+    }
+
     // ------------------------------------------------------------------ text
     public static TMP_Text Text(Transform parent, string s, float size, TextAlignmentOptions al = TextAlignmentOptions.Center, bool head = false, Color? color = null)
     {
@@ -125,6 +139,25 @@ public static class UIKit
         cb.fadeDuration = 0.06f;
         b.colors = cb;
     }
+
+    // ---- one button language (Apple style): Solid = the single main action of a dialog, Soft = an action inside a card or list,
+    // ---- Plain = neutral (cancel, back), Danger = a soft red. Fill and label colours always come from the same accent.
+    /// <summary>Solid fill: a deepened accent so white text on it keeps a readable contrast.</summary>
+    public static Color Solid(Color accent) => new Color(accent.r * 0.74f, accent.g * 0.74f, accent.b * 0.74f, 1f);
+    /// <summary>Soft (tinted) fill: a translucent wash of the accent.</summary>
+    public static Color Soft(Color accent) => new Color(accent.r, accent.g, accent.b, 0.26f);
+    /// <summary>Label colour for a soft button: the accent lifted towards white.</summary>
+    public static Color SoftInk(Color accent) => Color.Lerp(accent, Color.white, 0.42f);
+    public static readonly Color Amber = new Color(1f, 0.72f, 0.3f, 1f);
+
+    public static Button SoftBtn(Transform parent, string label, float x, float y, float w, float h, Color accent, UnityAction click, float size = 7f)
+        => Btn(parent, label, x, y, w, h, Soft(accent), click, size, true, SoftInk(accent));
+    /// <summary>White on a deep fill, near-black on a light one (amber, orange), so the label always keeps its contrast.</summary>
+    public static Color OnSolid(Color accent) { var s = Solid(accent); return 0.2126f * s.r + 0.7152f * s.g + 0.0722f * s.b > 0.42f ? new Color(0.1f, 0.07f, 0.02f, 1f) : Color.white; }
+    public static Button SolidBtn(Transform parent, string label, float x, float y, float w, float h, Color accent, UnityAction click, float size = 7f)
+        => Btn(parent, label, x, y, w, h, Solid(accent), click, size, true, OnSolid(accent));
+    public static Button PlainBtn(Transform parent, string label, float x, float y, float w, float h, UnityAction click, float size = 7f)
+        => Btn(parent, label, x, y, w, h, T.chip, click, size, true, T.ink);
 
     public static Button Btn(Transform parent, string label, float x, float y, float w, float h, Color tint, UnityAction click, float size = 7.5f, bool head = true, Color? labelColor = null)
     {
@@ -204,9 +237,42 @@ public static class UIKit
         }
         content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
         var sr = root.gameObject.AddComponent<ScrollRect>();
-        sr.viewport = vp; sr.content = content; sr.horizontal = false; sr.scrollSensitivity = 14f; sr.movementType = ScrollRect.MovementType.Clamped;
+        sr.viewport = vp; sr.content = content; sr.horizontal = false; sr.movementType = ScrollRect.MovementType.Clamped;
+        StyleScroll(sr, root);
         return content;
     }
+
+    /// <summary>Gives a ScrollRect a slim rounded scrollbar (it hides when everything fits) and smooth wheel scrolling.</summary>
+    public static void StyleScroll(ScrollRect sr, RectTransform root)
+    {
+        sr.scrollSensitivity = 0f;                                         // the wheel is handled by SmoothScroll
+        sr.inertia = true; sr.decelerationRate = 0.1f; sr.elasticity = 0.08f;
+        var bar = new GameObject("Scrollbar", typeof(RectTransform), typeof(CanvasGroup)).GetComponent<RectTransform>();
+        bar.SetParent(root, false);
+        bar.anchorMin = new Vector2(1f, 0f); bar.anchorMax = new Vector2(1f, 1f); bar.pivot = new Vector2(1f, 0.5f);
+        bar.sizeDelta = new Vector2(4f, -8f); bar.anchoredPosition = new Vector2(-1.5f, 0f);
+        var track = bar.gameObject.AddComponent<Image>();
+        track.sprite = T.round; track.type = Image.Type.Sliced; track.pixelsPerUnitMultiplier = 1f; track.color = new Color(1f, 1f, 1f, 0.07f);
+        UIRound.Attach(track);
+        var area = new GameObject("Sliding Area", typeof(RectTransform)).GetComponent<RectTransform>();
+        area.SetParent(bar, false); area.anchorMin = Vector2.zero; area.anchorMax = Vector2.one; area.offsetMin = area.offsetMax = Vector2.zero;
+        var handle = new GameObject("Handle", typeof(RectTransform), typeof(Image)).GetComponent<RectTransform>();
+        handle.SetParent(area, false); handle.anchorMin = Vector2.zero; handle.anchorMax = Vector2.one; handle.offsetMin = handle.offsetMax = Vector2.zero;
+        var hi = handle.GetComponent<Image>();
+        hi.sprite = T.round; hi.type = Image.Type.Sliced; hi.pixelsPerUnitMultiplier = 1f; hi.color = Color.white;
+        UIRound.Attach(hi);
+        var sb = bar.gameObject.AddComponent<Scrollbar>();
+        sb.handleRect = handle; sb.direction = Scrollbar.Direction.BottomToTop; sb.targetGraphic = hi;
+        var cb = sb.colors;
+        cb.normalColor = new Color(1f, 1f, 1f, 0.38f); cb.highlightedColor = new Color(1f, 1f, 1f, 0.75f); cb.pressedColor = new Color(1f, 1f, 1f, 0.95f); cb.selectedColor = cb.normalColor;
+        cb.colorMultiplier = 1f; cb.fadeDuration = 0.12f; sb.colors = cb;
+        sr.verticalScrollbar = sb; sr.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide; sr.verticalScrollbarSpacing = 0f;
+        var smooth = root.gameObject.AddComponent<SmoothScroll>();
+        smooth.sr = sr; smooth.barGroup = bar.GetComponent<CanvasGroup>();
+    }
+
+    /// <summary>True while the left mouse button is held: lists must not be rebuilt then, or the pressed button vanishes and the click is lost.</summary>
+    public static bool PointerHeld => Mouse.current != null && Mouse.current.leftButton.isPressed;
 
     public static void Clear(Transform t)
     {

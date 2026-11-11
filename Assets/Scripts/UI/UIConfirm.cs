@@ -42,8 +42,8 @@ public static class UIConfirm
         card.sizeDelta = new Vector2(w, h);
 
         float by = h - 24f;
-        UIKit.Btn(card, "Cancel", 10, by, (w - 28f) * 0.42f, 16, UIKit.T.chip, () => { Close(); onCancel?.Invoke(); }, 6.8f);
-        UIKit.Btn(card, confirmLabel, 10 + (w - 28f) * 0.42f + 8, by, (w - 28f) * 0.58f, 16, UIKit.T.green, () => { Close(); onConfirm?.Invoke(); }, 6.8f);
+        UIKit.PlainBtn(card, "Cancel", 10, by, (w - 28f) * 0.42f, 16, () => { Close(); onCancel?.Invoke(); }, 6.8f);
+        UIKit.SolidBtn(card, confirmLabel, 10 + (w - 28f) * 0.42f + 8, by, (w - 28f) * 0.58f, 16, UIKit.T.green, () => { Close(); onConfirm?.Invoke(); }, 6.8f);
     }
 
     public static void Close()
