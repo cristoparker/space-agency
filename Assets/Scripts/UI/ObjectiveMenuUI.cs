@@ -41,7 +41,7 @@ public class ObjectiveMenuUI : MonoBehaviour
         var btn = new GameObject("Objectives Button", typeof(RectTransform)).GetComponent<RectTransform>();
         btn.SetParent(rt, false);
         btn.anchorMin = btn.anchorMax = new Vector2(0f, 1f); btn.pivot = new Vector2(0f, 1f);
-        btn.anchoredPosition = new Vector2(8f, -32f); btn.sizeDelta = new Vector2(66f, 22f);
+        btn.anchoredPosition = new Vector2(8f, -36f); btn.sizeDelta = new Vector2(66f, 22f);
         UIKit.Glass(btn);
         var inner = UIKit.At(btn, "Hit", 3, 3, 60, 16);
         var b = UIKit.MakeButton(inner, "", UIKit.T.chip, Toggle);
@@ -58,7 +58,7 @@ public class ObjectiveMenuUI : MonoBehaviour
         panel = new GameObject("Objectives Panel", typeof(RectTransform)).GetComponent<RectTransform>();
         panel.SetParent(rt, false);
         panel.anchorMin = panel.anchorMax = new Vector2(0f, 1f); panel.pivot = new Vector2(0f, 1f);
-        panel.anchoredPosition = new Vector2(8f, -58f); panel.sizeDelta = new Vector2(PW, PanelH);
+        panel.anchoredPosition = new Vector2(8f, -62f); panel.sizeDelta = new Vector2(PW, PanelH);
         UIKit.Panel(panel);
         UIKit.TitleBar(panel, "Objectives", UIKit.T.orange, PW, () => SetOpen(false));
         content = UIKit.ScrollList(panel, "List", 5, 28, PW - 10, PanelH - 33, null, 4f);

@@ -7,6 +7,8 @@ using UnityEngine.UI;
 /// <summary>Small helpers that build glass-styled UI in code. All sizes are in canvas units (the canvas is 640 x 360).</summary>
 public static class UIKit
 {
+    /// <summary>Size of every menu and panel relative to the original layout (the top bar and the dock stay at 1).</summary>
+    public const float Shrink = 0.86f;
     public static UITheme T => UITheme.Current;
 
     // ------------------------------------------------------------------ rects
@@ -366,6 +368,27 @@ public static class Panels
 }
 
 /// <summary>A soft drop shadow drawn behind a glass panel (a sibling placed under it that follows its size and visibility).</summary>
+/// <summary>
+/// The whole game UI is drawn at <see cref="UIKit.Shrink"/> of its old size (the canvas reference resolution is larger), which frees screen space for menus.
+/// The top bar and the bottom dock keep their original on-screen size: this component scales them back up and re-anchors them.
+/// </summary>
+public class KeepHudSize : MonoBehaviour
+{
+    RectTransform rt;
+    Vector2 baseSize, basePos;
+    void Awake() { rt = (RectTransform)transform; baseSize = rt.sizeDelta; basePos = rt.anchoredPosition; }
+    void LateUpdate()
+    {
+        float s = 1f / UIKit.Shrink;
+        if (rt.localScale.x != s) rt.localScale = new Vector3(s, s, 1f);
+        var size = baseSize;
+        if (rt.anchorMin.x != rt.anchorMax.x && rt.parent is RectTransform p) size.x -= (1f - UIKit.Shrink) * p.rect.width;      // stretched bar: same margin to the screen edge
+        if (rt.sizeDelta != size) rt.sizeDelta = size;
+        var pos = basePos * s;
+        if (rt.anchoredPosition != pos) rt.anchoredPosition = pos;
+    }
+}
+
 public class UIShadow : MonoBehaviour
 {
     static Sprite sprite;
@@ -419,9 +442,11 @@ public class UIShadow : MonoBehaviour
         var target = (RectTransform)transform;
         me.anchorMin = target.anchorMin; me.anchorMax = target.anchorMax; me.pivot = new Vector2(0.5f, 0.5f);
         var size = target.sizeDelta;
+        float k = target.localScale.x;
+        me.localScale = new Vector3(k, k, 1f);
         me.sizeDelta = size + new Vector2(spread * 2f, spread * 2f);
         // centre of the panel, whatever its pivot, pushed down a little (light comes from above)
-        me.anchoredPosition = target.anchoredPosition + new Vector2((0.5f - target.pivot.x) * size.x, (0.5f - target.pivot.y) * size.y - dropY);
+        me.anchoredPosition = target.anchoredPosition + new Vector2((0.5f - target.pivot.x) * size.x, (0.5f - target.pivot.y) * size.y) * k - new Vector2(0f, dropY * k);
         int want = Mathf.Max(0, target.GetSiblingIndex() - 1);          // just under the panel when it moves to the front
         if (me.GetSiblingIndex() != want) me.SetSiblingIndex(want);
     }

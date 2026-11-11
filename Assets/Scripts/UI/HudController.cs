@@ -72,6 +72,8 @@ public class HudController : MonoBehaviour
     {
         if (UITheme.Current == null) { Debug.LogError("HudController: Resources/UITheme is missing. Run Tools / Space Agency / Setup Game UI."); return; }
         canvasRt = (RectTransform)transform;
+        var scaler = GetComponent<UnityEngine.UI.CanvasScaler>();
+        if (scaler != null) scaler.referenceResolution = new Vector2(640f, 360f) / UIKit.Shrink;      // everything but the top bar and the dock is drawn smaller: more room for menus
         Canvas.ForceUpdateCanvases();
 
         BuildPanels();
@@ -144,6 +146,7 @@ public class HudController : MonoBehaviour
         bar.anchorMin = bar.anchorMax = Vector2.zero; bar.pivot = Vector2.zero;
         bar.anchoredPosition = new Vector2(8f, 8f); bar.sizeDelta = new Vector2(w, h);
         UIKit.Glass(bar);
+        bar.gameObject.AddComponent<KeepHudSize>();
 
         // bottom right: the Layer button and the cinematic camera button, side by side
         var rbar = new GameObject("Bottom Right", typeof(RectTransform)).GetComponent<RectTransform>();
@@ -151,6 +154,7 @@ public class HudController : MonoBehaviour
         rbar.anchorMin = rbar.anchorMax = new Vector2(1f, 0f); rbar.pivot = new Vector2(1f, 0f);
         rbar.anchoredPosition = new Vector2(-8f, 8f); rbar.sizeDelta = new Vector2(pad * 2 + 15f * 3 + gap * 2, h);
         UIKit.Glass(rbar);
+        rbar.gameObject.AddComponent<KeepHudSize>();
         var cine = UIKit.At(rbar, "Cinematic", pad + 15f + gap, pad, 15f, bh);
         UIKit.MakeButton(cine, "", UIKit.T.chip, () => { CloseMenus(); CinematicCamera.Begin(this, canvasRt); });
         UIKit.IconAt(cine, Resources.Load<Sprite>("UIIcons/icon_camera"), 3.5f, 3.5f, bh - 7f, bh - 7f, UIKit.T.ink);
@@ -424,6 +428,7 @@ public class HudController : MonoBehaviour
         bar.anchorMin = new Vector2(0f, 1f); bar.anchorMax = new Vector2(1f, 1f); bar.pivot = new Vector2(0.5f, 1f);
         bar.sizeDelta = new Vector2(-16f, 19f); bar.anchoredPosition = new Vector2(0f, -5f);
         UIKit.Glass(bar);
+        bar.gameObject.AddComponent<KeepHudSize>();
         bar.SetAsFirstSibling();
         var left = Cluster(bar, "Left", true);
         var right = Cluster(bar, "Right", false);

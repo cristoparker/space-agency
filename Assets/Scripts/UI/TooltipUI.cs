@@ -61,25 +61,25 @@ public class TooltipUI : MonoBehaviour
         else le.preferredWidth = -1f;
         LayoutRebuilder.ForceRebuildLayoutImmediate(rect);
 
-        var corners = new Vector3[4];
-        target.GetWorldCorners(corners);                                   // 0 bottom-left, 1 top-left, 2 top-right, 3 bottom-right
         var root = canvas != null ? (RectTransform)canvas.rootCanvas.transform : null;
         var rc = new Vector3[4];
         if (root != null) root.GetWorldCorners(rc); else { rc[0] = Vector3.zero; rc[2] = new Vector3(Screen.width, Screen.height, 0f); }
         float scale = canvas != null ? canvas.rootCanvas.transform.lossyScale.x : 1f;
-
-        float midY = (rc[0].y + rc[2].y) * 0.5f;
-        bool below = (corners[0].y + corners[1].y) * 0.5f > midY;           // target in the upper half -> tooltip goes below it
-        float cx = (corners[0].x + corners[3].x) * 0.5f;
-        float g = gap * scale;
-        rect.pivot = new Vector2(0.5f, below ? 1f : 0f);
+        // always BELOW the cursor (its top-left corner just under the pointer tip), so the tooltip never hides what is being clicked
+        Vector3 anchor = target.position;
+        var mouse = UnityEngine.InputSystem.Mouse.current;
+        if (mouse != null && root != null)
+            RectTransformUtility.ScreenPointToWorldPointInRectangle(root, mouse.position.ReadValue(), canvas.rootCanvas.worldCamera, out anchor);
+        rect.pivot = new Vector2(0f, 1f);
         float w = rect.rect.width * scale, h = rect.rect.height * scale;
-        float x = Mathf.Clamp(cx, rc[0].x + w * 0.5f + 2f * scale, rc[2].x - w * 0.5f - 2f * scale);
-        float y = below ? corners[0].y - g : corners[1].y + g;
+        float x = Mathf.Clamp(anchor.x + 4f * scale, rc[0].x + 2f * scale, rc[2].x - w - 2f * scale);
+        float y = anchor.y - 12f * scale;                                              // 12 units: clear of the pointer image
+        if (y - h < rc[0].y + 2f * scale) { y = rc[0].y + h + 2f * scale; x = Mathf.Clamp(anchor.x + 14f * scale, rc[0].x + 2f * scale, rc[2].x - w - 2f * scale); }   // no room below: beside the cursor, still not over it
         rect.position = new Vector3(x, y, target.position.z);
 
         transform.SetAsLastSibling();
         group.alpha = 1f;
+        group.blocksRaycasts = false;
     }
 
     public void Hide()

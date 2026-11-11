@@ -35,7 +35,7 @@ public class FacilityPanelUI : MonoBehaviour
     {
         var r = (RectTransform)transform;
         r.anchorMin = r.anchorMax = new Vector2(1f, 1f); r.pivot = new Vector2(1f, 1f);
-        r.anchoredPosition = new Vector2(-8f, -32f); r.sizeDelta = new Vector2(W, H);
+        r.anchoredPosition = new Vector2(-8f, -36f); r.sizeDelta = new Vector2(W, H);
         UIKit.Panel(r);
         UIKit.TitleBar(r, "Facility", UIKit.T.teal, W, () => gameObject.SetActive(false));
         starIcon = Resources.Load<Sprite>("UIIcons/icon_star"); powerIcon = Resources.Load<Sprite>("UIIcons/icon_power");

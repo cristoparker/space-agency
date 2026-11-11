@@ -15,9 +15,10 @@ public class PartTip
 }
 
 /// <summary>Put on a UI element to show a <see cref="PartTip"/> while the pointer is over it.</summary>
-public class PartTipTrigger : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
+public class PartTipTrigger : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerDownHandler
 {
     public Func<PartTip> build;
+    public void OnPointerDown(PointerEventData e) => PartTooltipUI.Hide();      // a click: get out of the way
     public void OnPointerEnter(PointerEventData e) { if (build != null) PartTooltipUI.Show(build(), (RectTransform)transform); }
     public void OnPointerExit(PointerEventData e) => PartTooltipUI.Hide();
     void OnDisable() => PartTooltipUI.Hide();
@@ -65,15 +66,19 @@ public static class PartTooltipUI
             n.textWrappingMode = TextWrappingModes.Normal; n.lineSpacing = -6f; n.raycastTarget = false;
         }
 
-        // beside the element: above it when it is in the lower half of the screen, below it otherwise; always inside the screen
-        var corners = new Vector3[4]; target.GetWorldCorners(corners);
+        // always BELOW the cursor (top-left corner just under the pointer tip) so it never covers the card being picked or its neighbours;
+        // with no room below it moves beside the cursor, never above it. The position comes from the pointer, so camera zoom (FOV) cannot move it.
         var rc = new Vector3[4]; canvasRt.GetWorldCorners(rc);
-        float scale = canvasRt.lossyScale.x, g = 3f * scale;
-        bool below = (corners[0].y + corners[1].y) * 0.5f > (rc[0].y + rc[2].y) * 0.5f;
-        float cx = (corners[0].x + corners[3].x) * 0.5f;
-        box.pivot = new Vector2(0.5f, below ? 1f : 0f);
-        float x = Mathf.Clamp(cx, rc[0].x + w * 0.5f * scale + 2f * scale, rc[2].x - w * 0.5f * scale - 2f * scale);
-        float yy = below ? corners[0].y - g : corners[1].y + g;
+        float scale = canvasRt.lossyScale.x;
+        Vector3 anchor = target.position;
+        var mouse = UnityEngine.InputSystem.Mouse.current;
+        var cam = hud.GetComponent<Canvas>() != null ? hud.GetComponent<Canvas>().worldCamera : null;
+        if (mouse != null) RectTransformUtility.ScreenPointToWorldPointInRectangle(canvasRt, mouse.position.ReadValue(), cam, out anchor);
+        box.pivot = new Vector2(0f, 1f);
+        float bw = w * scale, bh = h * scale;
+        float x = Mathf.Clamp(anchor.x + 4f * scale, rc[0].x + 2f * scale, rc[2].x - bw - 2f * scale);
+        float yy = anchor.y - 12f * scale;
+        if (yy - bh < rc[0].y + 2f * scale) { yy = rc[0].y + bh + 2f * scale; x = Mathf.Clamp(anchor.x + 14f * scale, rc[0].x + 2f * scale, rc[2].x - bw - 2f * scale); }
         box.position = new Vector3(x, yy, target.position.z);
         box.SetAsLastSibling();
         box.GetComponent<CanvasGroup>().alpha = 1f;

@@ -165,7 +165,7 @@ public class FlightPanelUI : MonoBehaviour
     ObjectiveMenuUI objectives;
     bool expanded;
     FlightRecord shown;
-    float y = -58f, x = 8f, height = Hc;
+    float y = -62f, x = 8f, height = Hc;
 
     public static FlightPanelUI Create(RectTransform canvas, ObjectiveMenuUI obj)
     {
@@ -178,7 +178,7 @@ public class FlightPanelUI : MonoBehaviour
         ui.panel = new GameObject("Panel", typeof(RectTransform)).GetComponent<RectTransform>();      // a child: this component stays active so it can switch the panel on
         ui.panel.SetParent(prt, false);
         ui.panel.anchorMin = ui.panel.anchorMax = new Vector2(0f, 1f); ui.panel.pivot = new Vector2(0f, 1f);
-        ui.panel.anchoredPosition = new Vector2(8f, -58f); ui.panel.sizeDelta = new Vector2(W, Hc);
+        ui.panel.anchoredPosition = new Vector2(8f, -62f); ui.panel.sizeDelta = new Vector2(W, Hc);
         UIKit.Panel(ui.panel);
         ui.panel.gameObject.AddComponent<UIPopIn>(); ui.panel.gameObject.AddComponent<CanvasGroup>();
         ui.panel.gameObject.SetActive(false);
@@ -245,8 +245,8 @@ public class FlightPanelUI : MonoBehaviour
 
         // under the Objectives button; under its panel while that is open; beside it when expanded and the panel is open (no room below)
         bool objOpen = objectives != null && objectives.IsOpen;
-        float tx = 8f, ty = -58f;
-        if (objOpen) { if (expanded) tx = 8f + ObjectiveMenuUI.PW + 6f; else ty = -(58f + ObjectiveMenuUI.PanelH + 4f); }
+        float tx = 8f, ty = -62f;
+        if (objOpen) { if (expanded) tx = 8f + ObjectiveMenuUI.PW + 6f; else ty = -(62f + ObjectiveMenuUI.PanelH + 4f); }
         float k = 1f - Mathf.Exp(-14f * Time.unscaledDeltaTime);
         x = Mathf.Lerp(x, tx, k); y = Mathf.Lerp(y, ty, k);
         panel.anchoredPosition = new Vector2(x, y);
