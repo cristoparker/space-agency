@@ -12,7 +12,7 @@ public class DeploymentManager : MonoBehaviour
     const string Key = "SpaceAgency.Deployment";
 
     public PartLibrary library;
-    [Tooltip("Old placeholder rocket on the pad; hidden while a deployed rocket stands there.")]
+    [Tooltip("Old placeholder rocket on the pad; always hidden at runtime (the pad starts empty).")]
     public GameObject placeholder;
     public Vector3 rocketPosition = new Vector3(8f, 5.26f, 0f);
     [Tooltip("Parts are modelled at 1:1 for the builder; on the pad the rocket is shown this much bigger to match the full-size launch complex.")]
@@ -97,7 +97,7 @@ public class DeploymentManager : MonoBehaviour
     {
         if (padRocket != null) Destroy(padRocket);
         padRocket = null;
-        if (placeholder != null) placeholder.SetActive(Current == null);
+        if (placeholder != null) placeholder.SetActive(false);        // no ready-made rocket: the pad is empty until the player deploys their own
         if (Current == null || library == null) return;
         var design = RocketDesign.FromJson(Current.design);
         design.stack.RemoveAll(id => library.Get(id) == null);

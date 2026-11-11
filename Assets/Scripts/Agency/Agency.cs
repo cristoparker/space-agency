@@ -114,7 +114,7 @@ public static class Agency
     public static void Create(string name, int type, int[] stats, LogoDesign logo)
     {
         // fresh game: wipe the previous run's progress
-        foreach (var key in new[] { "SpaceAgency.Deployment", "SpaceAgency.RocketDesign", "SpaceAgency.RocketName", K("Rep"), K("Owned"), K("Accepted") })
+        foreach (var key in new[] { "SpaceAgency.Deployment", "SpaceAgency.RocketBuild", "SpaceAgency.Flight", "SpaceAgency.ClientTrust", "SpaceAgency.RocketDesign", "SpaceAgency.RocketName", "SpaceAgency.PayloadDesign", "SpaceAgency.PayloadName", K("Rep"), K("Owned"), K("Accepted") })
             PlayerPrefs.DeleteKey(key);
         BaseSave.Reset();                                     // buildings, programmes and certificates start over
         PlayerPrefs.SetString(K("AgencyName"), string.IsNullOrWhiteSpace(name) ? "Space Agency" : name.Trim());

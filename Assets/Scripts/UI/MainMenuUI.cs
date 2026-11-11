@@ -5,7 +5,7 @@ using UnityEngine.UI;
 
 /// <summary>
 /// Main menu (TV-1) and "Register Your Agency" (TV-2) from the reference layouts.
-/// Title: Play / Load Game / Settings / Exit.  Register: agency name, type, stats and the layer based logo creator.
+/// Title: New Game / Load Game / Settings / Exit.  Register: agency name, type, stats and the layer based logo creator.
 /// The finished agency is stored in <see cref="Agency"/> and the Game scene is loaded.
 /// </summary>
 public class MainMenuUI : MonoBehaviour
@@ -116,12 +116,12 @@ public class MainMenuUI : MonoBehaviour
         BuildLogo(s);
 
         // each menu button is one glass capsule (blurred scenery behind it, fully rounded ends) with its label on it: no card, no inner chip
-        string[] labels = { "Play", "Load Game", "Settings", "Exit" };
+        string[] labels = { "New Game", "Load Game", "Settings", "Exit" };
         for (int i = 0; i < labels.Length; i++)
         {
             int idx = i;
             var r = UIKit.At(s, "Menu " + labels[i], 44, 134 + i * 34, 150, 26);
-            var glass = UIKit.Glass(r);                                   // the game's own blurred glass
+            var glass = UIKit.Glass(r, true, true);                                   // the game's own blurred glass
             var round = r.GetComponent<UIRound>(); round.radius = 13f; round.Force();     // exactly half the height: ends are full half-circles
             var b = r.gameObject.AddComponent<Button>();
             b.targetGraphic = glass; b.onClick.AddListener(() => OnTitle(idx));
@@ -139,7 +139,7 @@ public class MainMenuUI : MonoBehaviour
         {
             case 0: Show(registerScreen); break;
             case 1:
-                if (!Agency.Registered) { Say("No saved agency yet. Press Play to register one."); return; }
+                if (!Agency.Registered) { Say("No saved agency yet. Press New Game to register one."); return; }
                 SceneManager.LoadScene(gameScene);
                 break;
             case 2: Show(settingsScreen); break;

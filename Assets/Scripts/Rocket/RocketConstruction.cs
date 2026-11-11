@@ -66,8 +66,21 @@ public class RocketConstruction : MonoBehaviour
         return true;
     }
 
+    bool checkedStale;
     void Update()
     {
+        // A job that belongs to a contract which is no longer running (an old game, a declined contract) is a leftover: drop it, so the builder never
+        // says "a rocket is already under construction / waiting" when nothing is really being built.
+        if (!checkedStale && Current != null && MissionManager.Instance != null && Time.unscaledTime > 1.5f)
+        {
+            checkedStale = true;
+            if (!string.IsNullOrEmpty(Current.missionId))
+            {
+                bool live = false;
+                foreach (var m in MissionManager.Instance.Running) if (m.Definition.id == Current.missionId) live = true;
+                if (!live) { Current = null; Save(); Changed?.Invoke(); }
+            }
+        }
         if (Current == null || Current.ready) return;
         var clock = GameClock.Instance; if (clock == null) return;
         float dt = clock.GameDeltaSeconds;

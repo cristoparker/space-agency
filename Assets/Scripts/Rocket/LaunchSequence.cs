@@ -59,6 +59,13 @@ public class LaunchSequence : MonoBehaviour
 
         var rocket = dep.PadRocket;
         Vector3 basePos = rocket.transform.position;
+        // the size of this rocket (designs differ a lot): the onboard camera must stay OUTSIDE it, however big it is
+        float rocketH = 30f, rocketR = 4f;
+        {
+            Bounds rb = default; bool has = false;
+            foreach (var mr in rocket.GetComponentsInChildren<MeshRenderer>()) { if (!has) { rb = mr.bounds; has = true; } else rb.Encapsulate(mr.bounds); }
+            if (has) { rocketH = Mathf.Max(8f, rb.size.y); rocketR = Mathf.Max(1.5f, Mathf.Max(rb.size.x, rb.size.z) * 0.5f); }
+        }
         cam = Camera.main;
         rig = cam != null ? cam.GetComponent<CameraRig>() : null;
         Vector3 camPos = cam.transform.position; Quaternion camRot = cam.transform.rotation; float camFov = cam.fieldOfView;
@@ -145,14 +152,15 @@ public class LaunchSequence : MonoBehaviour
                 if (shot == 0) { cam.fieldOfView = 46f; }
                 if (shot == 1) { cam.fieldOfView = 58f; }
                 if (shot == 2) { cam.fieldOfView = 34f; }
-                if (shot == 3) { cam.fieldOfView = 78f; }
+                if (shot == 3) { cam.fieldOfView = 68f; }
             }
             Vector3 cpos, target;
             if (shot == 3)
             {
-                // riding on top of the rocket, looking down as the pad falls away
-                cpos = pos + rocket.transform.up * 9f + rocket.transform.forward * -2.5f;
-                target = Vector3.Lerp(basePos, pos - rocket.transform.up * 10f, 0.25f);
+                // a chase view from above and beside the rocket (never inside the body, whatever its size): it looks down along the rocket
+                // while the pad falls away behind it
+                cpos = pos + rocket.transform.up * (rocketH * 0.75f + 6f) + rocket.transform.right * (rocketR * 2.4f + 9f);
+                target = Vector3.Lerp(pos + rocket.transform.up * (rocketH * 0.4f), basePos, 0.3f);
             }
             else if (shot == 0)
             {

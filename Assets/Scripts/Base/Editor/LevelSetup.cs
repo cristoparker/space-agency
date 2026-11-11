@@ -320,7 +320,6 @@ public static class LevelSetup
         new RoadDef { name = "TopWest", radius = 6, pts = new[] { new Vector2(-279, 238), new Vector2(-380, 234), new Vector2(-470, 226) } },
         new RoadDef { name = "East", radius = 16, pts = new[] { new Vector2(-94.5f, 173), new Vector2(270, 173), new Vector2(270, 272) } },
         new RoadDef { name = "Mid", radius = 14, pts = new[] { new Vector2(29, 284), new Vector2(29, 79), new Vector2(196, 79) } },
-        new RoadDef { name = "HousingTrack", gravel = true, radius = 10, pts = new[] { new Vector2(196, 79), new Vector2(233, 86) } },   // gravel track to the staff housing
         new RoadDef { name = "GateWest", radius = 30, pts = new[] { new Vector2(-396, 11.4f), new Vector2(-396, 20), new Vector2(-390, 32), new Vector2(-372, 54), new Vector2(-330, 71), new Vector2(-279, 85) } },
         new RoadDef { name = "Spur Office", pts = new[] { new Vector2(-94.5f, 118), new Vector2(-44, 118) } },
         new RoadDef { name = "Spur Pad", pts = new[] { new Vector2(-187, 85), new Vector2(-187, 98) } },

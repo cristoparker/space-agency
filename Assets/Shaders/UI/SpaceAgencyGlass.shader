@@ -17,6 +17,9 @@ Shader "SpaceAgency/UI/Glass"
 
         _TintStrength ("Glass Tint Strength", Range(0, 1)) = 0.5
         _BlurRadius ("Blur Radius (px at 360p)", Range(0, 12)) = 4
+        _Refraction ("Edge refraction: how far the scene bends at the rim (px at 360p)", Range(0, 24)) = 0
+        _Dispersion ("Edge dispersion: colour fringes along the bent rim", Range(0, 1)) = 0
+        _Specular ("Rim specular glint (light from the top left)", Range(0, 0.5)) = 0
         _BackdropBrightness ("Backdrop Brightness", Range(0, 2)) = 0.9
         _BackdropSaturation ("Backdrop Saturation", Range(0, 2)) = 1.2
         _FlatFill ("Flat Fill Opacity", Range(0, 1)) = 1
@@ -83,6 +86,9 @@ Shader "SpaceAgency/UI/Glass"
                 float _Flat;
                 float _TintStrength;
                 float _BlurRadius;
+                float _Refraction;
+                float _Dispersion;
+                float _Specular;
                 float _BackdropBrightness;
                 float _BackdropSaturation;
                 float _FlatFill;
@@ -165,12 +171,25 @@ Shader "SpaceAgency/UI/Glass"
                 else
                 {
                     float2 suv = IN.screenPos.xy / max(IN.screenPos.w, 0.0001);
-                    float3 bg = BlurBackdrop(suv, _BlurRadius);
+
+                    // Refraction: the slope of the rounded shape (only non-zero in the curved rim of the sprite) tells which way the glass bends the light.
+                    // Inside the flat middle the slope is 0, so the glass stays clear there; at the rim the scene behind is pulled in like through a lens.
+                    const float e = 0.035;
+                    float2 slope = float2(SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, IN.uv + float2(e, 0)).a - SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, IN.uv - float2(e, 0)).a,
+                                          SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, IN.uv + float2(0, e)).a - SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, IN.uv - float2(0, e)).a);
+                    float band = saturate(length(slope) * 2.2);                       // 0 in the middle, ~1 at the very edge
+                    float2 inward = slope / max(length(slope), 1e-4);                 // points to the middle of the glass
+                    float2 off = -inward * band * band * _Refraction * (_ScreenParams.y / 360.0) / _ScreenParams.xy;
+                    float3 bg = BlurBackdrop(saturate(suv + off), _BlurRadius);
+                    // dispersion: red and blue are bent a little more / less than green, which draws thin colour fringes on the rim
+                    float3 fr = float3(SampleSceneColor(saturate(suv + off * 1.35)).r, bg.g, SampleSceneColor(saturate(suv + off * 0.65)).b);
+                    bg = lerp(bg, fr, saturate(band * _Dispersion * 1.5));
                     float lum = dot(bg, float3(0.299, 0.587, 0.114));
                     bg = lerp(lum.xxx, bg, _BackdropSaturation) * _BackdropBrightness;
                     col = lerp(bg, tint, _TintStrength);
                     col = lerp(col, _BorderColor.rgb, rim * _BorderColor.a);
                     col += _EdgeGlow * lit * (1.0 - inner) * outer * 0.25;
+                    col += _Specular * band * band * saturate(dot(-inward, normalize(float2(-0.45, 0.9))) * 1.3);       // a glint where the rim faces the light
                     alpha = outer * IN.color.a;
                 }
 

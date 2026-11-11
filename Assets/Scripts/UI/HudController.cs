@@ -81,6 +81,7 @@ public class HudController : MonoBehaviour
         BuildToast();
         BuildingTags.Create(canvasRt);                      // floating name tags, progress bars and completion bubbles (the Labels layer)
         BuildTopBar();
+        BirdFlocks.Create();                                // an occasional flock of birds crossing the sky
         CalendarUI.Create(canvasRt);                        // drops down from the date in the top bar
         var objectiveMenu = ObjectiveMenuUI.Create(canvasRt);                  // the Objectives button at the left and its panel
         if (FlightManager.Instance == null) new GameObject("Flight Manager").AddComponent<FlightManager>();
@@ -145,7 +146,7 @@ public class HudController : MonoBehaviour
         bar.SetParent(transform, false);
         bar.anchorMin = bar.anchorMax = Vector2.zero; bar.pivot = Vector2.zero;
         bar.anchoredPosition = new Vector2(8f, 8f); bar.sizeDelta = new Vector2(w, h);
-        UIKit.Glass(bar);
+        UIKit.Glass(bar, true, true);
         bar.gameObject.AddComponent<KeepHudSize>();
 
         // bottom right: the Layer button and the cinematic camera button, side by side
@@ -153,7 +154,7 @@ public class HudController : MonoBehaviour
         rbar.SetParent(transform, false);
         rbar.anchorMin = rbar.anchorMax = new Vector2(1f, 0f); rbar.pivot = new Vector2(1f, 0f);
         rbar.anchoredPosition = new Vector2(-8f, 8f); rbar.sizeDelta = new Vector2(pad * 2 + 15f * 3 + gap * 2, h);
-        UIKit.Glass(rbar);
+        UIKit.Glass(rbar, true, true);
         rbar.gameObject.AddComponent<KeepHudSize>();
         var cine = UIKit.At(rbar, "Cinematic", pad + 15f + gap, pad, 15f, bh);
         UIKit.MakeButton(cine, "", UIKit.T.chip, () => { CloseMenus(); CinematicCamera.Begin(this, canvasRt); });
@@ -427,7 +428,7 @@ public class HudController : MonoBehaviour
         bar.SetParent(transform, false);
         bar.anchorMin = new Vector2(0f, 1f); bar.anchorMax = new Vector2(1f, 1f); bar.pivot = new Vector2(0.5f, 1f);
         bar.sizeDelta = new Vector2(-16f, 19f); bar.anchoredPosition = new Vector2(0f, -5f);
-        UIKit.Glass(bar);
+        UIKit.Glass(bar, true, true);
         bar.gameObject.AddComponent<KeepHudSize>();
         bar.SetAsFirstSibling();
         var left = Cluster(bar, "Left", true);

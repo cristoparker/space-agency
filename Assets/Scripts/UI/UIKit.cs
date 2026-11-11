@@ -41,11 +41,23 @@ public static class UIKit
 
     // ------------------------------------------------------------------ surfaces
     /// <summary>Top-level glass panel (blurs the scene behind it). Use for the outermost card only.</summary>
-    public static Image Glass(RectTransform r, bool shadow = true)
+    static Material refractMat;
+    /// <summary>The see-through glass with edge refraction, colour fringes and a rim glint. Only the top bar, the bottom docks and the main menu use it.</summary>
+    static Material RefractGlass()
+    {
+        if (refractMat == null)
+        {
+            refractMat = new Material(T.glass) { name = "UI-Glass-Refract" };
+            refractMat.SetFloat("_Refraction", 16f); refractMat.SetFloat("_Dispersion", 0.7f); refractMat.SetFloat("_Specular", 0.22f);
+        }
+        return refractMat;
+    }
+
+    public static Image Glass(RectTransform r, bool shadow = true, bool refract = false)
     {
         var i = r.gameObject.AddComponent<Image>();
         i.sprite = T.round; i.type = Image.Type.Sliced; i.pixelsPerUnitMultiplier = 1f;
-        i.material = T.glass; i.color = T.dark;
+        i.material = refract ? RefractGlass() : T.glass; i.color = T.dark;
         UIRound.Attach(i, 14f);                                       // panels: a larger, softer corner
         if (shadow) UIShadow.Attach(r);
         return i;
@@ -393,6 +405,8 @@ public class UIShadow : MonoBehaviour
 {
     static Sprite sprite;
     RectTransform me;
+    Image img;
+    const float baseAlpha = 0.38f;
     public float spread = 14f, dropY = 4f;
 
     static Sprite Soft()
@@ -440,6 +454,10 @@ public class UIShadow : MonoBehaviour
     void Sync()
     {
         var target = (RectTransform)transform;
+        // follow the panel's own fade: a panel hidden with a CanvasGroup (the tooltips) or fading in (pop-ups) must not leave its black shadow behind
+        float a = target.TryGetComponent<CanvasGroup>(out var cg) ? cg.alpha : 1f;
+        if (img == null) img = me.GetComponent<Image>();
+        if (img != null && !Mathf.Approximately(img.color.a, baseAlpha * a)) { var c = img.color; c.a = baseAlpha * a; img.color = c; }
         me.anchorMin = target.anchorMin; me.anchorMax = target.anchorMax; me.pivot = new Vector2(0.5f, 0.5f);
         var size = target.sizeDelta;
         float k = target.localScale.x;
