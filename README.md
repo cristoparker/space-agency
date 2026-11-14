@@ -2,6 +2,8 @@
 
 A space agency management game for one to four players, made for the NASA International Space Apps Challenge 2026.
 
+![Space Mission Tycoon: the space centre from the air as day turns to evening](docs/media/space-mission-tycoon.gif)
+
 ## Videos
 
 **Short video**
