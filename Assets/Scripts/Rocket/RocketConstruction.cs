@@ -82,21 +82,28 @@ public class RocketConstruction : MonoBehaviour
         return true;
     }
 
-    bool checkedStale;
+    float staleTimer;
+
+    /// <summary>The player threw the rocket in progress away (builds a different one instead).</summary>
+    public void Cancel()
+    {
+        if (Current == null) return;
+        Current = null; Save(); Changed?.Invoke();
+    }
+
     void Update()
     {
         if (TeamSync.Mirror) return;                                   // a guest's construction follows the host's save
-        // A job that belongs to a contract which is no longer running (an old game, a declined contract) is a leftover: drop it, so the builder never
-        // says "a rocket is already under construction / waiting" when nothing is really being built.
-        if (!checkedStale && Current != null && MissionManager.Instance != null && Time.unscaledTime > 1.5f)
+        // A job must belong to a contract that is still running. One left over from an old game, or from a contract that was declined, failed or expired,
+        // is dropped, so the builder never says "a rocket is under construction" when nothing is really being built.
+        staleTimer += Time.unscaledDeltaTime;
+        if (staleTimer > 1f && Current != null && MissionManager.Instance != null && Time.unscaledTime > 1.5f)
         {
-            checkedStale = true;
+            staleTimer = 0f;
+            bool live = false;
             if (!string.IsNullOrEmpty(Current.missionId))
-            {
-                bool live = false;
                 foreach (var m in MissionManager.Instance.Running) if (m.Definition.id == Current.missionId) live = true;
-                if (!live) { Current = null; Save(); Changed?.Invoke(); }
-            }
+            if (!live) { Current = null; Save(); Changed?.Invoke(); }
         }
         if (Current == null || Current.ready) return;
         var clock = GameClock.Instance; if (clock == null) return;

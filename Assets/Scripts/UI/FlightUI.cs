@@ -14,7 +14,7 @@ public static class LaunchResultUI
 
     public static readonly Color Gold = new Color(1f, 0.82f, 0.28f, 1f), Amber = new Color(1f, 0.72f, 0.3f, 1f);
 
-    static RectTransform Modal(float w, float h)
+    public static RectTransform Modal(float w, float h)
     {
         Close();
         var hud = Object.FindAnyObjectByType<HudController>();
@@ -114,7 +114,7 @@ public static class LaunchResultUI
                 UIKit.TextAt(card, "Hint", 12, y + 16f, w - 24, 8, "Follow it under Objectives. Reward comes when it finishes.", 5.2f, TextAlignmentOptions.MidlineLeft, false, UIKit.T.dim);
             }
         }
-        UIKit.SolidBtn(card, "Continue", w - 12 - 70, h - 26f, 70, 18, col, Close, 7f);
+        UIKit.SolidBtn(card, "Continue", w - 12 - 70, h - 26f, 70, 18, col, final ? (UnityEngine.Events.UnityAction)Close : () => { Close(); LearningOutcomeUI.Prompt(); }, 7f);
     }
 
     /// <summary>Before the launch: lists what is not met. The player may still go ahead.</summary>

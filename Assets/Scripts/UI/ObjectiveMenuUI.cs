@@ -69,6 +69,7 @@ public class ObjectiveMenuUI : MonoBehaviour
         if (MissionManager.Instance != null) MissionManager.Instance.Changed += Request;
         if (BaseSim.Instance != null) BaseSim.Instance.Changed += Request;
         if (DeploymentManager.Instance != null) DeploymentManager.Instance.Changed += Request;
+        LearningLog.Changed += Request;
         Refresh();
     }
 
@@ -77,6 +78,7 @@ public class ObjectiveMenuUI : MonoBehaviour
         if (MissionManager.Instance != null) MissionManager.Instance.Changed -= Request;
         if (BaseSim.Instance != null) BaseSim.Instance.Changed -= Request;
         if (DeploymentManager.Instance != null) DeploymentManager.Instance.Changed -= Request;
+        LearningLog.Changed -= Request;
     }
 
     public void Toggle() => SetOpen(!open);
@@ -113,7 +115,7 @@ public class ObjectiveMenuUI : MonoBehaviour
     {
         var mm = MissionManager.Instance;
         if (mm == null) return "";
-        var sb = new System.Text.StringBuilder();
+        var sb = new System.Text.StringBuilder(LearningLog.Last != null ? "L" : "");
         foreach (var m in mm.Running)
         {
             sb.Append(m.Definition.id);
@@ -139,9 +141,27 @@ public class ObjectiveMenuUI : MonoBehaviour
             var go = UIKit.At(content, "Go", 0, 0, 100, 16);
             go.gameObject.AddComponent<LayoutElement>().preferredHeight = 16;
             UIKit.MakeButton(go, "Open Contracts", UIKit.T.teal, () => Panels.Open("contracts"), 6.6f);
+            LearningRow();
             return;
         }
         MissionBlock(mm.Running[0], true);
+        LearningRow();
+    }
+
+    /// <summary>"Learning objectives from the last mission": opens the ledger and the AI learning outcome of the last launch.</summary>
+    void LearningRow()
+    {
+        if (LearningLog.Last == null) return;
+        var T = UIKit.T;
+        float w = PW - 16;
+        var row = UIKit.At(content, "Learning", 0, 0, w, 36);
+        row.gameObject.AddComponent<LayoutElement>().preferredHeight = 36;
+        UIKit.Tint(row, UIKit.Wash(T.purple, 0.2f));
+        var chip = UIKit.At(row, "Chip", 5, 5, 16, 16); UIKit.Tint(chip, UIKit.Wash(T.purple, 0.35f)).raycastTarget = false;
+        UIKit.IconAt(chip, Resources.Load<Sprite>("UIIcons/icon_learn"), 2, 2, 12, 12, Color.Lerp(T.purple, Color.white, 0.5f));
+        UIKit.TextAt(row, "Title", 27, 2, w - 32, 11, "Learning objectives from the last mission", 6.2f, TextAlignmentOptions.MidlineLeft, true).overflowMode = TextOverflowModes.Ellipsis;
+        UIKit.TextAt(row, "Detail", 27, 12, w - 32, 9, LearningLog.Last.missionName, 5.4f, TextAlignmentOptions.MidlineLeft, false, T.dim).overflowMode = TextOverflowModes.Ellipsis;
+        UIKit.Btn(row, "Open", w - 46, 21, 40, 12, T.purple, () => LearningOutcomeUI.OpenLast(), 5.8f);
     }
 
     void MissionBlock(MissionInstance m, bool tracked)

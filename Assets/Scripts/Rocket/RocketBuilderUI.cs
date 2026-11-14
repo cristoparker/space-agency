@@ -501,6 +501,15 @@ public class RocketBuilderUI : MonoBehaviour
 
     void OpenDeploy()
     {
+        // a rocket is only built for a contract: designing is free, building needs an active contract
+        if (Mission == null)
+        {
+            ImpactCard.Show("No active contract",
+                new[] { "Accept a contract and it is used here" }, null,
+                new[] { "No contract is active, so nothing can be built", "You can still design and save rockets" },
+                -1f, () => Panels.Open("contracts"), null, "Open Contracts", "Close");
+            return;
+        }
         var core = RocketRules.MissingCore(design, library);
         if (design.stack.Count == 0 || core.Count > 0)
         {
@@ -509,10 +518,22 @@ public class RocketBuilderUI : MonoBehaviour
             return;
         }
         if (DeploymentManager.Instance == null) { Toast("No launch pad found in this scene.", true); return; }
-        if (RocketConstruction.Instance != null && RocketConstruction.Instance.Current != null) { Toast("A rocket is already " + (RocketConstruction.Instance.WaitingForDate ? "waiting for its launch date." : "under construction."), true); return; }
         string nm = (nameInput.text ?? "").Trim();
         if (nm.Length == 0) nm = "Rocket " + (RocketSaves.All().Count + 1);
         nameInput.text = nm;
+        var rc = RocketConstruction.Instance;
+        if (rc != null && rc.Current != null)
+        {
+            // another rocket is really being built (or waits for its date): ask before throwing it away
+            var old = rc.Current;
+            string state = rc.WaitingForDate ? "built, waiting for its launch date" : "built " + Mathf.RoundToInt(rc.Progress * 100f) + "%";
+            ImpactCard.Show("Replace the rocket in progress?",
+                new[] { "Keep it: it is finished and shown on the launch pad" }, 
+                new[] { "\"" + old.rocketName + "\" is " + state },
+                new[] { "Cancelling it loses the money already spent", "Then \"" + nm + "\" starts from the beginning" },
+                -1f, () => { rc.Cancel(); BuildRocketCard(nm); }, null, "Cancel old, build new", "Keep old");
+            return;
+        }
         BuildRocketCard(nm);
         return;
         minDate = Today;

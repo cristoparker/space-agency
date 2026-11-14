@@ -35,6 +35,7 @@ public class LaunchSequence : MonoBehaviour
         inst.record = dep.library != null && dep.Current != null ? FlightOutcome.Evaluate(dep.Current, dep.library, mission) : new FlightRecord();
         inst.profile = FlightOutcome.LastProfile;
         TeamSync.HostLaunched(inst.record);
+        LearningLog.Capture(dep.Current, dep.library, inst.record);       // the diary of this mission, for the learning outcome
         inst.StartCoroutine(inst.Run(dep));
         return true;
     }

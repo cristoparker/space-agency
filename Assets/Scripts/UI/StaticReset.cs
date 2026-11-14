@@ -14,6 +14,7 @@ static class StaticReset
         VisualSettings.ResetStatics();
         CinematicCamera.ResetStatics();
         LaunchResultUI.ResetStatics();
+        LearningLog.ResetStatics();
         FlightManager.ResetStatics();
         UIConfirm.ResetStatics();
         ImpactCard.ResetStatics();

@@ -550,7 +550,9 @@ public static class LevelSetup
             }
     }
 
-    // gravel walkways inside the staff housing (model at (317,110): walks at z=86 and z=128, and three cross walks)
+    // paved walkways inside the staff housing (model at (317,110): walks at z=86 and z=128, and three cross walks), all in one mesh.
+    // The mesh is uploaded as non-readable: a readable scene mesh skips the player's vertex compression, and on Metal a draw whose
+    // vertex layout differs from the rest of its SRP batch read garbage normals in the build (the south walk glowed white).
     static void BuildHousingWalks(Transform root)
     {
         Vector2 c = new Vector2(317f, 110f);
@@ -562,18 +564,23 @@ public static class LevelSetup
             new[] { c + new Vector2(0f, -24f), c + new Vector2(0f, 18f) },
             new[] { c + new Vector2(72f, -24f), c + new Vector2(72f, 18f) },
         };
-        int n = 0;
+        var parts = new List<CombineInstance>();
         foreach (var r in runs)
         {
             var pts = new List<Vector2>();
             float len = Vector2.Distance(r[0], r[1]);
             for (int i = 0; i <= (int)(len / 4f); i++) pts.Add(Vector2.Lerp(r[0], r[1], i * 4f / len));
             pts.Add(r[1]);
-            var go = new GameObject("Housing Walk " + n++, typeof(MeshFilter), typeof(MeshRenderer));
-            go.transform.SetParent(root, false);
-            go.GetComponent<MeshFilter>().sharedMesh = RoadMesh("HousingWalk" + n, pts, 3.2f, P + 0.24f, 8f);
-            go.GetComponent<MeshRenderer>().sharedMaterial = gravelMat; go.isStatic = true;
+            parts.Add(new CombineInstance { mesh = RoadMesh("HousingWalkPart", pts, 3.2f, P + 0.24f, 8f), transform = Matrix4x4.identity });
         }
+        var mesh = new Mesh { name = "HousingWalks" };
+        mesh.CombineMeshes(parts.ToArray(), true, true);
+        mesh.RecalculateBounds();
+        mesh.UploadMeshData(true);
+        var go = new GameObject("Housing Walks", typeof(MeshFilter), typeof(MeshRenderer));
+        go.transform.SetParent(root, false);
+        go.GetComponent<MeshFilter>().sharedMesh = mesh;
+        go.GetComponent<MeshRenderer>().sharedMaterial = pathMat; go.isStatic = true;
     }
 
     // road crossings: one blank concrete patch where roads meet (hides the overlapping geometry and markings) and a zebra crossing on every arm
