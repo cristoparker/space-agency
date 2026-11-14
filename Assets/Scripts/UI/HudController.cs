@@ -90,6 +90,7 @@ public class HudController : MonoBehaviour
         if (RocketConstruction.Instance == null) new GameObject("Rocket Construction").AddComponent<RocketConstruction>();
         ResourceUI.Create(canvasRt, moneyRect);                                 // hourly power/money popups, shortage warning, money hover panel
         FlightPanelUI.Create(canvasRt, objectiveMenu);                          // 'Mission in flight' under it after a launch
+        TeamHud.Create(canvasRt);                                               // Team Play: friends, the shared agency and chat (top right)
         Agency.Changed += RefreshStats;
         RefreshStats();
     }
@@ -365,8 +366,8 @@ public class HudController : MonoBehaviour
     void TogglePause()
     {
         var c = GameClock.Instance; if (c == null) return;
-        if (c.Speed <= 0f) c.SetSpeedIndex(Mathf.Max(1, resumeIndex));
-        else { resumeIndex = c.SpeedIndex; c.SetSpeedIndex(0); }
+        if (c.Speed <= 0f) c.RequestSpeed(Mathf.Max(1, resumeIndex));
+        else { resumeIndex = c.SpeedIndex; c.RequestSpeed(0); }
     }
 
     void SetFast(float factor)
@@ -374,7 +375,7 @@ public class HudController : MonoBehaviour
         var c = GameClock.Instance; if (c == null) return;
         int fast = IndexOfSpeed(factor), normal = IndexOfSpeed(1f);
         if (fast < 0) return;
-        c.SetSpeedIndex(c.SpeedIndex == fast ? normal : fast);        // pressing the active one goes back to normal speed
+        c.RequestSpeed(c.SpeedIndex == fast ? normal : fast);        // pressing the active one goes back to normal speed
     }
 
     void RefreshClockControls()

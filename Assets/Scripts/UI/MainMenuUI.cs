@@ -20,6 +20,7 @@ public class MainMenuUI : MonoBehaviour
     readonly Image[] typeChips = new Image[4];
     RectTransform logoPreview, layerList;
     Button loadBtn;
+    MultiplayerUI teamWindow;
 
     string agencyName = "";
     int type = 1;
@@ -48,6 +49,10 @@ public class MainMenuUI : MonoBehaviour
         BuildSettings();
         hint = UIKit.TextAt(stage, "Hint", 0, 336, 640, 14, "", 8f, TextAlignmentOptions.Center, false, new Color(1f, 0.7f, 0.5f, 1f));
         Show(titleScreen);
+
+        // still in a shared agency after its game ended, or invited from Steam while the game was closed: show the lobby right away
+        var s = NetSession.Ensure();
+        if (s != null && s.InSession) { teamWindow = MultiplayerUI.Create(stage, null); teamWindow.Show(1); }
     }
 
     static void Glow(RectTransform parent, Vector2 pos, float size, Color c)
@@ -116,7 +121,7 @@ public class MainMenuUI : MonoBehaviour
         BuildLogo(s);
 
         // each menu button is one glass capsule (blurred scenery behind it, fully rounded ends) with its label on it: no card, no inner chip
-        string[] labels = { "New Game", "Load Game", "Settings", "Exit" };
+        string[] labels = { "New Game", "Load Game", "Team Play", "Settings", "Exit" };
         for (int i = 0; i < labels.Length; i++)
         {
             int idx = i;
@@ -142,7 +147,11 @@ public class MainMenuUI : MonoBehaviour
                 if (!Agency.Registered) { Say("No saved agency yet. Press New Game to register one."); return; }
                 SceneManager.LoadScene(gameScene);
                 break;
-            case 2: Show(settingsScreen); break;
+            case 2:
+                if (teamWindow == null) teamWindow = MultiplayerUI.Create(stage, null);
+                teamWindow.Show();
+                break;
+            case 3: Show(settingsScreen); break;
             default:
 #if UNITY_EDITOR
                 UnityEditor.EditorApplication.isPlaying = false;

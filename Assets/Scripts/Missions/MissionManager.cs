@@ -41,6 +41,66 @@ public class MissionManager : MonoBehaviour
         if (database != null)
             foreach (var m in database.missions)
                 if (m != null && !available.Contains(m)) available.Add(m);
+        Changed += TeamSync.MarkMissionsDirty;           // a shared game's host sends the lists to the team when they change
+    }
+
+    // ---------------------------------------------------------------- shared game
+    /// <summary>The contract lists as the host sends them to its team.</summary>
+    public MissionsMsg Snapshot()
+    {
+        var m = new MissionsMsg
+        {
+            available = available.ConvertAll(d => d.id).ToArray(), pending = pending.ConvertAll(d => d.id).ToArray(),
+            completed = completed.ConvertAll(x => x.Definition.id).ToArray(),
+            running = new string[running.Count], runStart = new double[running.Count], runStartTicks = new long[running.Count],
+            runShift = new double[running.Count], runProgress = new float[running.Count], tracked = Tracked != null ? Tracked.Definition.id : "",
+        };
+        for (int i = 0; i < running.Count; i++)
+        {
+            var r = running[i];
+            m.running[i] = r.Definition.id; m.runStart[i] = r.StartGameTime; m.runStartTicks[i] = r.StartDate.Ticks;
+            m.runShift[i] = r.ShiftSeconds; m.runProgress[i] = r.Progress;
+        }
+        return m;
+    }
+
+    /// <summary>A guest takes over the host's contract lists. Contracts this game does not know (global market) are left out.</summary>
+    public void ApplyRemote(MissionsMsg m)
+    {
+        MissionDefinition Def(string id)
+        {
+            if (database != null) foreach (var d in database.missions) if (d != null && d.id == id) return d;
+            foreach (var d in available) if (d.id == id) return d;
+            foreach (var d in pending) if (d.id == id) return d;
+            foreach (var r in running) if (r.Definition.id == id) return r.Definition;
+            return null;
+        }
+        void Fill(List<MissionDefinition> list, string[] ids) { list.Clear(); if (ids != null) foreach (var id in ids) { var d = Def(id); if (d != null) list.Add(d); } }
+
+        var oldRunning = new List<MissionInstance>(running);
+        var newAvail = new List<MissionDefinition>(); Fill(newAvail, m.available);
+        var newPend = new List<MissionDefinition>(); Fill(newPend, m.pending);
+        var newRunning = new List<MissionInstance>();
+        int n = m.running?.Length ?? 0;
+        for (int i = 0; i < n; i++)
+        {
+            var d = Def(m.running[i]); if (d == null) continue;
+            var inst = oldRunning.Find(x => x.Definition == d && Math.Abs(x.StartGameTime - m.runStart[i]) < 1.0)
+                       ?? new MissionInstance(d, m.runStart[i], new DateTime(m.runStartTicks[i]));
+            inst.ShiftSeconds = m.runShift[i];
+            inst.SetProgress(m.runProgress[i]);
+            newRunning.Add(inst);
+        }
+        var newDone = new List<MissionInstance>();
+        if (m.completed != null) foreach (var id in m.completed) { var d = Def(id); if (d != null) newDone.Add(completed.Find(x => x.Definition == d) ?? new MissionInstance(d, 0, DateTime.MinValue) { State = MissionState.Completed }); }
+
+        available.Clear(); available.AddRange(newAvail);
+        pending.Clear(); pending.AddRange(newPend);
+        running.Clear(); running.AddRange(newRunning);
+        completed.Clear(); completed.AddRange(newDone);
+        Tracked = running.Find(x => x.Definition.id == m.tracked) ?? (running.Count > 0 ? running[0] : null);
+        foreach (var r in running) if (!oldRunning.Contains(r)) MissionStarted?.Invoke(r);
+        Changed?.Invoke();
     }
 
     void OnDestroy()
@@ -51,6 +111,7 @@ public class MissionManager : MonoBehaviour
     void Update()
     {
         var clock = GameClock.Instance;
+        bool mirror = TeamSync.Mirror;                       // a guest only shows the host's contracts: the host decides when they end
         for (int i = running.Count - 1; i >= 0; i--)
         {
             var m = running[i];
@@ -59,6 +120,7 @@ public class MissionManager : MonoBehaviour
                 double total = m.Definition.DurationDays * 86400.0;
                 m.SetProgress(total > 0 ? (float)((clock.GameTime - m.StartGameTime + m.ShiftSeconds) / total) : 1f);
             }
+            if (mirror) continue;
             if (m.Progress >= 1f)
             {
                 if (m.Definition.progressMode == ProgressMode.TimeBased) Expire(m);     // the deadline passed before the rocket launched
@@ -106,6 +168,7 @@ public class MissionManager : MonoBehaviour
     public MissionInstance AcceptExternal(MissionDefinition definition)
     {
         if (definition == null) return null;
+        if (TeamSync.Mirror) { Hud.Toast("In a shared agency only the host can take contracts from the global market."); return null; }
         if (!available.Contains(definition)) available.Add(definition);
         return StartMission(definition);
     }
@@ -113,7 +176,9 @@ public class MissionManager : MonoBehaviour
     /// <summary>Only one contract runs at a time: a second accepted contract waits as pending until the first one is launched or ends.</summary>
     public MissionInstance StartMission(MissionDefinition definition)
     {
-        if (definition == null || !available.Remove(definition)) return null;
+        if (definition == null) return null;
+        if (TeamSync.Route(TeamRole.Finance, TeamAction.Accept, definition.id) != TeamSync.RouteResult.Local) return null;
+        if (!available.Remove(definition)) return null;
         if (running.Count > 0) { if (!pending.Contains(definition)) pending.Add(definition); Changed?.Invoke(); return null; }
         return Begin(definition);
     }
@@ -121,6 +186,9 @@ public class MissionManager : MonoBehaviour
     /// <summary>Takes a pending contract off the list and puts it back on offer.</summary>
     public bool RemovePending(MissionDefinition definition)
     {
+        if (definition == null) return false;
+        var route = TeamSync.Route(TeamRole.Finance, TeamAction.RemovePending, definition.id);
+        if (route != TeamSync.RouteResult.Local) return route == TeamSync.RouteResult.Sent;
         if (!pending.Remove(definition)) return false;
         if (!available.Contains(definition)) available.Add(definition);
         Changed?.Invoke();
@@ -149,6 +217,9 @@ public class MissionManager : MonoBehaviour
     /// <summary>Rejects a contract so it no longer appears in the list.</summary>
     public bool DiscardMission(MissionDefinition definition)
     {
+        if (definition == null) return false;
+        var route = TeamSync.Route(TeamRole.Finance, TeamAction.Decline, definition.id);
+        if (route != TeamSync.RouteResult.Local) return route == TeamSync.RouteResult.Sent;
         if (!available.Remove(definition)) return false;
         Changed?.Invoke();
         return true;
@@ -157,7 +228,10 @@ public class MissionManager : MonoBehaviour
     /// <summary>Gives up a running contract: it goes back to the available list and its progress is lost.</summary>
     public bool AbandonMission(MissionInstance mission)
     {
-        if (mission == null || !running.Remove(mission)) return false;
+        if (mission == null) return false;
+        var route = TeamSync.Route(TeamRole.Finance, TeamAction.Abandon, mission.Definition.id);
+        if (route != TeamSync.RouteResult.Local) return route == TeamSync.RouteResult.Sent;
+        if (!running.Remove(mission)) return false;
         if (!available.Contains(mission.Definition)) available.Add(mission.Definition);
         if (Tracked == mission) Tracked = running.Count > 0 ? running[0] : null;
         Agency.AddReputation(-5);

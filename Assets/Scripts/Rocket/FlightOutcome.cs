@@ -136,6 +136,17 @@ public class FlightManager : MonoBehaviour
 
     void OnDestroy() { if (Instance == this) Instance = null; }
 
+    /// <summary>A shared game's host changed the save: follow its flight.</summary>
+    public void ReloadFromSave()
+    {
+        FlightRecord r = null;
+        try { r = JsonUtility.FromJson<FlightRecord>(PlayerPrefs.GetString(Key, "")); } catch { /* nothing saved */ }
+        var before = Current;
+        Current = r != null && !string.IsNullOrEmpty(r.startDate) && r.durationDays > 0f ? r : null;
+        if (before != null && Current == null && Progress >= 0f) LaunchResultUI.Show(before, true);   // the host's flight just finished
+        Changed?.Invoke();
+    }
+
     public float Progress
     {
         get
@@ -169,6 +180,7 @@ public class FlightManager : MonoBehaviour
 
     void Update()
     {
+        if (TeamSync.Mirror) return;                                   // a guest sees the end of the flight when the host's save says so
         if (Current == null || Progress < 1f) return;
         var rec = Current;
         Current = null;

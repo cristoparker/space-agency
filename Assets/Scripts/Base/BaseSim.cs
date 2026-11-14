@@ -375,6 +375,8 @@ public class BaseSim : MonoBehaviour
     // ---------------------------------------------------------------- actions
     public bool StartProgram(ProgramDef p)
     {
+        var route = TeamSync.Route(TeamRole.Scientist, TeamAction.Program, p.id);
+        if (route != TeamSync.RouteResult.Local) return route == TeamSync.RouteResult.Sent && WhyNot(p) == null;
         if (WhyNot(p) != null || !Agency.TrySpend(MoneyOf(p.costM))) return false;
         float secs = DurationSeconds(p);
         D.jobs.Add(new BaseJob { id = p.id, isBuild = false, remaining = secs, total = secs });
@@ -386,6 +388,8 @@ public class BaseSim : MonoBehaviour
     public bool StartBuild(BuildingDef b, int plot = -1)
     {
         if (WhyNotBuild(b, plot) != null) return false;
+        var route = TeamSync.Route(TeamRole.Finance, TeamAction.Build, b.id, i: plot);
+        if (route != TeamSync.RouteResult.Local) return route == TeamSync.RouteResult.Sent;
         int next = LevelOf(b.id) + 1;
         if (b.needsPlot && next == 1)
         {
@@ -407,11 +411,19 @@ public class BaseSim : MonoBehaviour
         Changed?.Invoke();
     }
 
+    /// <summary>A shared game's host changed the save: show the new buildings, jobs and finished programmes.</summary>
+    public void RefreshFromSave()
+    {
+        ApplyVisibility();
+        Changed?.Invoke();
+    }
+
     // ---------------------------------------------------------------- time
     void Update()
     {
         var clock = GameClock.Instance;
         if (clock == null) return;
+        if (TeamSync.Mirror) return;                                            // a guest's base follows the host's save
         expiryTimer += Time.unscaledDeltaTime;
         if (expiryTimer > 1f) { expiryTimer = 0f; CheckExpiry(); }
         if (D.jobs.Count == 0) return;

@@ -583,9 +583,14 @@ public class RocketBuilderUI : MonoBehaviour
     void ConfirmBuild(float days)
     {
         long cost = DeployCost;
-        if (!Agency.TrySpend(cost)) { Toast("Not enough money to build this rocket.", true); return; }
-        SaveRocket();
+        if (!Agency.CanAfford(cost)) { Toast("Not enough money to build this rocket.", true); return; }
         string nm = nameInput.text;
+        // shared game: the Engineer builds; a guest's order goes to the host, which pays and starts the construction
+        var route = TeamSync.Route(TeamRole.Engineer, TeamAction.BuildRocket, nm, design.ToJson(), Mission != null ? Mission.id : "", 0, days, cost);
+        if (route == TeamSync.RouteResult.Denied) return;
+        SaveRocket();
+        if (route == TeamSync.RouteResult.Sent) { Toast("Order sent: the host starts building \"" + nm + "\"."); return; }
+        if (!Agency.TrySpend(cost)) { Toast("Not enough money to build this rocket.", true); return; }
         if (RocketConstruction.Instance == null || !RocketConstruction.Instance.Begin(nm, design, Mission, days)) { Agency.Earn(cost); Toast("Could not start building.", true); return; }
         Toast("Building \"" + nm + "\": about " + Mathf.CeilToInt(days) + " days   (-$" + UIKit.Money(cost) + ")");
     }
@@ -594,9 +599,14 @@ public class RocketBuilderUI : MonoBehaviour
     {
         if (!pickDate.HasValue || DeploymentManager.Instance == null) return;
         long cost = DeployCost;
-        if (!Agency.TrySpend(cost)) { Toast("Not enough money to build this rocket.", true); return; }
-        SaveRocket();
+        if (!Agency.CanAfford(cost)) { Toast("Not enough money to build this rocket.", true); return; }
         string nm = nameInput.text;
+        var route = TeamSync.Route(TeamRole.Engineer, TeamAction.DeployRocket, nm, design.ToJson(),
+            pickDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "|" + (Mission != null ? Mission.id : ""), 0, 0f, cost);
+        if (route == TeamSync.RouteResult.Denied) return;
+        SaveRocket();
+        if (route == TeamSync.RouteResult.Sent) { deployDialog.SetActive(false); return; }
+        if (!Agency.TrySpend(cost)) { Toast("Not enough money to build this rocket.", true); return; }
         DeploymentManager.Instance.Schedule(nm, design, Mission, pickDate.Value);
         deployDialog.SetActive(false);
         Toast("\"" + nm + "\" is on the launch pad. Launch " + pickDate.Value.ToString("dd MMM yyyy", CultureInfo.InvariantCulture) + "   (-$" + UIKit.Money(cost) + ")");
@@ -898,6 +908,7 @@ public class RocketBuilderUI : MonoBehaviour
             var dd = UIKit.TextAt(row, "D", 4, 13, 112, 10, demo.description, 6f, TextAlignmentOptions.TopLeft, false, T.dim); dd.overflowMode = TextOverflowModes.Ellipsis;
             var buy = UIKit.Btn(row, "Buy  $" + price.ToString("0.#") + " M", 0, 4, 58, 18, UIKit.Wash(T.purple, 0.4f), () =>
             {
+                if (TeamSync.Mirror) { Toast("In a shared agency only the host can buy blueprints.", true); return; }
                 if (!Agency.TrySpend((long)(price * 1_000_000f))) { Toast("Not enough money for this blueprint.", true); return; }
                 Agency.AddBlueprint(demo.name);
                 Toast("Blueprint bought: " + demo.name);

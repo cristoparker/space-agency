@@ -88,6 +88,7 @@ public class RandomEvents : MonoBehaviour
         timer += Time.unscaledDeltaTime;
         if (timer < 0.5f) return;
         timer = 0f;
+        if (TeamSync.Mirror) return;                                      // in a shared game only the host rolls events; everyone sees them
         var mm = MissionManager.Instance;
         if (mm == null || mm.Running.Count == 0) return;
         if (ImpactCard.IsOpen || EventCard.IsOpen || LaunchSequence.Running || CinematicCamera.Active || LaunchResultUI.IsOpen) return;
@@ -107,7 +108,9 @@ public class RandomEvents : MonoBehaviour
             bool afford = ch.cost <= 0 || Agency.CanAfford(ch.cost);
             rows.Add(new EventCard.Row { label = ch.label, benefits = ch.benefits, costs = ch.costs, risks = ch.risks, enabled = afford, note = afford ? null : "Not enough money", onPick = () => Apply(m, st, ch) });
         }
-        EventCard.Show(def.client ? "Call from the client" : "Mission event", def.title, def.body, def.client, rows);
+        string kicker = def.client ? "Call from the client" : "Mission event";
+        if (TeamSync.HostShowEvent(m.Definition.id + ":" + def.id, kicker, def.title, def.body, def.client, rows)) return;   // shared game: the whole team sees it
+        EventCard.Show(kicker, def.title, def.body, def.client, rows);
     }
 
     void Apply(MissionInstance m, State st, EventChoice c)

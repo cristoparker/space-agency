@@ -85,8 +85,19 @@ public class DeploymentManager : MonoBehaviour
         Changed?.Invoke();
     }
 
+    /// <summary>A shared game's host changed the save: show the rocket it has on the pad (or none).</summary>
+    public void ReloadFromSave()
+    {
+        Deployment d = null;
+        try { d = JsonUtility.FromJson<Deployment>(PlayerPrefs.GetString(Key, "")); } catch { /* nothing saved */ }
+        Current = d != null && !string.IsNullOrEmpty(d.design) ? d : null;
+        Show();
+        Changed?.Invoke();
+    }
+
     public void Cancel()
     {
+        if (TeamSync.Route(TeamRole.Engineer, TeamAction.CancelDeploy) != TeamSync.RouteResult.Local) return;
         Current = null;
         PlayerPrefs.DeleteKey(Key);
         Show();

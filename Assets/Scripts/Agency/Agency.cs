@@ -51,6 +51,8 @@ public static class Agency
     public const int StatPoints = 8, StatMax = 5;
 
     public static event Action Changed;
+    /// <summary>The save was changed from outside (a shared game's host): redraw money, reputation and name.</summary>
+    public static void NotifyChanged() => Changed?.Invoke();
     static string K(string s) => "SpaceAgency." + s;
 
     public static bool Registered => PlayerPrefs.GetInt(K("Registered"), 0) == 1;
@@ -72,6 +74,7 @@ public static class Agency
 
     static void SetMoney(long v)
     {
+        if (TeamSync.Mirror) { Changed?.Invoke(); return; }          // a guest in a shared game: the host's money is the only money
         PlayerPrefs.SetString(K("Money"), v.ToString(CultureInfo.InvariantCulture));
         Changed?.Invoke();
     }
@@ -101,6 +104,7 @@ public static class Agency
 
     public static void AddReputation(int pts)
     {
+        if (TeamSync.Mirror) return;                                  // the host's reputation is streamed to the guests
         float mul = (TypeIndex == 2 ? 1.25f : 1f) * (1f + 0.1f * (Stat(1) - 1)) * (1f + 0.08f * BaseSave.Level("sci"));
         PlayerPrefs.SetInt(K("Rep"), Mathf.Max(0, RepPoints + Mathf.RoundToInt(pts * (pts > 0 ? mul : 1f))));
         Changed?.Invoke();

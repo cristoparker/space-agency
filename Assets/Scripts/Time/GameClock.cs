@@ -64,7 +64,42 @@ public class GameClock : MonoBehaviour
         if (Instance == this) { Time.timeScale = 1f; Instance = null; }
     }
 
+    /// <summary>
+    /// Set in a shared game for a guest: the player's speed and pause buttons go to the host as requests.
+    /// Returns true when the request was taken.
+    /// </summary>
+    public static Func<int, bool> SpeedRequest;
+
+    /// <summary>True for a guest in a shared game: the clock follows the host, so local pauses (popups, cutscenes) do nothing.</summary>
+    public static bool FollowingHost;
+
     public void SetSpeedIndex(int index)
+    {
+        if (FollowingHost) return;
+        ApplySpeedIndex(index);
+    }
+
+    /// <summary>The player pressed a speed or pause button. In a shared game a guest's press becomes a request to the host.</summary>
+    public void RequestSpeed(int index)
+    {
+        if (SpeedRequest != null && SpeedRequest(index)) return;
+        SetSpeedIndex(index);
+    }
+
+    /// <summary>A guest's clock follows the host: same time, speed and pause. Minute and day events still fire as the time passes.</summary>
+    public void SyncTo(DateTime hostNow, double hostGameTime, int speedIndex, bool hostPaused)
+    {
+        if (speedIndex != SpeedIndex) ApplySpeedIndex(speedIndex);
+        paused = hostPaused;
+        // small drift is left to the local clock (smooth); a real gap jumps to the host's time
+        if (Math.Abs((hostNow - Now).TotalMinutes) < 20.0) return;
+        var before = Now;
+        Now = hostNow; GameTime = hostGameTime;
+        if (Now.Minute != before.Minute || Now.Hour != before.Hour || Now.Date != before.Date) MinuteChanged?.Invoke(Now);
+        if (Now.Date != before.Date) DayChanged?.Invoke(Now);
+    }
+
+    void ApplySpeedIndex(int index)
     {
         SpeedIndex = Mathf.Clamp(index, 0, speedLevels.Length - 1);
         Time.timeScale = Mathf.Min(speedLevels[SpeedIndex], maxTimeScale);

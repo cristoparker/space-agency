@@ -293,6 +293,8 @@ public class ContractsPanelUI : MonoBehaviour
         UIKit.Btn(card, "+", 75, 91, 14, 14, UIKit.T.chip, () => { draft[id] = Draft(l) + Step(l); lc.bid.text = "$" + UIKit.Money(Draft(l)); }, 8f);
         UIKit.SoftBtn(card, "Place bid", 93, 91, w - 98, 14, UIKit.T.green, () =>
         {
+            if (TeamSync.Mirror) { Hud.Toast("In a shared agency only the host can bid on the global market."); return; }
+            if (!NetSession.MayAct(TeamRole.Finance)) return;
             string err = svc.PlaceBid(id, Draft(l));
             if (err != null) Hud.Toast(err);
             else { draft.Remove(id); Hud.Toast("Bid placed on \"" + l.title + "\"."); }

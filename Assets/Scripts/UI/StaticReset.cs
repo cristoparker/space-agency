@@ -26,6 +26,10 @@ static class StaticReset
         FlightSceneLauncher.ResetStatics();
         FacilityPanelUI.ResetStatics();
         FacilityPreview.ResetStatics();
+        NetSession.ResetStatics();
+        TeamSync.ResetStatics();
+        SteamService.ResetStatics();
+        GameClock.SpeedRequest = null; GameClock.FollowingHost = false;
         BuildingSelector.LabelsVisible = true;
         DayNightCycle.HazeEnabled = true;
     }

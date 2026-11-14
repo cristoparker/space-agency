@@ -27,13 +27,33 @@ public class LaunchSequence : MonoBehaviour
         if (Running) return false;
         var dep = DeploymentManager.Instance;
         if (dep == null || dep.PadRocket == null || !MissionObjectives.LaunchAllowed(dep)) return false;
+        var route = TeamSync.Route(TeamRole.Safety, TeamAction.Launch);          // shared game: the Safety officer gives the GO, the host flies it
+        if (route != TeamSync.RouteResult.Local) return route == TeamSync.RouteResult.Sent;
         if (inst == null) inst = new GameObject("Launch Sequence").AddComponent<LaunchSequence>();
         var mission = MissionManager.Instance != null && dep.Current != null && !string.IsNullOrEmpty(dep.Current.missionId)
             ? MissionManager.Instance.Running.FirstOrDefault(x => x.Definition.id == dep.Current.missionId)?.Definition : null;
         inst.record = dep.library != null && dep.Current != null ? FlightOutcome.Evaluate(dep.Current, dep.library, mission) : new FlightRecord();
         inst.profile = FlightOutcome.LastProfile;
+        TeamSync.HostLaunched(inst.record);
         inst.StartCoroutine(inst.Run(dep));
         return true;
+    }
+
+    /// <summary>A guest in a shared game watches the host's launch: same rocket, same path, the host's result.</summary>
+    public static void Spectate(FlightRecord hostRecord)
+    {
+        if (Running || hostRecord == null) return;
+        var dep = DeploymentManager.Instance;
+        if (dep == null) return;
+        if (dep.PadRocket == null) dep.ReloadFromSave();
+        if (dep.PadRocket == null || dep.Current == null) { Hud.Toast("Liftoff! \"" + hostRecord.rocketName + "\" is on its way."); return; }
+        if (inst == null) inst = new GameObject("Launch Sequence").AddComponent<LaunchSequence>();
+        var mission = MissionManager.Instance != null && !string.IsNullOrEmpty(dep.Current.missionId)
+            ? MissionManager.Instance.Running.FirstOrDefault(x => x.Definition.id == dep.Current.missionId)?.Definition : null;
+        if (dep.library != null) FlightOutcome.Evaluate(dep.Current, dep.library, mission);     // only for the flight path (it does not depend on luck)
+        inst.record = hostRecord;
+        inst.profile = FlightOutcome.LastProfile;
+        inst.StartCoroutine(inst.Run(dep));
     }
 
     // ---------------------------------------------------------------- the show

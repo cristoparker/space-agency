@@ -35,6 +35,22 @@ public class RocketConstruction : MonoBehaviour
     void OnApplicationQuit() => Save();
 
     void Save() { if (Current != null) PlayerPrefs.SetString(Key, JsonUtility.ToJson(Current)); else PlayerPrefs.DeleteKey(Key); }
+    public void SaveNow() => Save();
+
+    /// <summary>A shared game's host changed the save: take over its construction job. The Engineer picks the date when it is done.</summary>
+    public void ReloadFromSave()
+    {
+        bool wasReady = Current != null && Current.ready;
+        ConstructionJob j = null;
+        try { j = JsonUtility.FromJson<ConstructionJob>(PlayerPrefs.GetString(Key, "")); } catch { /* nothing saved */ }
+        Current = j != null && !string.IsNullOrEmpty(j.design) ? j : null;
+        Changed?.Invoke();
+        if (Current != null && Current.ready && !wasReady && NetSession.MayAct(TeamRole.Engineer, false))
+        {
+            Hud.Toast("\"" + Current.rocketName + "\" is built. Choose its launch date.");
+            LaunchDateUI.Show();
+        }
+    }
 
     public bool Building => Current != null && !Current.ready;
     public bool WaitingForDate => Current != null && Current.ready;
@@ -69,6 +85,7 @@ public class RocketConstruction : MonoBehaviour
     bool checkedStale;
     void Update()
     {
+        if (TeamSync.Mirror) return;                                   // a guest's construction follows the host's save
         // A job that belongs to a contract which is no longer running (an old game, a declined contract) is a leftover: drop it, so the builder never
         // says "a rocket is already under construction / waiting" when nothing is really being built.
         if (!checkedStale && Current != null && MissionManager.Instance != null && Time.unscaledTime > 1.5f)
@@ -90,8 +107,12 @@ public class RocketConstruction : MonoBehaviour
         if (Current.remaining <= 0f)
         {
             Current.remaining = 0f; Current.ready = true; Save(); Changed?.Invoke();
-            Hud.Toast("\"" + Current.rocketName + "\" is built. Choose its launch date.");
-            LaunchDateUI.Show();
+            if (NetSession.MayAct(TeamRole.Engineer, false))
+            {
+                Hud.Toast("\"" + Current.rocketName + "\" is built. Choose its launch date.");
+                LaunchDateUI.Show();
+            }
+            else Hud.Toast("\"" + Current.rocketName + "\" is built. The Engineer chooses its launch date.");
         }
     }
 
@@ -99,6 +120,7 @@ public class RocketConstruction : MonoBehaviour
     public void Finish(DateTime date)
     {
         if (Current == null || !Current.ready || DeploymentManager.Instance == null) return;
+        if (TeamSync.Route(TeamRole.Engineer, TeamAction.FinishRocket, date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)) != TeamSync.RouteResult.Local) return;
         var design = RocketDesign.FromJson(Current.design);
         MissionDefinition mission = null;
         var mm = MissionManager.Instance;
