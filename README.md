@@ -20,6 +20,20 @@ In Space Mission Tycoon, the player runs a space agency. They take contracts fro
 
 The game can be played alone, or by a team of up to four friends over Steam. In team play, each player takes a role (Engineer, Scientist, Finance or Safety) and the team runs one agency together.
 
+## Key Facts
+
+| | |
+| --- | --- |
+| Players | 1 to 4 (single player, or team play over Steam) |
+| Maximum players in team play | **4** (one host and up to three guests) |
+| Team roles | **Engineer**, **Scientist**, **Finance**, **Safety** (one player per role; a free role can be done by anyone) |
+| Multiplayer system | Host-authoritative shared agency, built with PurrNet and Steamworks.NET over Steam peer-to-peer |
+| Missions | 12, from Earth orbit to the Moon and Mars |
+| Rocket parts | More than 50, in three sizes |
+| Engine | Unity 6 (6000.6.5f1), C# |
+
+See [Team Play (Multiplayer)](#team-play-multiplayer) for the full details.
+
 ## Team
 
 | Name | Role |
@@ -158,6 +172,16 @@ The game clock starts from the real current time in Dhaka, Bangladesh. The playe
 ## Team Play (Multiplayer)
 
 Up to **four players** run one agency together over Steam. This answers the challenge's call for teams of up to four with different responsibilities.
+
+| Multiplayer at a glance | |
+| --- | --- |
+| Maximum players | 4: one host and up to three guests. A fifth player is turned away with the message "The agency is full (4 players)." |
+| Roles | 4: Engineer, Scientist, Finance, Safety. Each player can hold one role; a role nobody holds can be done by anyone. |
+| How players connect | Steam friends list, friends-only Steam lobby, Steam invites, or joining from a friend's Steam profile |
+| Who runs the game | The host. Guests see the host's agency live and send their actions to the host, which checks the player's role. |
+| Chat | Team chat in the lobby and during the game |
+| Joining late | A friend can join a game that has already started |
+| Testing on one computer | ParrelSync clone, connected over the local network |
 
 ### Getting together
 
